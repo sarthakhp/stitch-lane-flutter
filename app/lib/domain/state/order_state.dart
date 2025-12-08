@@ -1,0 +1,60 @@
+import 'package:flutter/foundation.dart';
+import '../../backend/models/order.dart';
+import '../../backend/models/order_status.dart';
+
+class OrderState extends ChangeNotifier {
+  List<Order> _orders = [];
+  bool _isLoading = false;
+  String? _error;
+
+  List<Order> get orders => List.unmodifiable(_orders);
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  int getPendingOrderCount(String customerId) {
+    return _orders
+        .where((order) =>
+            order.customerId == customerId &&
+            order.status == OrderStatus.pending)
+        .length;
+  }
+
+  void setOrders(List<Order> orders) {
+    _orders = orders;
+    notifyListeners();
+  }
+
+  void setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  void setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  void addOrder(Order order) {
+    _orders.add(order);
+    notifyListeners();
+  }
+
+  void updateOrder(Order order) {
+    final index = _orders.indexWhere((o) => o.id == order.id);
+    if (index != -1) {
+      _orders[index] = order;
+      notifyListeners();
+    }
+  }
+
+  void removeOrder(String id) {
+    _orders.removeWhere((o) => o.id == id);
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+}
+
