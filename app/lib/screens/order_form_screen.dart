@@ -210,6 +210,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        FocusManager.instance.primaryFocus?.unfocus();
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) {
           Navigator.pop(context);
@@ -219,13 +220,17 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         appBar: AppBar(
           title: Text(_isEditing ? 'Edit Order' : 'Add Order'),
         ),
-        body: Consumer<CustomerState>(
-        builder: (context, customerState, child) {
-          return Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(AppConfig.spacing16),
-              children: [
+        body: GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: Consumer<CustomerState>(
+            builder: (context, customerState, child) {
+              return Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(AppConfig.spacing16),
+                  children: [
                 DropdownMenu<Customer>(
                   width: MediaQuery.of(context).size.width - (AppConfig.spacing16 * 2),
                   enabled: !_isEditing && !_isLoading,
@@ -345,8 +350,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           ],
         ),
       );
-        },
-      ),
+            },
+          ),
+        ),
       ),
     );
   }

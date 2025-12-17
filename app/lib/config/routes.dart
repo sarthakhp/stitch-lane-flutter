@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/login_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/customers_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
@@ -13,6 +14,11 @@ import '../constants/app_constants.dart';
 class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case AppConstants.loginRoute:
+        return MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        );
+
       case AppConstants.homeRoute:
         return MaterialPageRoute(
           builder: (_) => const HomeScreen(),

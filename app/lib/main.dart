@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
@@ -7,6 +9,9 @@ import 'constants/app_constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await DatabaseService.initialize();
   runApp(const StitchLaneApp());
 }
@@ -18,6 +23,7 @@ class StitchLaneApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider(create: (_) => CustomerState()),
         Provider<CustomerRepository>(
           create: (_) => HiveCustomerRepository(),
@@ -48,14 +54,28 @@ class _AppInitializerState extends State<AppInitializer> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadInitialSettings();
+      _initializeApp();
     });
   }
 
-  Future<void> _loadInitialSettings() async {
+  Future<void> _initializeApp() async {
+    final authState = context.read<AuthState>();
+    final currentUser = AuthService.getCurrentUser();
+
+    if (currentUser != null) {
+      authState.setUser(currentUser);
+    }
+
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
     await SettingsService.loadSettings(settingsState, settingsRepository);
+  }
+
+  String _getInitialRoute() {
+    final authState = context.watch<AuthState>();
+    return authState.isAuthenticated
+        ? AppConstants.homeRoute
+        : AppConstants.loginRoute;
   }
 
   @override
@@ -86,7 +106,7 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
       ),
       themeMode: ThemeMode.system,
-      initialRoute: AppConstants.homeRoute,
+      initialRoute: _getInitialRoute(),
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

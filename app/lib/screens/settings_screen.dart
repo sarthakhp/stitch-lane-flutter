@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
+import 'widgets/confirmation_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -155,6 +157,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           )
                         : const Text('Save Settings'),
                   ),
+                  const SizedBox(height: AppConfig.spacing48),
+                  Consumer<AuthState>(
+                    builder: (context, authState, child) {
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppConfig.spacing16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Account',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: AppConfig.spacing16),
+                              if (authState.userEmail != null) ...[
+                                ListTile(
+                                  leading: const Icon(Icons.email),
+                                  title: const Text('Email'),
+                                  subtitle: Text(authState.userEmail!),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                const SizedBox(height: AppConfig.spacing8),
+                              ],
+                              if (authState.userName != null) ...[
+                                ListTile(
+                                  leading: const Icon(Icons.person),
+                                  title: const Text('Name'),
+                                  subtitle: Text(authState.userName!),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                const SizedBox(height: AppConfig.spacing16),
+                              ],
+                              const Divider(),
+                              const SizedBox(height: AppConfig.spacing16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: authState.isLoading ? null : () => _handleSignOut(context),
+                                  icon: const Icon(Icons.logout),
+                                  label: const Text('Sign Out'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -162,6 +215,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _handleSignOut(BuildContext context) async {
+    final confirmed = await ConfirmationDialog.show(
+      context: context,
+      title: 'Sign Out',
+      content: 'Are you sure you want to sign out?',
+      confirmText: 'Sign Out',
+    );
+
+    if (confirmed && context.mounted) {
+      final authState = context.read<AuthState>();
+      await AuthService.signOut(authState);
+
+      if (context.mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppConstants.loginRoute,
+          (route) => false,
+        );
+      }
+    }
   }
 }
 

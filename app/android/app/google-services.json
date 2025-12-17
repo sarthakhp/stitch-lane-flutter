@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1036651729586",
+    "project_id": "stitch-lane-flutter",
+    "storage_bucket": "stitch-lane-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1036651729586:android:20aadeefa18a5ee7c56fab",
+        "android_client_info": {
+          "package_name": "com.stitchlane.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpJ7OreeXBaJBcMJOgRljdKQYcPGKvhrY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

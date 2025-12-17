@@ -151,6 +151,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        FocusManager.instance.primaryFocus?.unfocus();
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) {
           Navigator.pop(context);
@@ -160,11 +161,15 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         appBar: AppBar(
           title: Text(_isEditing ? 'Edit Customer' : 'Add Customer'),
         ),
-        body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(AppConfig.spacing16),
-          children: [
+        body: GestureDetector(
+          onTap: () {
+            FocusScope.of(context).unfocus();
+          },
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(AppConfig.spacing16),
+              children: [
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -238,7 +243,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             ),
           ],
         ),
-      ),
+          ),
+        ),
       ),
     );
   }
