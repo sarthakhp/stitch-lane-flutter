@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Documentation (project-specific)
+*.md.backup
+
