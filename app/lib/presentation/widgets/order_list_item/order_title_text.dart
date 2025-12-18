@@ -21,10 +21,6 @@ class OrderTitleText extends StatelessWidget {
       return Text(customerName!, style: titleStyle);
     }
 
-    if (order.title != null && order.title!.isNotEmpty) {
-      return Text(order.title!, style: titleStyle);
-    }
-
     return const SizedBox.shrink();
   }
 }

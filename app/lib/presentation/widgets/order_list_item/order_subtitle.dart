@@ -45,22 +45,20 @@ class OrderSubtitle extends StatelessWidget {
               ),
         ),
         const SizedBox(height: AppConfig.spacing4),
-        if (customerName != null && 
-            order.title != null && 
-            order.title!.isNotEmpty) ...[
+        Text(
+          'Due: ${_formatDate(order.dueDate)}',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: isDueSoon ? colorScheme.error : null,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (order.title != null && order.title!.isNotEmpty) ...[
+          const SizedBox(height: AppConfig.spacing4),
           Text(
             'Title: ${order.title!}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: AppConfig.spacing4),
         ],
-        Text(
-          'Due: ${_formatDate(order.dueDate)}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isDueSoon ? colorScheme.error : null,
-            fontWeight: isDueSoon ? FontWeight.w600 : null,
-          ),
-        ),
         if (descriptionPreview != null) ...[
           const SizedBox(height: AppConfig.spacing4),
           Text(

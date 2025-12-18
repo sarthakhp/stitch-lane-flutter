@@ -275,6 +275,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               label: const Text('View Orders'),
                             ),
                           ),
+                          const SizedBox(height: AppConfig.spacing8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppConstants.orderFormRoute,
+                                  arguments: {'customer': customer},
+                                );
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Create Order'),
+                            ),
+                          ),
                           if (hasPhone) ...[
                             const SizedBox(height: AppConfig.spacing8),
                             ContactActionButtons(

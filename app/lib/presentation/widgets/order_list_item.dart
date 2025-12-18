@@ -9,6 +9,7 @@ import 'order_list_item/order_subtitle.dart';
 class OrderListItem extends StatelessWidget {
   final Order order;
   final VoidCallback onTap;
+  final VoidCallback onStatusToggle;
   final String? customerName;
   final int dueDateWarningThreshold;
 
@@ -16,6 +17,7 @@ class OrderListItem extends StatelessWidget {
     super.key,
     required this.order,
     required this.onTap,
+    required this.onStatusToggle,
     this.customerName,
     required this.dueDateWarningThreshold,
   });
@@ -44,7 +46,11 @@ class OrderListItem extends StatelessWidget {
           horizontal: AppConfig.spacing16,
           vertical: AppConfig.spacing8,
         ),
-        leading: OrderStatusAvatar(status: order.status),
+        leading: InkWell(
+          onTap: onStatusToggle,
+          borderRadius: BorderRadius.circular(20),
+          child: OrderStatusAvatar(status: order.status),
+        ),
         title: OrderTitleText(
           order: order,
           customerName: customerName,

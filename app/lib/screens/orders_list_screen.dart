@@ -62,6 +62,40 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     });
   }
 
+  Future<void> _toggleOrderStatus(Order order) async {
+    final state = context.read<OrderState>();
+    final repository = context.read<OrderRepository>();
+
+    try {
+      final newStatus = order.status == OrderStatus.done
+          ? OrderStatus.pending
+          : OrderStatus.done;
+
+      final updatedOrder = order.copyWith(status: newStatus);
+
+      await OrderService.updateOrder(state, repository, updatedOrder);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(milliseconds: 800),
+            content: Text(
+              newStatus == OrderStatus.done
+                  ? 'Order marked as done'
+                  : 'Order marked as pending',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update order status: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,13 +193,14 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                       arguments: {'order': order, 'customer': customer},
                     );
                   },
+                  onStatusToggle: () => _toggleOrderStatus(order),
                 );
               },
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.pushNamed(
             context,
@@ -175,7 +210,8 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                 : <String, dynamic>{},
           );
         },
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Create Order'),
       ),
     );
   }
