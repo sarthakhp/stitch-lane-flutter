@@ -74,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: DashboardStatsCard(
                         icon: Icons.currency_rupee,
                         label: 'Unpaid Amount',
-                        value: '₹$unpaidAmount',
+                        value: '$unpaidAmount',
                         valueColor: Theme.of(context).colorScheme.error,
                       ),
                     ),

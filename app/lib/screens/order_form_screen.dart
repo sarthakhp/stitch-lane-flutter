@@ -7,6 +7,7 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
+import '../presentation/widgets/order_images_section.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -33,6 +34,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   Customer? _selectedCustomer;
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
+  List<String> _imagePaths = [];
 
   bool get _isEditing => widget.order != null;
 
@@ -49,10 +51,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _valueController.text = widget.order!.value.toString();
       _isPaid = widget.order!.isPaid;
       _selectedDueDate = widget.order!.dueDate;
+      _imagePaths = List.from(widget.order!.imagePaths);
     } else {
       _valueController.text = '0';
       _isPaid = false;
       _selectedDueDate = DateTime.now();
+      _imagePaths = [];
     }
     _titleController.addListener(_onFieldChanged);
     _descriptionController.addListener(_onFieldChanged);
@@ -181,6 +185,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         status: _isEditing ? widget.order!.status : OrderStatus.pending,
         value: valueInt,
         isPaid: _isPaid,
+        imagePaths: _imagePaths,
       );
 
       if (_isEditing) {
@@ -250,38 +255,101 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.all(AppConfig.spacing16),
                         children: [
-                DropdownMenu<Customer>(
-                  width: MediaQuery.of(context).size.width - (AppConfig.spacing16 * 2),
-                  enabled: !_isEditing && !_isLoading,
-                  label: const Text('Customer'),
-                  hintText: 'Search and select customer...',
-                  enableFilter: true,
-                  enableSearch: true,
-                  requestFocusOnTap: true,
-                  leadingIcon: const Icon(Icons.person),
-                  initialSelection: _selectedCustomer,
-                  errorText: _hasAttemptedSubmit && _selectedCustomer == null
-                      ? 'Please select a customer'
-                      : null,
-                  onSelected: (Customer? customer) {
+                Autocomplete<Customer>(
+                  initialValue: _selectedCustomer != null
+                      ? TextEditingValue(text: _selectedCustomer!.name)
+                      : const TextEditingValue(),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return customerState.customers;
+                    }
+                    return customerState.customers.where((Customer customer) {
+                      return customer.name
+                          .toLowerCase()
+                          .contains(textEditingValue.text.toLowerCase()) ||
+                          (customer.phoneNumber?.contains(textEditingValue.text) ?? false);
+                    });
+                  },
+                  displayStringForOption: (Customer customer) => customer.name,
+                  fieldViewBuilder: (
+                    BuildContext context,
+                    TextEditingController textEditingController,
+                    FocusNode focusNode,
+                    VoidCallback onFieldSubmitted,
+                  ) {
+                    return TextFormField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      enabled: !_isEditing && !_isLoading,
+                      decoration: InputDecoration(
+                        labelText: 'Customer',
+                        hintText: 'Search customer by name or phone...',
+                        prefixIcon: const Icon(Icons.person),
+                        border: const OutlineInputBorder(),
+                        errorText: _hasAttemptedSubmit && _selectedCustomer == null
+                            ? 'Please select a customer'
+                            : null,
+                        suffixIcon: _selectedCustomer != null
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedCustomer = null;
+                                    _hasUnsavedChanges = true;
+                                  });
+                                  textEditingController.clear();
+                                  focusNode.requestFocus();
+                                },
+                              )
+                            : null,
+                      ),
+                      onFieldSubmitted: (String value) {
+                        onFieldSubmitted();
+                      },
+                    );
+                  },
+                  optionsViewBuilder: (
+                    BuildContext context,
+                    AutocompleteOnSelected<Customer> onSelected,
+                    Iterable<Customer> options,
+                  ) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 200,
+                            maxWidth: 400,
+                          ),
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final Customer customer = options.elementAt(index);
+                              return ListTile(
+                                title: Text(customer.name),
+                                subtitle: customer.phoneNumber != null
+                                    ? Text(customer.phoneNumber!)
+                                    : null,
+                                onTap: () {
+                                  onSelected(customer);
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  onSelected: (Customer customer) {
                     setState(() {
                       _selectedCustomer = customer;
                       _hasUnsavedChanges = true;
                     });
+                    FocusScope.of(context).unfocus();
                   },
-                  dropdownMenuEntries: customerState.customers.map((customer) {
-                    return DropdownMenuEntry<Customer>(
-                      value: customer,
-                      label: customer.name,
-                      labelWidget: ListTile(
-                        title: Text(customer.name),
-                        subtitle: customer.phoneNumber != null
-                            ? Text(customer.phoneNumber!)
-                            : const Text('No phone'),
-                        dense: true,
-                      ),
-                    );
-                  }).toList(),
                 ),
                 const SizedBox(height: AppConfig.spacing16),
                 TextFormField(
@@ -381,6 +449,16 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       : Theme.of(context).colorScheme.outline,
                 ),
               ),
+            ),
+            const SizedBox(height: AppConfig.spacing16),
+            OrderImagesSection(
+              imagePaths: _imagePaths,
+              onImagesChanged: (updatedPaths) {
+                setState(() {
+                  _imagePaths = updatedPaths;
+                  _hasUnsavedChanges = true;
+                });
+              },
             ),
           ],
                       ),

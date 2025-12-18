@@ -2,6 +2,7 @@ import '../../backend/models/order.dart';
 import '../../backend/models/order_status.dart';
 import '../../backend/repositories/order_repository.dart';
 import '../state/order_state.dart';
+import 'image_storage_service.dart';
 
 class OrderService {
   static Future<void> loadOrders(
@@ -86,6 +87,12 @@ class OrderService {
     state.clearError();
 
     try {
+      final order = state.orders.firstWhere((o) => o.id == id);
+
+      if (order.imagePaths.isNotEmpty) {
+        await ImageStorageService.deleteImages(order.imagePaths);
+      }
+
       await repository.deleteOrder(id);
       state.removeOrder(id);
     } catch (e) {

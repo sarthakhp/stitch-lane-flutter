@@ -8,8 +8,9 @@ import '../../utils/app_logger.dart';
 class DriveService {
   static const String appFolderName = 'Stitch Lane';
   static const String backupFileName = 'stitch_lane_backup.json';
+  static const String imagesFolderName = 'images';
 
-  static Future<drive.DriveApi> _getDriveApi() async {
+  static Future<drive.DriveApi> getDriveApi() async {
     try {
       AppLogger.info('Attempting to get Drive API access...');
 
@@ -65,7 +66,7 @@ class DriveService {
 
   static Future<void> uploadBackup(String jsonData) async {
     AppLogger.info('Starting backup upload...');
-    final driveApi = await _getDriveApi();
+    final driveApi = await getDriveApi();
     final folderId = await _getAppDataFolderId(driveApi);
 
     if (folderId == null) {
@@ -103,7 +104,7 @@ class DriveService {
   }
 
   static Future<String?> downloadBackup() async {
-    final driveApi = await _getDriveApi();
+    final driveApi = await getDriveApi();
     final folderId = await _getAppDataFolderId(driveApi);
 
     if (folderId == null) {
@@ -131,7 +132,7 @@ class DriveService {
 
   static Future<BackupInfo?> getBackupInfo() async {
     try {
-      final driveApi = await _getDriveApi();
+      final driveApi = await getDriveApi();
       final folderId = await _getAppDataFolderId(driveApi);
 
       if (folderId == null) {
@@ -149,9 +150,17 @@ class DriveService {
       }
 
       final file = fileList.files!.first;
+      final backupSize = int.tryParse(file.size ?? '0') ?? 0;
+
+      final images = await DriveServiceImageOperations.listImagesInFolder(driveApi);
+      final imagesSize = images.fold<int>(
+        0,
+        (sum, img) => sum + (int.tryParse(img['size']?.toString() ?? '0') ?? 0),
+      );
+
       return BackupInfo(
         lastModified: file.modifiedTime ?? DateTime.now(),
-        size: int.tryParse(file.size ?? '0') ?? 0,
+        size: backupSize + imagesSize,
       );
     } catch (e) {
       return null;
@@ -175,3 +184,120 @@ class BackupInfo {
   }
 }
 
+extension DriveServiceImageOperations on DriveService {
+  static Future<String?> _getImagesFolderId(drive.DriveApi driveApi) async {
+    final folderId = await DriveService._getAppDataFolderId(driveApi);
+    if (folderId == null) return null;
+
+    final fileList = await driveApi.files.list(
+      q: "name='${DriveService.imagesFolderName}' and '$folderId' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id, name)',
+    );
+
+    if (fileList.files != null && fileList.files!.isNotEmpty) {
+      return fileList.files!.first.id;
+    }
+
+    final folderMetadata = drive.File()
+      ..name = DriveService.imagesFolderName
+      ..mimeType = 'application/vnd.google-apps.folder'
+      ..parents = [folderId];
+
+    final folder = await driveApi.files.create(
+      folderMetadata,
+      $fields: 'id',
+    );
+
+    AppLogger.info('Created images folder: ${folder.id}');
+    return folder.id;
+  }
+
+  static Future<List<Map<String, dynamic>>> listImagesInFolder(drive.DriveApi driveApi) async {
+    final imagesFolderId = await _getImagesFolderId(driveApi);
+    if (imagesFolderId == null) return [];
+
+    final fileList = await driveApi.files.list(
+      q: "'$imagesFolderId' in parents and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id, name, size, modifiedTime)',
+    );
+
+    if (fileList.files == null || fileList.files!.isEmpty) {
+      return [];
+    }
+
+    return fileList.files!.map((file) => {
+      'id': file.id,
+      'name': file.name,
+      'size': file.size,
+      'modifiedTime': file.modifiedTime,
+    }).toList();
+  }
+
+  static Future<void> uploadImage(drive.DriveApi driveApi, String fileName, List<int> imageBytes) async {
+    final imagesFolderId = await _getImagesFolderId(driveApi);
+    if (imagesFolderId == null) {
+      throw Exception('Failed to access images folder');
+    }
+
+    final fileList = await driveApi.files.list(
+      q: "name='$fileName' and '$imagesFolderId' in parents and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id)',
+    );
+
+    final media = drive.Media(
+      Stream.value(imageBytes),
+      imageBytes.length,
+    );
+
+    if (fileList.files != null && fileList.files!.isNotEmpty) {
+      await driveApi.files.update(
+        drive.File(),
+        fileList.files!.first.id!,
+        uploadMedia: media,
+      );
+      AppLogger.info('Updated existing image: $fileName');
+    } else {
+      final fileMetadata = drive.File()
+        ..name = fileName
+        ..parents = [imagesFolderId];
+
+      await driveApi.files.create(
+        fileMetadata,
+        uploadMedia: media,
+      );
+      AppLogger.info('Uploaded new image: $fileName');
+    }
+  }
+
+  static Future<List<int>?> downloadImage(drive.DriveApi driveApi, String fileId) async {
+    try {
+      final media = await driveApi.files.get(
+        fileId,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media;
+
+      final List<int> dataStore = [];
+      await for (var data in media.stream) {
+        dataStore.addAll(data);
+      }
+
+      return dataStore;
+    } catch (e) {
+      AppLogger.error('Failed to download image', e);
+      return null;
+    }
+  }
+
+  static Future<void> deleteImageFromDrive(drive.DriveApi driveApi, String fileId) async {
+    try {
+      await driveApi.files.delete(fileId);
+      AppLogger.info('Deleted image from Drive: $fileId');
+    } catch (e) {
+      AppLogger.error('Failed to delete image from Drive', e);
+      rethrow;
+    }
+  }
+}

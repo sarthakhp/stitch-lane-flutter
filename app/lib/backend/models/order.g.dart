@@ -23,16 +23,17 @@ class OrderAdapter extends TypeAdapter<Order> {
       dueDate: fields[3] as DateTime,
       description: fields[4] as String?,
       created: fields[5] as DateTime,
-      status: fields[6] as OrderStatus,
-      value: fields[7] as int,
-      isPaid: fields[8] as bool,
+      status: fields[6] as OrderStatus? ?? OrderStatus.pending,
+      value: fields[7] as int? ?? 0,
+      isPaid: fields[8] as bool? ?? false,
+      imagePaths: fields[9] != null ? (fields[9] as List).cast<String>() : [],
     );
   }
 
   @override
   void write(BinaryWriter writer, Order obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class OrderAdapter extends TypeAdapter<Order> {
       ..writeByte(7)
       ..write(obj.value)
       ..writeByte(8)
-      ..write(obj.isPaid);
+      ..write(obj.isPaid)
+      ..writeByte(9)
+      ..write(obj.imagePaths);
   }
 
   @override

@@ -339,13 +339,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       backupState.setLoading(true);
-      backupState.setProgress(0.3);
+      backupState.setProgress(0.2);
 
       final backupJson = await BackupService.createBackup();
 
-      backupState.setProgress(0.6);
+      backupState.setProgress(0.4);
 
       await DriveService.uploadBackup(backupJson);
+
+      backupState.setProgress(0.6);
+
+      await ImageSyncService.syncImagesToDrive();
 
       backupState.setProgress(0.9);
 
@@ -402,12 +406,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final metadata = BackupService.getBackupMetadata(backupJson);
 
+      final driveApi = await DriveService.getDriveApi();
+      final images = await DriveServiceImageOperations.listImagesInFolder(driveApi);
+      final imageCount = images.length;
+
       if (!context.mounted) return;
 
       final confirmed = await ConfirmationDialog.show(
         context: context,
         title: 'Restore from Backup',
-        content: 'This will replace all current data with the backup from ${_formatDate(DateTime.parse(metadata['timestamp']))}.\n\nBackup contains:\n• ${metadata['customerCount']} customers\n• ${metadata['orderCount']} orders\n• ${metadata['measurementCount']} measurements\n\nThis action cannot be undone.',
+        content: 'This will replace all current data with the backup from ${_formatDate(DateTime.parse(metadata['timestamp']))}.\n\nBackup contains:\n• ${metadata['customerCount']} customers\n• ${metadata['orderCount']} orders\n• ${metadata['measurementCount']} measurements\n• $imageCount images\n\nThis action cannot be undone.',
         confirmText: 'Restore',
         cancelText: 'Cancel',
       );

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:hive/hive.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
+import 'image_sync_service.dart';
+import '../../utils/app_logger.dart';
 
 class BackupService {
   static const String _backupVersion = '1.0.0';
@@ -69,6 +71,14 @@ class BackupService {
     await _restoreOrders(boxes, ordersBox);
     await _restoreMeasurements(boxes, measurementsBox);
     await _restoreSettings(boxes, settingsBox);
+
+    try {
+      AppLogger.info('Starting image download from Drive after restore');
+      await ImageSyncService.downloadImagesFromDrive();
+      AppLogger.info('Images restored successfully');
+    } catch (e) {
+      AppLogger.error('Failed to restore images from Drive', e);
+    }
   }
 
   static Future<void> _restoreCustomers(

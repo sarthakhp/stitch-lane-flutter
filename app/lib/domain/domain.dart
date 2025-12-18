@@ -9,6 +9,8 @@ export 'services/backup_service.dart';
 export 'services/contacts_service.dart';
 export 'services/customer_service.dart';
 export 'services/drive_service.dart';
+export 'services/image_storage_service.dart';
+export 'services/image_sync_service.dart';
 export 'services/order_service.dart';
 export 'services/measurement_service.dart';
 export 'services/settings_service.dart';

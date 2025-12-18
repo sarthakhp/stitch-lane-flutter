@@ -9,6 +9,7 @@ import '../presentation/widgets/order_detail_card.dart';
 import '../presentation/widgets/order_status_toggle.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
+import '../presentation/widgets/order_images_section.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
@@ -169,7 +170,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     OrderDetailCard(
                       icon: Icons.currency_rupee,
                       label: 'Order Value',
-                      value: '₹${order.value}',
+                      value: '${order.value}',
                     ),
                     const SizedBox(height: AppConfig.spacing16),
                     Card(
@@ -230,6 +231,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       icon: Icons.access_time,
                       label: 'Created',
                       value: _formatDate(order.created),
+                    ),
+                    const SizedBox(height: AppConfig.spacing16),
+                    OrderImagesSection(
+                      imagePaths: order.imagePaths,
+                      onImagesChanged: (updatedPaths) async {
+                        final state = context.read<OrderState>();
+                        final repository = context.read<OrderRepository>();
+                        final updatedOrder = order.copyWith(imagePaths: updatedPaths);
+                        try {
+                          await OrderService.updateOrder(state, repository, updatedOrder);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to update images: $e')),
+                            );
+                          }
+                        }
+                      },
                     ),
                         ],
                       ),

@@ -31,11 +31,15 @@ class DashboardStatsCard extends StatelessWidget {
               color: colorScheme.primary,
             ),
             const SizedBox(height: AppConfig.spacing8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: valueColor ?? colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: valueColor ?? colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
               ),
             ),
             const SizedBox(height: AppConfig.spacing4),

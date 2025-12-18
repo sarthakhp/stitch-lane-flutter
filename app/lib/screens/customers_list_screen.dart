@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:stitch_lane_app/utils/app_logger.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../presentation/presentation.dart';
 import '../constants/app_constants.dart';
 import '../utils/utils.dart';
+
+enum CustomerSort {
+  dueDate,
+  orderCount,
+  pendingAmount,
+}
 
 class CustomersListScreen extends StatefulWidget {
   const CustomersListScreen({super.key});
@@ -15,6 +22,7 @@ class CustomersListScreen extends StatefulWidget {
 
 class _CustomersListScreenState extends State<CustomersListScreen> {
   String _searchQuery = '';
+  CustomerSort _selectedSort = CustomerSort.dueDate;
 
   @override
   void initState() {
@@ -54,17 +62,81 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
     });
   }
 
+  DateTime? _getEarliestDueDate(String customerId, List<Order> orders) {
+    final customerOrders = orders
+        .where((order) => order.customerId == customerId && order.status == OrderStatus.pending)
+        .toList();
+
+    if (customerOrders.isEmpty) return null;
+
+
+    customerOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    return customerOrders.first.dueDate;
+  }
+
+  int _getOrderCount(String customerId, List<Order> orders) {
+    return orders.where((order) => order.customerId == customerId).length;
+  }
+
+  int _getTotalPendingAmount(String customerId, List<Order> orders) {
+    return orders
+        .where((order) => order.customerId == customerId && !order.isPaid)
+        .fold(0, (sum, order) => sum + order.value);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customers'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: SearchBarWidget(
-            hintText: 'Search customers...',
-            onSearchChanged: _onSearchChanged,
-            onClear: _onClearSearch,
+          preferredSize: const Size.fromHeight(120),
+          child: Column(
+            children: [
+              SearchBarWidget(
+                hintText: 'Search customers...',
+                onSearchChanged: _onSearchChanged,
+                onClear: _onClearSearch,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.sort, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<CustomerSort>(
+                          value: _selectedSort,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(
+                              value: CustomerSort.dueDate,
+                              child: Text('Sort by: Due Date'),
+                            ),
+                            DropdownMenuItem(
+                              value: CustomerSort.orderCount,
+                              child: Text('Sort by: Pending Orders'),
+                            ),
+                            DropdownMenuItem(
+                              value: CustomerSort.pendingAmount,
+                              child: Text('Sort by: Pending Amount'),
+                            ),
+                          ],
+                          onChanged: (CustomerSort? value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedSort = value;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -90,7 +162,38 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
               customerState.customers,
               _searchQuery,
             ),
-          )..sort((a, b) => b.created.compareTo(a.created));
+          );
+
+          final orders = orderState.orders;
+
+          switch (_selectedSort) {
+            case CustomerSort.dueDate:
+              filteredCustomers.sort((a, b) {
+                final aDueDate = _getEarliestDueDate(a.id, orders);
+                final bDueDate = _getEarliestDueDate(b.id, orders);
+
+                if (aDueDate == null && bDueDate == null) return 0;
+                if (aDueDate == null) return 1;
+                if (bDueDate == null) return -1;
+
+                return aDueDate.compareTo(bDueDate);
+              });
+              break;
+            case CustomerSort.orderCount:
+              filteredCustomers.sort((a, b) {
+                final aCount = _getOrderCount(a.id, orders);
+                final bCount = _getOrderCount(b.id, orders);
+                return bCount.compareTo(aCount);
+              });
+              break;
+            case CustomerSort.pendingAmount:
+              filteredCustomers.sort((a, b) {
+                final aAmount = _getTotalPendingAmount(a.id, orders);
+                final bAmount = _getTotalPendingAmount(b.id, orders);
+                return bAmount.compareTo(aAmount);
+              });
+              break;
+          }
 
           if (filteredCustomers.isEmpty) {
             return Center(

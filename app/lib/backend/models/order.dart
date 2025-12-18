@@ -32,6 +32,9 @@ class Order {
   @HiveField(8)
   final bool isPaid;
 
+  @HiveField(9)
+  final List<String> imagePaths;
+
   Order({
     required this.id,
     required this.customerId,
@@ -42,6 +45,7 @@ class Order {
     this.status = OrderStatus.pending,
     this.value = 0,
     this.isPaid = false,
+    this.imagePaths = const [],
   });
 
   Order copyWith({
@@ -54,6 +58,7 @@ class Order {
     OrderStatus? status,
     int? value,
     bool? isPaid,
+    List<String>? imagePaths,
   }) {
     return Order(
       id: id ?? this.id,
@@ -65,6 +70,7 @@ class Order {
       status: status ?? this.status,
       value: value ?? this.value,
       isPaid: isPaid ?? this.isPaid,
+      imagePaths: imagePaths ?? this.imagePaths,
     );
   }
 
@@ -79,6 +85,7 @@ class Order {
       'status': status.name,
       'value': value,
       'isPaid': isPaid,
+      'imagePaths': imagePaths,
     };
   }
 
@@ -98,12 +105,15 @@ class Order {
           : OrderStatus.pending,
       value: json['value'] as int? ?? 0,
       isPaid: json['isPaid'] as bool? ?? false,
+      imagePaths: json['imagePaths'] != null
+          ? List<String>.from(json['imagePaths'] as List)
+          : [],
     );
   }
 
   @override
   String toString() {
-    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid)';
+    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid, imagePaths: $imagePaths)';
   }
 
   @override

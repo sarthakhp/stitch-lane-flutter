@@ -6,6 +6,12 @@ import '../presentation/presentation.dart';
 import '../constants/app_constants.dart';
 import '../utils/utils.dart';
 
+enum OrderFilter {
+  all,
+  pending,
+  unpaid,
+}
+
 class OrdersListScreen extends StatefulWidget {
   final Customer? customer;
 
@@ -20,6 +26,7 @@ class OrdersListScreen extends StatefulWidget {
 
 class _OrdersListScreenState extends State<OrdersListScreen> {
   String _searchQuery = '';
+  OrderFilter _selectedFilter = OrderFilter.all;
 
   @override
   void initState() {
@@ -104,11 +111,53 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             ? '${widget.customer!.name}\'s Orders'
             : 'All Orders'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: SearchBarWidget(
-            hintText: 'Search orders...',
-            onSearchChanged: _onSearchChanged,
-            onClear: _onClearSearch,
+          preferredSize: const Size.fromHeight(120),
+          child: Column(
+            children: [
+              SearchBarWidget(
+                hintText: 'Search orders...',
+                onSearchChanged: _onSearchChanged,
+                onClear: _onClearSearch,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.filter_list, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<OrderFilter>(
+                          value: _selectedFilter,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(
+                              value: OrderFilter.all,
+                              child: Text('All Orders'),
+                            ),
+                            DropdownMenuItem(
+                              value: OrderFilter.pending,
+                              child: Text('Pending Orders'),
+                            ),
+                            DropdownMenuItem(
+                              value: OrderFilter.unpaid,
+                              child: Text('Unpaid Orders'),
+                            ),
+                          ],
+                          onChanged: (OrderFilter? value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedFilter = value;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -136,14 +185,30 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             return const EmptyOrdersState();
           }
 
-          final filteredOrders = List<Order>.from(
+          var filteredOrders = List<Order>.from(
             SearchHelper.filterOrders(
               displayOrders,
               _searchQuery,
               customers: customerState.customers,
             ),
-          // )..sort((a, b) => b.created.compareTo(a.created));
-          )..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+          );
+
+          switch (_selectedFilter) {
+            case OrderFilter.pending:
+              filteredOrders = filteredOrders
+                  .where((order) => order.status == OrderStatus.pending)
+                  .toList();
+              break;
+            case OrderFilter.unpaid:
+              filteredOrders = filteredOrders
+                  .where((order) => !order.isPaid)
+                  .toList();
+              break;
+            case OrderFilter.all:
+              break;
+          }
+
+          filteredOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
           if (filteredOrders.isEmpty) {
             return Center(
