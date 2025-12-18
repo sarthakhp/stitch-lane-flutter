@@ -173,3 +173,265 @@ provider: ^6.1.0
 
 ## Task 6: Implement Home Screen Navigation
 
+### Subtasks:
+1. **Update Home Screen**
+   - File: `app/lib/screens/home_screen.dart`
+   - Add "Show Customers" navigation tile using Card or ListTile
+   - Use Material 3 design with proper spacing (16-24px padding)
+   - Add navigation to CustomersListScreen on tap
+   - Use Icons.people or Icons.contacts for the tile icon
+
+### Files to Modify:
+- `app/lib/screens/home_screen.dart`
+
+---
+
+## Task 7: Create Customers List Screen
+
+### Subtasks:
+1. **Create Customers List Screen**
+   - File: `app/lib/screens/customers_list_screen.dart`
+   - Scaffold with AppBar titled "Customers"
+   - Consumer widget to listen to CustomerState
+   - Display loading, error, or list based on state
+   - ListView.builder for customer list items
+   - FloatingActionButton to navigate to Add Customer screen
+   - Handle empty state with EmptyCustomersState widget
+   - Pull-to-refresh functionality
+   - Keep under 150 lines (split into sections if needed)
+
+### Files to Create:
+- `app/lib/screens/customers_list_screen.dart`
+
+---
+
+## Task 8: Create Customer Detail Screen
+
+### Subtasks:
+1. **Create Customer Detail Screen**
+   - File: `app/lib/screens/customer_detail_screen.dart`
+   - Accept Customer object as parameter
+   - Scaffold with AppBar showing customer name
+   - Display full customer information in Cards:
+     - Name (with icon)
+     - Phone Number (with icon and tap-to-call functionality)
+     - Description (with icon, handle null/empty)
+   - AppBar actions: Edit and Delete IconButtons
+   - Confirmation dialog for delete action
+   - Navigate back after delete
+   - Use Material 3 spacing (16-24px)
+
+### Files to Create:
+- `app/lib/screens/customer_detail_screen.dart`
+
+---
+
+## Task 9: Create Add/Edit Customer Screen
+
+### Subtasks:
+1. **Create Customer Form Screen**
+   - File: `app/lib/screens/customer_form_screen.dart`
+   - Accept optional Customer parameter (null for add, Customer for edit)
+   - Scaffold with AppBar titled "Add Customer" or "Edit Customer"
+   - Form with GlobalKey for validation
+   - TextFormFields for:
+     - Name (required, with validator)
+     - Phone Number (required, with validator, keyboard type: phone)
+     - Description (optional, multiline)
+   - Save button (validates and saves)
+   - Cancel button (pops navigation)
+   - Use domain validators for validation
+   - Show loading indicator during save
+   - Handle errors with SnackBar
+   - Navigate back on success
+
+### Files to Create:
+- `app/lib/screens/customer_form_screen.dart`
+
+---
+
+## Task 10: Wire Up Navigation and State
+
+### Subtasks:
+1. **Update main.dart**
+   - Initialize Hive in main() before runApp()
+   - Wrap MaterialApp with MultiProvider
+   - Provide CustomerState with ChangeNotifierProvider
+   - Provide CustomerRepository instance
+   - Load initial customers on app start
+
+2. **Create Route Configuration**
+   - File: `app/lib/config/routes.dart`
+   - Define named routes for all screens
+   - Create route generator function
+   - Handle route arguments
+
+3. **Update MaterialApp**
+   - Add routes configuration
+   - Set initial route
+   - Add onGenerateRoute for dynamic routing
+
+### Files to Modify:
+- `app/lib/main.dart`
+
+### Files to Create:
+- `app/lib/config/routes.dart`
+
+---
+
+## Task 11: Testing and Verification
+
+### Subtasks:
+1. **Test on Android**
+   - Run `flutter run -d android`
+   - Test all CRUD operations
+   - Verify data persistence (close and reopen app)
+   - Test navigation flow
+   - Verify Material 3 design
+
+2. **Test on Web**
+   - Run `flutter run -d chrome`
+   - Test all CRUD operations
+   - Verify data persistence (refresh page)
+   - Test navigation flow
+   - Verify responsive design
+
+3. **Code Quality Checks**
+   - Run `flutter analyze` - ensure no issues
+   - Verify all files follow design principles:
+     - Correct folder structure
+     - No Flutter imports in domain layer
+     - No business logic in presentation layer
+     - Widgets under 150 lines
+     - Config constants used (no magic numbers)
+     - Repository pattern for data access
+     - Barrel exports created
+
+4. **Feature Verification Checklist**
+   - [ ] Home screen has "Show Customers" navigation tile
+   - [ ] Customers list displays all customers
+   - [ ] FAB adds new customer
+   - [ ] List items show name and phone preview
+   - [ ] List items have View, Edit, Delete actions
+   - [ ] Tapping customer navigates to detail screen
+   - [ ] Empty state displays when no customers
+   - [ ] Detail screen shows full customer info
+   - [ ] Detail screen has Edit and Delete buttons
+   - [ ] Form validates required fields
+   - [ ] Form saves customer data
+   - [ ] Data persists on Android
+   - [ ] Data persists on Web
+   - [ ] Loading states display correctly
+   - [ ] Error handling works properly
+   - [ ] Material 3 design applied throughout
+   - [ ] 8-point grid spacing used
+
+---
+
+## Implementation Order Summary
+
+1. **Setup** → Add dependencies, create config files
+2. **Backend** → Models → Database → Repositories
+3. **Domain** → State → Services → Validators
+4. **Presentation** → Reusable widgets
+5. **Screens** → Home → List → Detail → Form
+6. **Integration** → Navigation → State management
+7. **Testing** → Android → Web → Verification
+
+---
+
+## Key Architecture Decisions
+
+### Database Choice: Hive
+- **Why**: Cross-platform (Android, iOS, Web)
+- **Why**: NoSQL key-value store, simple to use
+- **Why**: No native dependencies, pure Dart
+- **Why**: Fast and lightweight
+
+### State Management: Provider + ChangeNotifier
+- **Why**: Simple and follows Flutter best practices
+- **Why**: Aligns with design principles (separate state from UI)
+- **Why**: Easy to test and maintain
+
+### Navigation: Named Routes
+- **Why**: Clean separation of concerns
+- **Why**: Easy to manage and scale
+- **Why**: Type-safe with route arguments
+
+---
+
+## File Structure After Implementation
+
+```
+app/lib/
+├── main.dart
+├── backend/
+│   ├── backend.dart (barrel export)
+│   ├── models/
+│   │   ├── index.dart
+│   │   └── customer.dart
+│   ├── database/
+│   │   └── database_service.dart
+│   └── repositories/
+│       ├── customer_repository.dart
+│       └── hive_customer_repository.dart
+├── domain/
+│   ├── domain.dart (barrel export)
+│   ├── state/
+│   │   └── customer_state.dart
+│   ├── services/
+│   │   └── customer_service.dart
+│   └── validators/
+│       └── customer_validators.dart
+├── presentation/
+│   ├── presentation.dart (barrel export)
+│   └── widgets/
+│       ├── customer_list_item.dart
+│       ├── empty_customers_state.dart
+│       ├── loading_widget.dart
+│       └── error_widget.dart
+├── screens/
+│   ├── home_screen.dart (updated)
+│   ├── customers_list_screen.dart
+│   ├── customer_detail_screen.dart
+│   └── customer_form_screen.dart
+├── config/
+│   ├── app_config.dart
+│   └── routes.dart
+└── constants/
+    └── app_constants.dart
+```
+
+---
+
+## Estimated Implementation Time
+
+- Task 1: Setup and Configuration - 15 minutes
+- Task 2: Create Data Models - 20 minutes
+- Task 3: Implement Database Layer - 30 minutes
+- Task 4: Create Domain Layer - 30 minutes
+- Task 5: Build UI Components - 40 minutes
+- Task 6: Implement Home Screen Navigation - 10 minutes
+- Task 7: Create Customers List Screen - 30 minutes
+- Task 8: Create Customer Detail Screen - 25 minutes
+- Task 9: Create Add/Edit Customer Screen - 35 minutes
+- Task 10: Wire Up Navigation and State - 25 minutes
+- Task 11: Testing and Verification - 30 minutes
+
+**Total: ~4.5 hours**
+
+---
+
+## Notes
+
+- All async operations wrapped in try-catch blocks
+- Loading states shown during async operations
+- Errors displayed to user with SnackBars
+- Confirmation dialogs for destructive actions (delete)
+- Form validation before saving
+- Data persistence verified on both platforms
+- Material 3 design with seeded ColorScheme
+- 8-point grid spacing throughout
+- No test files created (as per requirements)
+
+

@@ -1,279 +1,301 @@
 # Current Project State
 
-**Last Updated:** December 7, 2025  
-**Project:** Stitch Lane Flutter App  
-**Status:** ✅ Customer Management Feature Complete
+**Last Updated:** December 8, 2025
+**Project:** Stitch Lane Flutter App
+**Status:** ✅ Customer & Order Management Complete
 
----
-
-## 📋 Project Overview
-
-A Flutter application for managing customer information with cross-platform support (Android & Web). Built with clean architecture, Material 3 design, and offline-first data persistence.
+Flutter app for managing customers and orders with offline-first persistence (Hive), Material 3 design, and clean architecture.
 
 ---
 
 ## 🏗️ Architecture
 
-### Folder Structure
+**Layers:** `backend/` (data) → `domain/` (business logic) → `screens/` + `presentation/` (UI)
+
+**Key Principles:**
+- Clean architecture with strict layer separation
+- Provider state management (ChangeNotifier)
+- Repository pattern for data access
+- Material 3 design with 8-point grid (8, 16, 24, 32, 48)
+- NO Flutter imports in domain layer
+
+---
+
+## 📦 Key Dependencies
+
+- **hive** + **hive_flutter** - Local NoSQL database
+- **provider** - State management
+- **uuid** - ID generation
+- **intl** - Date formatting
+- **build_runner** + **hive_generator** - Code generation
+
+---
+
+## 🎯 Data Models
+
+### Customer (Hive TypeId: 0)
+- **Fields:** id, name, phoneNumber?, description?, created
+- **Validation:** Name (2-100), Phone (10+ digits, optional), Description (max 500, optional)
+- **Auto-set:** created = DateTime.now() on creation
+- **Cascade Delete:** Deletes all customer's orders
+
+### Order (Hive TypeId: 1)
+- **Fields:** id, customerId, title, dueDate, description?, created, status
+- **Validation:** Title (2-100), Description (max 500), Due date (no past for new)
+- **Auto-set:** created = DateTime.now(), status = OrderStatus.pending on creation
+- **Relationship:** Many orders → One customer
+- **Status:** Enum (pending, done) - toggleable from detail screen
+
+### OrderStatus (Hive TypeId: 2)
+- **Enum Values:** pending, done
+- **Default:** pending
+- **Usage:** Order status tracking
+
+---
+
+## 📁 Key Files Reference
+
+### When Adding New Features
+- **Models:** `backend/models/` - Add Hive annotations, run build_runner
+- **State:** `domain/state/` - ChangeNotifier pattern
+- **Services:** `domain/services/` - Static methods coordinating state + repository
+- **Validators:** `domain/validators/` - Pure validation functions
+- **Repositories:** `backend/repositories/` - Interface + Hive implementation
+- **Utils:** `utils/` - Reusable utilities (search, filters, helpers)
+
+### Configuration
+- `config/app_config.dart` - Spacing, validation limits, animations
+- `config/routes.dart` - Route definitions
+- `constants/app_constants.dart` - Box names, route paths
+
+### Pattern Examples
+- **Form with validation:** `screens/customer_form_screen.dart`
+- **Form with date picker:** `screens/order_form_screen.dart`
+- **Form with multi-line input:** Description fields use `textInputAction: TextInputAction.newline`
+- **Detail screen (reactive):** `screens/customer_detail_screen.dart` (uses Consumer)
+- **Detail screen with status toggle:** `screens/order_detail_screen.dart` (SegmentedButton)
+- **List screen with search:** `screens/customers_list_screen.dart`
+- **List screen with multiple states:** `screens/customers_list_screen.dart` (Consumer2 for customer + order data)
+- **List screen with dual modes:** `screens/orders_list_screen.dart` (optional customer param for all-orders vs customer-specific)
+- **List item with conditional styling:** `presentation/widgets/order_list_item.dart` (green for done)
+- **List item with computed data:** `presentation/widgets/customer_list_item.dart` (pending order count)
+- **List item with optional context:** `presentation/widgets/order_list_item.dart` (optional customerName)
+- **Cascade delete:** `services/customer_service.dart`
+- **Reusable search widget:** `presentation/widgets/search_bar_widget.dart`
+- **Search/filter logic:** `utils/search_helper.dart`
+- **Enum with Hive:** `backend/models/order_status.dart`
+
+---
+
+## 🔑 Important Implementation Details
+
+### State Management Pattern
+```dart
+// State: ChangeNotifier with list, isLoading, error
+// Service: Static methods coordinating state + repository
+// Screen: Consumer<State> for reactive UI
+
+// Example: Creating an order
+await OrderService.createOrder(
+  context.read<OrderState>(),
+  context.read<OrderRepository>(),
+  order,
+);
 ```
-app/lib/
-├── backend/          # Data layer (models, repositories, database)
-├── domain/           # Business logic (state, services, validators)
-├── presentation/     # UI components (reusable widgets)
-├── screens/          # Top-level screens
-├── config/           # Configuration (spacing, routes)
-└── constants/        # App-wide constants
+
+### Routes & Navigation
+- `/` → Home
+- `/customers` → Customer List
+- `/customer/detail` → Customer Detail (arg: Customer)
+- `/customer/form` → Add/Edit Customer (arg: Customer?)
+- `/orders` → All Orders List (no args - shows all orders)
+- `/customer/orders` → Customer Orders List (arg: Customer - shows customer's orders)
+- `/order/detail` → Order Detail (arg: {order, customer})
+- `/order/form` → Add/Edit Order (arg: {customer, order?})
+
+### Cascade Delete
+When deleting a customer, `CustomerService.deleteCustomer()` first calls `OrderRepository.deleteOrdersByCustomerId()` to remove all orders.
+
+### Reactive Detail Screens
+Detail screens store only IDs and use `Consumer` to fetch latest data from state:
+```dart
+Consumer<CustomerState>(
+  builder: (context, state, _) {
+    final customer = state.customers.firstWhere((c) => c.id == customerId);
+    // Build UI with latest customer data
+  }
+)
 ```
 
-### Design Principles
-- **Clean Architecture** - Strict layer separation
-- **Repository Pattern** - Abstract data access
-- **Provider State Management** - ChangeNotifier pattern
-- **Material 3 Design** - Seeded ColorScheme, adaptive components
-- **8-Point Grid System** - Spacing: 8, 16, 24, 32, 48
-- **No Magic Numbers** - All values from config constants
-- **Pure Dart Domain Layer** - NO Flutter imports in domain/
+### Search Functionality
+Both Customer and Order list screens have live search:
+- **Customer Search:** Searches across name and phone number
+- **Order Search:** Searches across title and description
+- **Implementation:** `SearchBarWidget` in AppBar bottom + `SearchHelper` utility
+- **Features:** Case-insensitive, live filtering, clear button, empty state handling
 
----
+```dart
+// Using SearchHelper
+final filtered = SearchHelper.filterCustomers(customers, searchQuery);
+final filtered = SearchHelper.filterOrders(orders, searchQuery);
+```
 
-## 📦 Dependencies
+### List Sorting
+Both Customer and Order lists are sorted by creation date (newest first):
+- **Sort Order:** Descending by `created` field (most recent at top)
+- **Applied After:** Filtering/searching
+- **Implementation:** In-memory sorting using `compareTo()`
 
-```yaml
-dependencies:
-  flutter: sdk
-  hive: ^2.2.3              # NoSQL database (cross-platform)
-  hive_flutter: ^1.1.0      # Flutter integration for Hive
-  uuid: ^4.5.2              # Unique ID generation
-  provider: ^6.1.5+1        # State management
+```dart
+// Sort by created date descending (newest first)
+final filteredCustomers = List<Customer>.from(
+  SearchHelper.filterCustomers(state.customers, query)
+)..sort((a, b) => b.created.compareTo(a.created));
+```
 
-dev_dependencies:
-  build_runner: ^2.4.13     # Code generation
-  hive_generator: ^2.0.1    # Hive adapter generation
-  flutter_lints: ^2.0.0     # Linting rules
+### Data Loading Strategy
+All data is loaded once at app initialization for optimal performance:
+- **Customer List Screen:** Loads both customers AND all orders in parallel using `Future.wait()`
+- **Order List Screen:** Uses pre-loaded orders from OrderState, filters locally
+- **Benefits:** Single source of truth, reactive updates, no redundant loading
+- **Implementation:** `CustomersListScreen._loadData()` loads both states
+
+```dart
+// Load all data in parallel
+await Future.wait([
+  CustomerService.loadCustomers(customerState, customerRepository),
+  OrderService.loadOrders(orderState, orderRepository),
+]);
+```
+
+### Customer List with Pending Order Counts
+Customer list displays pending order count for each customer with visual indicators:
+- **Pending Count:** Shows number of orders with `status == OrderStatus.pending`
+- **Visual Indicators:**
+  - Has pending orders: Normal purple/blue avatar with person icon, shows "X pending"
+  - No pending orders: Green avatar (`Colors.green.shade100`) with checkmark icon, shows "All done"
+- **Reactive Updates:** Uses `Consumer2<CustomerState, OrderState>` to update when orders change
+- **Calculation:** Uses `orderState.getPendingOrderCount(customerId)` method
+
+```dart
+// In CustomerListScreen
+Consumer2<CustomerState, OrderState>(
+  builder: (context, customerState, orderState, child) {
+    // ...
+    CustomerListItem(
+      customer: customer,
+      pendingOrderCount: orderState.getPendingOrderCount(customer.id),
+      // ...
+    )
+  }
+)
+```
+
+### Order Status Management
+Orders have a status field (pending/done) with visual indicators:
+- **Default Status:** All new orders are "Pending"
+- **Toggle:** SegmentedButton in order detail screen switches between Pending/Done
+- **Visual Indicators:**
+  - Pending: Normal purple/blue avatar with assignment icon
+  - Done: Green avatar (`Colors.green.shade100`) with checkmark icon
+- **Persistence:** Status saved via `OrderService.updateOrder()`
+- **Backward Compatible:** Existing orders automatically become "Pending"
+
+```dart
+// Toggle status
+final updatedOrder = order.copyWith(
+  status: order.status == OrderStatus.done
+    ? OrderStatus.pending
+    : OrderStatus.done
+);
+await OrderService.updateOrder(state, repository, updatedOrder);
+```
+
+### Orders List Screen - Dual Mode Operation
+The `OrdersListScreen` supports two modes via optional `customer` parameter:
+
+**All Orders Mode (customer: null):**
+- Shows all orders from all customers
+- AppBar title: "All Orders"
+- Customer name displayed in each order item
+- No FAB (adding orders requires customer context)
+- Accessed from Home screen "Show Orders" tile
+
+**Customer-Specific Mode (customer: provided):**
+- Shows only that customer's orders
+- AppBar title: "[Customer Name]'s Orders"
+- No customer name in items (redundant)
+- FAB visible for adding new orders
+- Accessed from Customer detail or Customer list
+
+```dart
+// Dual mode implementation
+class OrdersListScreen extends StatefulWidget {
+  final Customer? customer; // Optional parameter
+
+  const OrdersListScreen({super.key, this.customer});
+}
+
+// In build method
+final displayOrders = widget.customer != null
+    ? state.orders.where((order) => order.customerId == widget.customer!.id).toList()
+    : state.orders; // Show all orders
+
+// Conditional FAB
+floatingActionButton: widget.customer != null
+    ? FloatingActionButton(/* ... */)
+    : null,
+
+// OrderListItem with optional customer name
+OrderListItem(
+  order: order,
+  customerName: widget.customer == null ? customer.name : null,
+  onTap: () { /* ... */ },
+)
 ```
 
 ---
 
-## 🎯 Implemented Features
 
-### 1. Customer Management (COMPLETE ✅)
-- **CRUD Operations** - Create, Read, Update, Delete customers
-- **Data Model** - id, name, phoneNumber, description (optional)
-- **Persistence** - Hive database (works offline on Android & Web)
-- **Validation** - Name (2-100 chars), Phone (10+ digits), Description (0-500 chars)
 
-### 2. Screens
-- **Home Screen** - Navigation tile to customer list
-- **Customers List** - List view with FAB, pull-to-refresh, empty state
-- **Customer Detail** - Full info display with Edit/Delete actions
-- **Customer Form** - Add/Edit with validation and error handling
+## 🚀 Common Commands
 
-### 3. UI Components
-- **CustomerListItem** - List item with name, phone, action buttons
-- **EmptyCustomersState** - Friendly empty state message
-- **LoadingWidget** - Circular progress indicator
-- **ErrorDisplayWidget** - Error message with retry button
-
----
-
-## 📁 File Inventory (22 files created)
-
-### Configuration (3 files)
-- `app/lib/config/app_config.dart` - Spacing, validation, animation constants
-- `app/lib/config/routes.dart` - Named routes and route generator
-- `app/lib/constants/app_constants.dart` - Database box names, route paths
-
-### Backend Layer (7 files)
-- `app/lib/backend/models/customer.dart` - Customer model with Hive annotations
-- `app/lib/backend/models/customer.g.dart` - Generated Hive adapter
-- `app/lib/backend/models/index.dart` - Models barrel export
-- `app/lib/backend/database/database_service.dart` - Hive initialization
-- `app/lib/backend/repositories/customer_repository.dart` - Repository interface
-- `app/lib/backend/repositories/hive_customer_repository.dart` - Hive implementation
-- `app/lib/backend/backend.dart` - Backend barrel export
-
-### Domain Layer (4 files)
-- `app/lib/domain/state/customer_state.dart` - CustomerState (ChangeNotifier)
-- `app/lib/domain/services/customer_service.dart` - CRUD service methods
-- `app/lib/domain/validators/customer_validators.dart` - Form validators
-- `app/lib/domain/domain.dart` - Domain barrel export
-
-### Presentation Layer (5 files)
-- `app/lib/presentation/widgets/customer_list_item.dart` - Customer list item
-- `app/lib/presentation/widgets/empty_customers_state.dart` - Empty state
-- `app/lib/presentation/widgets/loading_widget.dart` - Loading indicator
-- `app/lib/presentation/widgets/error_widget.dart` - Error display
-- `app/lib/presentation/presentation.dart` - Presentation barrel export
-
-### Screens (4 files)
-- `app/lib/screens/home_screen.dart` - Home with navigation tile
-- `app/lib/screens/customers_list_screen.dart` - Customer list screen
-- `app/lib/screens/customer_detail_screen.dart` - Customer detail view
-- `app/lib/screens/customer_form_screen.dart` - Add/Edit form
-
-### Main (1 file)
-- `app/lib/main.dart` - App entry point with Hive init, MultiProvider, routes
-
----
-
-## 🔑 Key Implementation Details
-
-### Database (Hive)
-- **Box Name:** `customers_box`
-- **Type Adapter:** CustomerAdapter (typeId: 0)
-- **Initialization:** In `main()` before `runApp()`
-- **Fields:** id (String), name (String), phoneNumber (String), description (String?)
-
-### State Management (Provider)
-- **CustomerState** - ChangeNotifier with customers list, isLoading, error
-- **Providers:** CustomerState (ChangeNotifierProvider), CustomerRepository (Provider)
-- **Services:** CustomerService with static methods for CRUD operations
-
-### Routes
-- `/` - Home Screen
-- `/customers` - Customers List Screen
-- `/customer/detail` - Customer Detail Screen (requires Customer argument)
-- `/customer/form` - Customer Form Screen (optional Customer argument for edit)
-
-### Validation Rules
-- **Name:** Required, 2-100 characters
-- **Phone:** Required, 10+ digits (non-digit chars ignored)
-- **Description:** Optional, max 500 characters
-
----
-
-## ✅ Quality Assurance
-
-### Code Quality
-- ✅ `flutter analyze` - No issues found
-- ✅ `flutter build web --release` - Build successful
-- ✅ Design principles compliance - All rules followed
-- ✅ No Flutter imports in domain layer
-- ✅ All widgets under 150 lines
-- ✅ No magic numbers (config constants used)
-
-### Testing Status
-- ✅ Web build verified
-- ✅ Android configuration verified
-- ⚠️ Manual testing pending (run app to test CRUD operations)
-
----
-
-## 🚀 How to Run
-
-### Development
 ```bash
 cd app
 
-# Run on Web
-flutter run -d chrome
+# Run app
+flutter run -d chrome  # or -d android
 
-# Run on Android
-flutter run -d android
-
-# Run on iOS (if configured)
-flutter run -d ios
-```
-
-### Build
-```bash
-cd app
-
-# Build for Web
-flutter build web --release
-
-# Build for Android
-flutter build apk --release
-
-# Build for iOS
-flutter build ios --release
-```
-
-### Code Generation (if models change)
-```bash
-cd app
+# Regenerate Hive adapters (after model changes)
 flutter pub run build_runner build --delete-conflicting-outputs
+
+# Build
+flutter build web --release
+flutter build apk --release
 ```
 
 ---
 
-## 🐛 Known Issues
 
-None currently. All features implemented and tested successfully.
-
----
-
-## 📝 Future Enhancements (Not Implemented)
-
-Potential features to add:
-- Search/filter customers by name or phone
-- Sort customers (alphabetically, by date added)
-- Customer categories/tags
-- Export customer list (CSV, PDF)
-- Import customers from file
-- Customer photos/avatars
-- Call/SMS integration
-- Customer notes/history
-- Backup/restore functionality
-- Multi-language support
-
----
 
 ## 🔧 Troubleshooting
 
-### Common Issues
-
-**Issue:** Build errors after adding dependencies  
-**Solution:** Run `flutter pub get` and `flutter clean`
-
-**Issue:** Hive adapter not found  
-**Solution:** Run `flutter pub run build_runner build --delete-conflicting-outputs`
-
-**Issue:** State not updating  
-**Solution:** Ensure `notifyListeners()` is called in CustomerState methods
-
-**Issue:** Navigation not working  
-**Solution:** Check route names in AppConstants match routes.dart
+**Hive adapter errors:** Run `flutter pub run build_runner build --delete-conflicting-outputs`
+**State not updating:** Ensure `notifyListeners()` is called in State classes
+**Cascade delete not working:** Pass OrderState + OrderRepository to CustomerService.deleteCustomer()
 
 ---
 
-## 📚 Important Files to Reference
 
-When implementing new features:
-1. **DESIGN_PRINCIPLES.md** - Architectural rules (MANDATORY)
-2. **app/lib/config/app_config.dart** - Add new constants here
-3. **app/lib/constants/app_constants.dart** - Add new route names here
-4. **app/lib/backend/backend.dart** - Update when adding new models/repositories
-5. **app/lib/domain/domain.dart** - Update when adding new services/validators
-6. **app/lib/presentation/presentation.dart** - Update when adding new widgets
 
----
 
-## 🎨 Design System
 
-### Colors
-- **Primary:** Blue (seeded ColorScheme)
-- **Theme Mode:** System (auto light/dark)
-- **Material Version:** Material 3
+## 🎨 Design Constants
 
-### Spacing (8-point grid)
-- `AppConfig.spacing8` = 8.0
-- `AppConfig.spacing16` = 16.0
-- `AppConfig.spacing24` = 24.0
-- `AppConfig.spacing32` = 32.0
-- `AppConfig.spacing48` = 48.0
-
-### Border Radius
-- `AppConfig.cardBorderRadius` = 12.0
-- `AppConfig.buttonBorderRadius` = 8.0
-
-### Icons
-- `AppConfig.iconSize` = 24.0
-- `AppConfig.largeIconSize` = 48.0
-
-### Animations
-- `AppConfig.animationDuration` = 300ms
-- `AppConfig.shortAnimationDuration` = 150ms
+**Spacing (8-point grid):** 8, 16, 24, 32, 48
+**Date Format:** "MMM d, y" (lists), "MMMM d, y" (details)
+**Theme:** Material 3, system light/dark mode
+**All constants:** See `config/app_config.dart`
 
 ---
 

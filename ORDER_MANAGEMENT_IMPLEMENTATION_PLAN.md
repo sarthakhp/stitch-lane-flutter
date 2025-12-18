@@ -191,4 +191,292 @@ This plan details the implementation of an Order Management feature that integra
 
 ---
 
+### Task 5: Build UI Components (3 subtasks)
+
+**5.1 Create order_list_item.dart**
+- File: `app/lib/presentation/widgets/order_list_item.dart`
+- Display order title and due date
+- Format date consistently (e.g., "Dec 7, 2025")
+- Include View, Edit, Delete action buttons
+- Use Card with ListTile
+- Follow Material 3 design with AppConfig spacing
+
+**5.2 Create empty_orders_state.dart**
+- File: `app/lib/presentation/widgets/empty_orders_state.dart`
+- Display when customer has no orders
+- Use assignment_outlined icon
+- Message: "No orders yet"
+- Follow same pattern as EmptyCustomersState
+
+**5.3 Update presentation barrel export**
+- File: `app/lib/presentation/presentation.dart`
+- Add exports for OrderListItem, EmptyOrdersState
+
+---
+
+### Task 6: Enhance Customer Detail Screen (1 subtask)
+
+**6.1 Update customer_detail_screen.dart**
+- File: `app/lib/screens/customer_detail_screen.dart`
+- Add Orders button/tile after customer info
+- Display order count badge (e.g., "Orders (5)")
+- Load order count using OrderService
+- Navigate to OrdersListScreen with customer argument
+- Use Card with InkWell for tap handling
+- Follow Material 3 design with proper spacing
+
+---
+
+### Task 7: Create Orders List Screen (1 subtask)
+
+**7.1 Create orders_list_screen.dart**
+- File: `app/lib/screens/orders_list_screen.dart`
+- Accept Customer as required parameter
+- Use Consumer<OrderState> for state management
+- Load orders in initState using addPostFrameCallback
+- Filter orders by customerId
+- Display ListView.builder with OrderListItem widgets
+- Add FloatingActionButton for adding new orders
+- Include RefreshIndicator for pull-to-refresh
+- Show LoadingWidget, ErrorDisplayWidget, or EmptyOrdersState based on state
+- Handle delete with confirmation dialog
+- Navigate to detail and form screens
+
+---
+
+### Task 8: Create Order Detail Screen (1 subtask)
+
+**8.1 Create order_detail_screen.dart**
+- File: `app/lib/screens/order_detail_screen.dart`
+- Accept Order and Customer as required parameters
+- Display order title, due date, customer name in separate Cards
+- Format date consistently
+- Add Edit and Delete actions in AppBar
+- Show delete confirmation dialog
+- Navigate to OrderFormScreen for editing
+- Navigate back to OrdersListScreen after deletion
+
+---
+
+### Task 9: Create Add/Edit Order Screen (1 subtask)
+
+**9.1 Create order_form_screen.dart**
+- File: `app/lib/screens/order_form_screen.dart`
+- Accept Customer (required) and Order (optional for edit) as parameters
+- Use Form with GlobalKey<FormState>
+- TextFormField for title with validation
+- Date picker for due date selection
+- Detect edit mode based on widget.order != null
+- Save/Cancel buttons with proper spacing
+- Show loading state during save (CircularProgressIndicator in button)
+- Create new Order with UUID or update existing
+- Call OrderService.addOrder or updateOrder
+- Show success/error SnackBar
+- Navigate back on success
+
+---
+
+### Task 10: Wire Up Navigation and State (3 subtasks)
+
+**10.1 Update app_constants.dart with routes**
+- Already covered in Task 1.2
+
+**10.2 Update routes.dart**
+- File: `app/lib/config/routes.dart`
+- Add route handlers in generateRoute():
+  ```dart
+  case AppConstants.ordersListRoute:
+    final customer = settings.arguments as Customer?;
+    return MaterialPageRoute(
+      builder: (_) => OrdersListScreen(customer: customer),
+    );
+
+  case AppConstants.orderDetailRoute:
+    final args = settings.arguments as Map<String, dynamic>?;
+    final order = args?['order'] as Order?;
+    final customer = args?['customer'] as Customer?;
+    return MaterialPageRoute(
+      builder: (_) => OrderDetailScreen(order: order, customer: customer),
+    );
+
+  case AppConstants.orderFormRoute:
+    final args = settings.arguments as Map<String, dynamic>?;
+    final customer = args?['customer'] as Customer;
+    final order = args?['order'] as Order?;
+    return MaterialPageRoute(
+      builder: (_) => OrderFormScreen(customer: customer, order: order),
+    );
+  ```
+
+**10.3 Update main.dart**
+- File: `app/lib/main.dart`
+- Add to MultiProvider:
+  ```dart
+  ChangeNotifierProvider(create: (_) => OrderState()),
+  Provider<OrderRepository>(
+    create: (_) => HiveOrderRepository(),
+  ),
+  ```
+
+---
+
+### Task 11: Handle Customer-Order Relationship (2 subtasks)
+
+**11.1 Implement cascade delete logic**
+- Decide on strategy: cascade delete or prevent deletion
+- Recommended: Cascade delete (delete all orders when customer is deleted)
+
+**11.2 Update customer_service.dart**
+- File: `app/lib/domain/services/customer_service.dart`
+- Modify deleteCustomer method:
+  - Accept OrderRepository as parameter
+  - Call `orderRepository.deleteOrdersByCustomerId(customerId)` before deleting customer
+  - Or check if customer has orders and show error message
+
+---
+
+### Task 12: Testing and Verification (4 subtasks)
+
+**12.1 Test on Android**
+- Run: `flutter run -d android`
+- Test all CRUD operations for orders
+- Test customer-order relationship (cascade delete)
+- Test navigation between screens
+- Test data persistence (restart app)
+- Test form validation
+- Test date picker functionality
+
+**12.2 Test on Web**
+- Run: `flutter run -d chrome`
+- Test all CRUD operations for orders
+- Test customer-order relationship
+- Test navigation and data persistence
+- Test responsive layout
+
+**12.3 Run code quality checks**
+- Run: `flutter analyze`
+- Verify no issues found
+- Check design principles compliance
+
+**12.4 Verify feature requirements**
+- ✅ Order data model with Hive persistence
+- ✅ Customer-order relationship with cascade delete
+- ✅ Customer detail screen with Orders button
+- ✅ Orders list screen with CRUD actions
+- ✅ Order detail screen
+- ✅ Add/Edit order form with validation
+- ✅ Backend layer with repository pattern
+- ✅ Domain layer with state management
+- ✅ Presentation layer with reusable widgets
+- ✅ Navigation and routes configured
+- ✅ Configuration constants added
+- ✅ State management integrated
+
+---
+
+## 🏗️ Architecture Decisions
+
+### Customer-Order Relationship
+- **Strategy:** Cascade Delete
+- **Rationale:** When a customer is deleted, their orders become orphaned and meaningless. Cascade delete maintains data integrity.
+- **Implementation:** Call `deleteOrdersByCustomerId()` before deleting customer
+
+### Date Handling
+- **Storage:** DateTime object in Hive
+- **Display:** Formatted string (e.g., "Dec 7, 2025" or "2025-12-07")
+- **Validation:** Cannot be in the past for new orders (can be in past for edits)
+- **Picker:** Material DatePicker with initialDate = DateTime.now()
+
+### State Management
+- **Pattern:** Same as Customer (Provider + ChangeNotifier)
+- **Scope:** OrderState provided at app level in main.dart
+- **Loading:** Separate loading state for each screen's operations
+
+---
+
+## 📊 Data Flow
+
+```
+User Action → Screen → Service → Repository → Hive Database
+                ↓         ↓
+              State ← notifyListeners()
+                ↓
+            Consumer rebuilds UI
+```
+
+---
+
+## 🎨 UI/UX Considerations
+
+### Date Display Format
+- Use `DateFormat` from `intl` package (if needed)
+- Or use simple formatting: `"${date.month}/${date.day}/${date.year}"`
+- Consistent format across all screens
+
+### Order Count Badge
+- Display in Customer Detail Screen
+- Format: "Orders (5)" or "Orders" with badge widget
+- Update dynamically when orders change
+
+### Empty State
+- Friendly message: "No orders yet"
+- Icon: assignment_outlined
+- Encourage action: "Tap + to add an order"
+
+### Loading States
+- Show CircularProgressIndicator during async operations
+- Disable buttons during save operations
+- Use RefreshIndicator for pull-to-refresh
+
+---
+
+## ⚠️ Important Notes
+
+1. **Hive TypeId:** Use typeId: 1 for Order (Customer uses 0)
+2. **Date Validation:** Allow past dates for edits, but not for new orders
+3. **Cascade Delete:** Always delete orders before deleting customer
+4. **Error Handling:** Wrap all database operations in try-catch
+5. **Navigation Arguments:** Use Map for multiple arguments (order + customer)
+6. **State Updates:** Always call notifyListeners() after state changes
+7. **Form Validation:** Validate on save, not on every keystroke
+8. **Date Picker:** Use showDatePicker() from Material library
+
+---
+
+## 🚀 Quick Start Commands
+
+```bash
+# Navigate to app directory
+cd app
+
+# Generate Hive adapters (after creating Order model)
+flutter pub run build_runner build --delete-conflicting-outputs
+
+# Run on Web
+flutter run -d chrome
+
+# Run on Android
+flutter run -d android
+
+# Analyze code
+flutter analyze
+
+# Build for web
+flutter build web --release
+```
+
+---
+
+## ✅ Checklist Before Starting
+
+- [ ] Read DESIGN_PRINCIPLES.md
+- [ ] Review existing Customer implementation
+- [ ] Understand Hive adapter generation process
+- [ ] Understand Provider state management pattern
+- [ ] Review Material 3 design guidelines
+- [ ] Understand 8-point grid spacing system
+
+---
+
+**End of Implementation Plan**
 
