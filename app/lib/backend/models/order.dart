@@ -12,7 +12,7 @@ class Order {
   final String customerId;
 
   @HiveField(2)
-  final String title;
+  final String? title;
 
   @HiveField(3)
   final DateTime dueDate;
@@ -29,7 +29,7 @@ class Order {
   Order({
     required this.id,
     required this.customerId,
-    required this.title,
+    this.title,
     required this.dueDate,
     this.description,
     required this.created,
@@ -72,7 +72,7 @@ class Order {
     return Order(
       id: json['id'] as String,
       customerId: json['customerId'] as String,
-      title: json['title'] as String,
+      title: json['title'] as String?,
       dueDate: DateTime.parse(json['dueDate'] as String),
       description: json['description'] as String?,
       created: DateTime.parse(json['created'] as String),

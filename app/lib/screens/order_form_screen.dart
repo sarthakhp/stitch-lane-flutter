@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import '../presentation/widgets/sticky_bottom_action_bar.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -40,7 +41,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _loadCustomersIfNeeded();
     });
     if (_isEditing) {
-      _titleController.text = widget.order!.title;
+      _titleController.text = widget.order!.title ?? '';
       _descriptionController.text = widget.order!.description ?? '';
       _selectedDueDate = widget.order!.dueDate;
     } else {
@@ -156,12 +157,13 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       final state = context.read<OrderState>();
       final repository = context.read<OrderRepository>();
 
+      final titleText = _titleController.text.trim();
       final descriptionText = _descriptionController.text.trim();
 
       final order = Order(
         id: _isEditing ? widget.order!.id : const Uuid().v4(),
         customerId: _selectedCustomer!.id,
-        title: _titleController.text.trim(),
+        title: titleText.isEmpty ? null : titleText,
         dueDate: _selectedDueDate!,
         description: descriptionText.isEmpty ? null : descriptionText,
         created: _isEditing ? widget.order!.created : DateTime.now(),
@@ -227,11 +229,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           },
           child: Consumer<CustomerState>(
             builder: (context, customerState, child) {
-              return Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(AppConfig.spacing16),
-                  children: [
+              return Column(
+                children: [
+                  Expanded(
+                    child: Form(
+                      key: _formKey,
+                      child: ListView(
+                        padding: const EdgeInsets.all(AppConfig.spacing16),
+                        children: [
                 DropdownMenu<Customer>(
                   width: MediaQuery.of(context).size.width - (AppConfig.spacing16 * 2),
                   enabled: !_isEditing && !_isLoading,
@@ -269,7 +274,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(
-                    labelText: 'Title',
+                    labelText: 'Title (Optional)',
                     hintText: 'Enter order title',
                     prefixIcon: Icon(Icons.assignment),
                     border: OutlineInputBorder(),
@@ -317,40 +322,23 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: AppConfig.spacing32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            final shouldPop = await _onWillPop();
-                            if (shouldPop && context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: AppConfig.spacing16),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _saveOrder,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_isEditing ? 'Update' : 'Save'),
-                  ),
-                ),
-              ],
-            ),
           ],
-        ),
-      );
+                      ),
+                    ),
+                  ),
+                  StickyBottomActionBar(
+                    onCancel: () async {
+                      final shouldPop = await _onWillPop();
+                      if (shouldPop && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    onSave: _saveOrder,
+                    saveLabel: _isEditing ? 'Update' : 'Save',
+                    isLoading: _isLoading,
+                  ),
+                ],
+              );
             },
           ),
         ),

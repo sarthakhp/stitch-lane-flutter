@@ -4,6 +4,7 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/widgets/contact_action_buttons.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final Customer customer;
@@ -235,7 +236,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   color: Theme.of(context).colorScheme.surface,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, -2),
                     ),
@@ -249,24 +250,38 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           .where((order) => order.customerId == customer.id)
                           .toList();
                       final orderCount = customerOrders.length;
+                      final hasPhone = customer.phoneNumber != null &&
+                                      customer.phoneNumber!.isNotEmpty;
 
-                      return SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              AppConstants.ordersListRoute,
-                              arguments: customer,
-                            );
-                          },
-                          icon: Badge(
-                            label: Text('$orderCount'),
-                            isLabelVisible: orderCount > 0,
-                            child: const Icon(Icons.assignment),
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppConstants.ordersListRoute,
+                                  arguments: customer,
+                                );
+                              },
+                              icon: Badge(
+                                label: Text('$orderCount'),
+                                isLabelVisible: orderCount > 0,
+                                child: const Icon(Icons.assignment),
+                              ),
+                              label: const Text('View Orders'),
+                            ),
                           ),
-                          label: const Text('View Orders'),
-                        ),
+                          if (hasPhone) ...[
+                            const SizedBox(height: AppConfig.spacing8),
+                            ContactActionButtons(
+                              phoneNumber: customer.phoneNumber!,
+                            ),
+                          ],
+                        ],
                       );
                     },
                   ),

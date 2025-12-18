@@ -32,14 +32,14 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   Future<void> _loadDataIfNeeded() async {
     final orderState = context.read<OrderState>();
     final customerState = context.read<CustomerState>();
+    final orderRepository = context.read<OrderRepository>();
+    final customerRepository = context.read<CustomerRepository>();
 
     if (orderState.orders.isEmpty) {
-      final orderRepository = context.read<OrderRepository>();
       await OrderService.loadOrders(orderState, orderRepository);
     }
 
     if (customerState.customers.isEmpty) {
-      final customerRepository = context.read<CustomerRepository>();
       await CustomerService.loadCustomers(customerState, customerRepository);
     }
   }
@@ -48,45 +48,6 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     final state = context.read<OrderState>();
     final repository = context.read<OrderRepository>();
     await OrderService.loadOrders(state, repository);
-  }
-
-  Future<void> _deleteOrder(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Order'),
-        content: const Text('Are you sure you want to delete this order?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      try {
-        final state = context.read<OrderState>();
-        final repository = context.read<OrderRepository>();
-        await OrderService.deleteOrder(state, repository, id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete order: $e')),
-          );
-        }
-      }
-    }
   }
 
   void _onSearchChanged(String query) {
@@ -145,6 +106,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             SearchHelper.filterOrders(
               displayOrders,
               _searchQuery,
+              customers: customerState.customers,
             ),
           // )..sort((a, b) => b.created.compareTo(a.created));
           )..sort((a, b) => a.dueDate.compareTo(b.dueDate));

@@ -203,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ],
                               if (backupState.errorMessage != null) ...[
                                 Container(
-                                  padding: EdgeInsets.all(AppConfig.spacing12),
+                                  padding: const EdgeInsets.all(AppConfig.spacing12),
                                   decoration: BoxDecoration(
                                     color: Theme.of(context).colorScheme.errorContainer,
                                     borderRadius: BorderRadius.circular(8),
@@ -417,18 +417,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return;
       }
 
-      backupState.setProgress(0.6);
-
-      await BackupService.restoreBackup(backupJson);
-
-      backupState.setProgress(0.9);
-
       final customerState = context.read<CustomerState>();
       final orderState = context.read<OrderState>();
       final settingsState = context.read<SettingsState>();
       final customerRepository = context.read<CustomerRepository>();
       final orderRepository = context.read<OrderRepository>();
       final settingsRepository = context.read<SettingsRepository>();
+
+      backupState.setProgress(0.6);
+
+      await BackupService.restoreBackup(backupJson);
+
+      backupState.setProgress(0.9);
 
       await CustomerService.loadCustomers(customerState, customerRepository);
       await OrderService.loadOrders(orderState, orderRepository);
@@ -513,9 +513,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => PopScope(
+        builder: (context) => const PopScope(
           canPop: false,
-          child: const Center(
+          child: Center(
             child: Card(
               child: Padding(
                 padding: EdgeInsets.all(AppConfig.spacing24),

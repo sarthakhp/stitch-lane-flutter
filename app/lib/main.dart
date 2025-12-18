@@ -77,6 +77,8 @@ class _AppInitializerState extends State<AppInitializer> {
 
   Future<void> _initializeApp() async {
     final authState = context.read<AuthState>();
+    final settingsState = context.read<SettingsState>();
+    final settingsRepository = context.read<SettingsRepository>();
 
     await Future.delayed(const Duration(milliseconds: 100));
 
@@ -84,10 +86,9 @@ class _AppInitializerState extends State<AppInitializer> {
 
     if (currentUser != null) {
       authState.setUser(currentUser);
+      await AuthService.silentSignIn();
     }
 
-    final settingsState = context.read<SettingsState>();
-    final settingsRepository = context.read<SettingsRepository>();
     await SettingsService.loadSettings(settingsState, settingsRepository);
 
     if (mounted) {
@@ -100,7 +101,7 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   Widget build(BuildContext context) {
     if (_isInitializing) {
-      return MaterialApp(
+      return const MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(

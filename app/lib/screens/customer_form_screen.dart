@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import '../presentation/widgets/sticky_bottom_action_bar.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final Customer? customer;
@@ -24,6 +25,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
   bool _hasUnsavedChanges = false;
+  bool _importedFromContacts = false;
 
   bool get _isEditing => widget.customer != null;
 
@@ -46,6 +48,11 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         _hasUnsavedChanges = true;
       });
     }
+    if (_importedFromContacts) {
+      setState(() {
+        _importedFromContacts = false;
+      });
+    }
   }
 
   @override
@@ -57,6 +64,55 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     _phoneController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _importFromContacts() async {
+    if (!ContactsService.isContactsAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contacts are not available on this platform'),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final contactData = await ContactsService.pickContact();
+
+      if (contactData != null && mounted) {
+        setState(() {
+          _nameController.text = contactData.name;
+          _phoneController.text = contactData.phoneNumber;
+          _importedFromContacts = true;
+          _hasUnsavedChanges = true;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(milliseconds: 700),
+            content: Text('Contact imported successfully'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to import contact: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<bool> _onWillPop() async {
@@ -113,6 +169,17 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         await CustomerService.updateCustomer(state, repository, customer);
       } else {
         await CustomerService.addCustomer(state, repository, customer);
+
+        if (!_importedFromContacts && phoneText.isNotEmpty) {
+          try {
+            await ContactsService.saveToContacts(
+              _nameController.text.trim(),
+              phoneText,
+            );
+          } catch (e) {
+            // Silently fail - don't block customer save
+          }
+        }
       }
 
       if (mounted) {
@@ -166,11 +233,22 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           onTap: () {
             FocusScope.of(context).unfocus();
           },
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(AppConfig.spacing16),
-              children: [
+          child: Column(
+            children: [
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppConfig.spacing16),
+                    children: [
+            if (!_isEditing && ContactsService.isContactsAvailable) ...[
+              OutlinedButton.icon(
+                onPressed: _isLoading ? null : _importFromContacts,
+                icon: const Icon(Icons.contacts),
+                label: const Text('Import from Contacts'),
+              ),
+              const SizedBox(height: AppConfig.spacing16),
+            ],
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -211,39 +289,22 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               textInputAction: TextInputAction.newline,
               enabled: !_isLoading,
             ),
-            const SizedBox(height: AppConfig.spacing32),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            final shouldPop = await _onWillPop();
-                            if (shouldPop && context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          },
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: AppConfig.spacing16),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _saveCustomer,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_isEditing ? 'Update' : 'Save'),
-                  ),
-                ),
-              ],
-            ),
           ],
-        ),
+                  ),
+                ),
+              ),
+              StickyBottomActionBar(
+                onCancel: () async {
+                  final shouldPop = await _onWillPop();
+                  if (shouldPop && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                onSave: _saveCustomer,
+                saveLabel: _isEditing ? 'Update' : 'Save',
+                isLoading: _isLoading,
+              ),
+            ],
           ),
         ),
       ),

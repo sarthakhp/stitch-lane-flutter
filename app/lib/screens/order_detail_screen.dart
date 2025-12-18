@@ -5,6 +5,9 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/widgets/order_detail_card.dart';
+import '../presentation/widgets/order_status_toggle.dart';
+import '../presentation/widgets/confirmation_dialog.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
@@ -35,76 +38,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return DateFormat('MMMM d, y').format(date);
   }
 
-  Future<void> _toggleOrderStatus(BuildContext context, Order order) async {
+  Future<void> _deleteOrder(BuildContext context, String orderId) async {
+    final confirmed = await ConfirmationDialog.show(
+      context: context,
+      title: 'Delete Order',
+      content: 'Are you sure you want to delete this order?',
+    );
+
+    if (!confirmed || !context.mounted) return;
+
+    final state = context.read<OrderState>();
+    final repository = context.read<OrderRepository>();
+
     try {
-      final state = context.read<OrderState>();
-      final repository = context.read<OrderRepository>();
-
-      final newStatus = order.status == OrderStatus.done
-          ? OrderStatus.pending
-          : OrderStatus.done;
-
-      final updatedOrder = order.copyWith(status: newStatus);
-
-      await OrderService.updateOrder(state, repository, updatedOrder);
-
+      await OrderService.deleteOrder(state, repository, orderId);
       if (context.mounted) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(milliseconds: 800),
-            content: Text(
-              newStatus == OrderStatus.done
-                  ? 'Order marked as done'
-                  : 'Order marked as pending',
-            ),
-          ),
+          const SnackBar(content: Text('Order deleted successfully')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update order status: $e')),
+          SnackBar(content: Text('Failed to delete order: $e')),
         );
-      }
-    }
-  }
-
-  Future<void> _deleteOrder(BuildContext context, String orderId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Order'),
-        content: const Text('Are you sure you want to delete this order?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      try {
-        final state = context.read<OrderState>();
-        final repository = context.read<OrderRepository>();
-        await OrderService.deleteOrder(state, repository, orderId);
-        if (context.mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete order: $e')),
-          );
-        }
       }
     }
   }
@@ -152,176 +110,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppConfig.spacing16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.assignment,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: AppConfig.spacing16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Title',
-                                        style: Theme.of(context).textTheme.labelMedium,
-                                      ),
-                                      const SizedBox(height: AppConfig.spacing8),
-                                      Text(
-                                        order.title,
-                                        style: Theme.of(context).textTheme.bodyLarge,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                    if (order.title != null && order.title!.isNotEmpty) ...[
+                      OrderDetailCard(
+                        icon: Icons.assignment,
+                        label: 'Title',
+                        value: order.title!,
                       ),
-                    ),
+                      const SizedBox(height: AppConfig.spacing16),
+                    ],
+                    OrderStatusToggle(order: order),
                     const SizedBox(height: AppConfig.spacing16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<OrderStatus>(
-                        segments: [
-                          ButtonSegment<OrderStatus>(
-                            value: OrderStatus.pending,
-                            label: const Text('Pending'),
-                            icon: const Icon(Icons.pending_outlined),
-                          ),
-                          ButtonSegment<OrderStatus>(
-                            value: OrderStatus.done,
-                            label: const Text('Done'),
-                            icon: const Icon(Icons.check_circle_outline),
-                          ),
-                        ],
-                        selected: {order.status},
-                        onSelectionChanged: (Set<OrderStatus> newSelection) {
-                          _toggleOrderStatus(context, order);
-                        },
-                        style: ButtonStyle(
-                          visualDensity: VisualDensity.comfortable,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppConfig.spacing16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppConfig.spacing16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: AppConfig.spacing16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Due Date',
-                                        style: Theme.of(context).textTheme.labelMedium,
-                                      ),
-                                      const SizedBox(height: AppConfig.spacing8),
-                                      Text(
-                                        _formatDate(order.dueDate),
-                                        style: Theme.of(context).textTheme.bodyLarge,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                    OrderDetailCard(
+                      icon: Icons.calendar_today,
+                      label: 'Due Date',
+                      value: _formatDate(order.dueDate),
                     ),
                     if (order.description != null && order.description!.isNotEmpty) ...[
                       const SizedBox(height: AppConfig.spacing16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppConfig.spacing16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.notes,
-                                    color: Theme.of(context).colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: AppConfig.spacing16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Description',
-                                          style: Theme.of(context).textTheme.labelMedium,
-                                        ),
-                                        const SizedBox(height: AppConfig.spacing8),
-                                        Text(
-                                          order.description!,
-                                          style: Theme.of(context).textTheme.bodyLarge,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                      OrderDetailCard(
+                        icon: Icons.notes,
+                        label: 'Description',
+                        value: order.description!,
                       ),
                     ],
                     const SizedBox(height: AppConfig.spacing16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppConfig.spacing16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                const SizedBox(width: AppConfig.spacing16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Created',
-                                        style: Theme.of(context).textTheme.labelMedium,
-                                      ),
-                                      const SizedBox(height: AppConfig.spacing8),
-                                      Text(
-                                        _formatDate(order.created),
-                                        style: Theme.of(context).textTheme.bodyLarge,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                    OrderDetailCard(
+                      icon: Icons.access_time,
+                      label: 'Created',
+                      value: _formatDate(order.created),
                     ),
                   ],
                 ),

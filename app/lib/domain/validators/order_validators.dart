@@ -2,16 +2,14 @@ import '../../config/app_config.dart';
 
 class OrderValidators {
   static String? validateTitle(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Title is required';
-    }
+    if (value != null && value.trim().isNotEmpty) {
+      if (value.trim().length < AppConfig.minTitleLength) {
+        return 'Title must be at least ${AppConfig.minTitleLength} characters';
+      }
 
-    if (value.trim().length < AppConfig.minTitleLength) {
-      return 'Title must be at least ${AppConfig.minTitleLength} characters';
-    }
-
-    if (value.length > AppConfig.maxTitleLength) {
-      return 'Title must not exceed ${AppConfig.maxTitleLength} characters';
+      if (value.length > AppConfig.maxTitleLength) {
+        return 'Title must not exceed ${AppConfig.maxTitleLength} characters';
+      }
     }
 
     return null;

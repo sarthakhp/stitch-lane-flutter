@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../backend/models/order.dart';
-import '../../backend/models/order_status.dart';
 import '../../config/app_config.dart';
+import '../../utils/date_helper.dart';
+import 'order_list_item/order_status_avatar.dart';
+import 'order_list_item/order_title_text.dart';
+import 'order_list_item/order_subtitle.dart';
 
 class OrderListItem extends StatelessWidget {
   final Order order;
@@ -18,30 +20,9 @@ class OrderListItem extends StatelessWidget {
     required this.dueDateWarningThreshold,
   });
 
-  String _formatDate(DateTime date) {
-    return DateFormat('MMM d, y').format(date);
-  }
-
-  String? _getDescriptionPreview() {
-    if (order.description != null && order.description!.isNotEmpty) {
-      return order.description!.length > 50
-          ? '${order.description!.substring(0, 50)}...'
-          : order.description!;
-    }
-    return null;
-  }
-
-  bool _isDueSoon() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dueDate = DateTime(order.dueDate.year, order.dueDate.month, order.dueDate.day);
-    final difference = dueDate.difference(today).inDays;
-    return difference <= dueDateWarningThreshold && difference >= 0;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isDueSoon = _isDueSoon();
+    final isDueSoon = DateHelper.isDueSoon(order, dueDateWarningThreshold);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
@@ -63,53 +44,15 @@ class OrderListItem extends StatelessWidget {
           horizontal: AppConfig.spacing16,
           vertical: AppConfig.spacing8,
         ),
-        leading: CircleAvatar(
-          backgroundColor: order.status == OrderStatus.done
-              ? Colors.green.shade100
-              : Theme.of(context).colorScheme.secondaryContainer,
-          child: Icon(
-            order.status == OrderStatus.done
-                ? Icons.check_circle
-                : Icons.assignment,
-            color: order.status == OrderStatus.done
-                ? Colors.green.shade700
-                : Theme.of(context).colorScheme.onSecondaryContainer,
-          ),
+        leading: OrderStatusAvatar(status: order.status),
+        title: OrderTitleText(
+          order: order,
+          customerName: customerName,
         ),
-        title: Text(
-          order.title,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Due: ${_formatDate(order.dueDate)}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDueSoon ? colorScheme.error : null,
-                fontWeight: isDueSoon ? FontWeight.w600 : null,
-              ),
-            ),
-            if (customerName != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Customer: $customerName',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-            if (_getDescriptionPreview() != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                _getDescriptionPreview()!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
+        subtitle: OrderSubtitle(
+          order: order,
+          customerName: customerName,
+          isDueSoon: isDueSoon,
         ),
         onTap: onTap,
       ),

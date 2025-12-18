@@ -1,4 +1,5 @@
 class AppConfig {
+  static const double spacing4 = 4.0;
   static const double spacing8 = 8.0;
   static const double spacing12 = 12.0;
   static const double spacing16 = 16.0;
@@ -22,5 +23,8 @@ class AppConfig {
 
   static const double iconSize = 24.0;
   static const double largeIconSize = 48.0;
+
+  static const int descriptionPreviewLength = 50;
+  static const int orderIdPreviewLength = 8;
 }
 

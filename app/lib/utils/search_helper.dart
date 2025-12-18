@@ -2,6 +2,15 @@ import '../backend/models/customer.dart';
 import '../backend/models/order.dart';
 
 class SearchHelper {
+  static List<String> _splitQuery(String query) {
+    return query
+        .toLowerCase()
+        .trim()
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .toList();
+  }
+
   static List<Customer> filterCustomers(
     List<Customer> customers,
     String query,
@@ -10,33 +19,54 @@ class SearchHelper {
       return customers;
     }
 
-    final lowerQuery = query.toLowerCase().trim();
+    final queryWords = _splitQuery(query);
 
     return customers.where((customer) {
       final nameLower = customer.name.toLowerCase();
       final phoneLower = customer.phoneNumber?.toLowerCase() ?? '';
 
-      return nameLower.contains(lowerQuery) ||
-          phoneLower.contains(lowerQuery);
+      return queryWords.every((word) =>
+          nameLower.contains(word) || phoneLower.contains(word));
     }).toList();
+  }
+
+  static Customer? _findCustomerById(
+    List<Customer>? customers,
+    String customerId,
+  ) {
+    if (customers == null) return null;
+
+    try {
+      return customers.firstWhere((c) => c.id == customerId);
+    } catch (e) {
+      return null;
+    }
   }
 
   static List<Order> filterOrders(
     List<Order> orders,
-    String query,
-  ) {
+    String query, {
+    List<Customer>? customers,
+  }) {
     if (query.isEmpty) {
       return orders;
     }
 
-    final lowerQuery = query.toLowerCase().trim();
+    final queryWords = _splitQuery(query);
 
     return orders.where((order) {
-      final titleLower = order.title.toLowerCase();
+      final titleLower = order.title?.toLowerCase() ?? '';
       final descriptionLower = order.description?.toLowerCase() ?? '';
 
-      return titleLower.contains(lowerQuery) ||
-          descriptionLower.contains(lowerQuery);
+      final customer = _findCustomerById(customers, order.customerId);
+      final customerNameLower = customer?.name.toLowerCase() ?? '';
+      final customerPhoneLower = customer?.phoneNumber?.toLowerCase() ?? '';
+
+      return queryWords.every((word) =>
+          titleLower.contains(word) ||
+          descriptionLower.contains(word) ||
+          customerNameLower.contains(word) ||
+          customerPhoneLower.contains(word));
     }).toList();
   }
 }

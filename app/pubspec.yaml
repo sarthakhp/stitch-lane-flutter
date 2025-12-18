@@ -20,6 +20,9 @@ dependencies:
   google_sign_in: ^6.2.2
   googleapis: ^13.2.0
   extension_google_sign_in_as_googleapis_auth: ^2.0.12
+  flutter_contacts: ^1.1.9+2
+  url_launcher: 6.2.6
+  logger: ^2.6.2
 
 dev_dependencies:
   flutter_test:

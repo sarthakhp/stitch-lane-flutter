@@ -42,53 +42,6 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
     await CustomerService.loadCustomers(state, repository);
   }
 
-  Future<void> _deleteCustomer(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Customer'),
-        content: const Text('Are you sure you want to delete this customer?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      try {
-        final customerState = context.read<CustomerState>();
-        final customerRepository = context.read<CustomerRepository>();
-        final orderState = context.read<OrderState>();
-        final orderRepository = context.read<OrderRepository>();
-        await CustomerService.deleteCustomer(
-          customerState,
-          customerRepository,
-          id,
-          orderState: orderState,
-          orderRepository: orderRepository,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Customer deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete customer: $e')),
-          );
-        }
-      }
-    }
-  }
-
   void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query;

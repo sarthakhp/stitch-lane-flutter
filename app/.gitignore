@@ -48,6 +48,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android Gradle build cache (NOT the wrapper files - those should be committed)
+android/.gradle/
+**/android/.gradle/
+
 # Android local configuration
 android/local.properties
 **/local.properties

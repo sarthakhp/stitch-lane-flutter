@@ -5,6 +5,7 @@ export 'state/order_state.dart';
 export 'state/settings_state.dart';
 export 'services/auth_service.dart';
 export 'services/backup_service.dart';
+export 'services/contacts_service.dart';
 export 'services/customer_service.dart';
 export 'services/drive_service.dart';
 export 'services/order_service.dart';
@@ -12,4 +13,5 @@ export 'services/settings_service.dart';
 export 'validators/customer_validators.dart';
 export 'validators/order_validators.dart';
 export 'validators/settings_validators.dart';
+export 'models/contact_data.dart';
 
