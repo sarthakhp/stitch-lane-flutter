@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -25,8 +26,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _valueController = TextEditingController();
   DateTime? _selectedDueDate;
   bool _isLoading = false;
+  bool _isPaid = false;
   Customer? _selectedCustomer;
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
@@ -43,12 +46,17 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     if (_isEditing) {
       _titleController.text = widget.order!.title ?? '';
       _descriptionController.text = widget.order!.description ?? '';
+      _valueController.text = widget.order!.value.toString();
+      _isPaid = widget.order!.isPaid;
       _selectedDueDate = widget.order!.dueDate;
     } else {
+      _valueController.text = '0';
+      _isPaid = false;
       _selectedDueDate = DateTime.now();
     }
     _titleController.addListener(_onFieldChanged);
     _descriptionController.addListener(_onFieldChanged);
+    _valueController.addListener(_onFieldChanged);
   }
 
   void _onFieldChanged() {
@@ -71,8 +79,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   void dispose() {
     _titleController.removeListener(_onFieldChanged);
     _descriptionController.removeListener(_onFieldChanged);
+    _valueController.removeListener(_onFieldChanged);
     _titleController.dispose();
     _descriptionController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
@@ -159,6 +169,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
       final titleText = _titleController.text.trim();
       final descriptionText = _descriptionController.text.trim();
+      final valueInt = int.parse(_valueController.text.trim());
 
       final order = Order(
         id: _isEditing ? widget.order!.id : const Uuid().v4(),
@@ -168,6 +179,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         description: descriptionText.isEmpty ? null : descriptionText,
         created: _isEditing ? widget.order!.created : DateTime.now(),
         status: _isEditing ? widget.order!.status : OrderStatus.pending,
+        value: valueInt,
+        isPaid: _isPaid,
       );
 
       if (_isEditing) {
@@ -298,6 +311,33 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               enabled: !_isLoading,
             ),
             const SizedBox(height: AppConfig.spacing16),
+            TextFormField(
+              controller: _valueController,
+              decoration: const InputDecoration(
+                labelText: 'Order Value',
+                hintText: 'Enter order value',
+                prefixIcon: Icon(Icons.currency_rupee),
+                border: OutlineInputBorder(),
+                helperText: 'Enter positive, negative, or zero value',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: false),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
+              ],
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a value';
+                }
+                final intValue = int.tryParse(value.trim());
+                if (intValue == null) {
+                  return 'Please enter a valid integer';
+                }
+                return null;
+              },
+              textInputAction: TextInputAction.next,
+              enabled: !_isLoading,
+            ),
+            const SizedBox(height: AppConfig.spacing16),
             InkWell(
               onTap: _isLoading ? null : _selectDueDate,
               child: InputDecorator(
@@ -319,6 +359,26 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       : Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: Theme.of(context).hintColor,
                           ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppConfig.spacing16),
+            Card(
+              child: SwitchListTile(
+                title: const Text('Payment Status'),
+                subtitle: Text(_isPaid ? 'Paid' : 'Not Paid'),
+                value: _isPaid,
+                onChanged: _isLoading ? null : (value) {
+                  setState(() {
+                    _isPaid = value;
+                    _hasUnsavedChanges = true;
+                  });
+                },
+                secondary: Icon(
+                  _isPaid ? Icons.check_circle : Icons.pending,
+                  color: _isPaid
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
                 ),
               ),
             ),

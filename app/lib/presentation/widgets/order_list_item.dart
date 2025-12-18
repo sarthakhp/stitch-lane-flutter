@@ -41,26 +41,77 @@ class OrderListItem extends StatelessWidget {
               ),
             )
           : null,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppConfig.spacing16,
-          vertical: AppConfig.spacing8,
-        ),
-        leading: InkWell(
-          onTap: onStatusToggle,
-          borderRadius: BorderRadius.circular(20),
-          child: OrderStatusAvatar(status: order.status),
-        ),
-        title: OrderTitleText(
-          order: order,
-          customerName: customerName,
-        ),
-        subtitle: OrderSubtitle(
-          order: order,
-          customerName: customerName,
-          isDueSoon: isDueSoon,
-        ),
+      child: InkWell(
         onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppConfig.spacing16),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: onStatusToggle,
+                borderRadius: BorderRadius.circular(20),
+                child: OrderStatusAvatar(status: order.status),
+              ),
+              const SizedBox(width: AppConfig.spacing16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OrderTitleText(
+                      order: order,
+                      customerName: customerName,
+                    ),
+                    const SizedBox(height: AppConfig.spacing4),
+                    OrderSubtitle(
+                      order: order,
+                      customerName: customerName,
+                      isDueSoon: isDueSoon,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppConfig.spacing16),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '₹${order.value}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: order.isPaid
+                          ? colorScheme.primary
+                          : colorScheme.error,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConfig.spacing4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConfig.spacing8,
+                      vertical: AppConfig.spacing4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: order.isPaid
+                          ? colorScheme.primaryContainer
+                          : colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(AppConfig.spacing12),
+                    ),
+                    child: Text(
+                      order.isPaid ? 'Paid' : 'Not Paid',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: order.isPaid
+                            ? colorScheme.onPrimaryContainer
+                            : colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

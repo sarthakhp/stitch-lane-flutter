@@ -1,9 +1,12 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/contact_data.dart';
 
 class ContactsService {
-  static bool get isContactsAvailable => Platform.isAndroid || Platform.isIOS;
+  static bool get isContactsAvailable {
+    if (kIsWeb) return false;
+    return true;
+  }
 
   static Future<bool> checkPermission() async {
     if (!isContactsAvailable) return false;

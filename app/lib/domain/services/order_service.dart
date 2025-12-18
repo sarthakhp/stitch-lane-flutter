@@ -1,4 +1,5 @@
 import '../../backend/models/order.dart';
+import '../../backend/models/order_status.dart';
 import '../../backend/repositories/order_repository.dart';
 import '../state/order_state.dart';
 
@@ -93,6 +94,24 @@ class OrderService {
     } finally {
       state.setLoading(false);
     }
+  }
+
+  static int getPendingOrdersCount(List<Order> orders) {
+    return orders.where((order) => order.status == OrderStatus.pending).length;
+  }
+
+  static int getCustomersWithPendingOrdersCount(List<Order> orders) {
+    final customerIds = orders
+        .where((order) => order.status == OrderStatus.pending)
+        .map((order) => order.customerId)
+        .toSet();
+    return customerIds.length;
+  }
+
+  static int getTotalUnpaidAmount(List<Order> orders) {
+    return orders
+        .where((order) => !order.isPaid)
+        .fold(0, (sum, order) => sum + order.value);
   }
 }
 

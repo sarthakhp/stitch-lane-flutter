@@ -26,6 +26,12 @@ class Order {
   @HiveField(6)
   final OrderStatus status;
 
+  @HiveField(7)
+  final int value;
+
+  @HiveField(8)
+  final bool isPaid;
+
   Order({
     required this.id,
     required this.customerId,
@@ -34,6 +40,8 @@ class Order {
     this.description,
     required this.created,
     this.status = OrderStatus.pending,
+    this.value = 0,
+    this.isPaid = false,
   });
 
   Order copyWith({
@@ -44,6 +52,8 @@ class Order {
     String? description,
     DateTime? created,
     OrderStatus? status,
+    int? value,
+    bool? isPaid,
   }) {
     return Order(
       id: id ?? this.id,
@@ -53,6 +63,8 @@ class Order {
       description: description ?? this.description,
       created: created ?? this.created,
       status: status ?? this.status,
+      value: value ?? this.value,
+      isPaid: isPaid ?? this.isPaid,
     );
   }
 
@@ -65,6 +77,8 @@ class Order {
       'description': description,
       'created': created.toIso8601String(),
       'status': status.name,
+      'value': value,
+      'isPaid': isPaid,
     };
   }
 
@@ -82,12 +96,14 @@ class Order {
               orElse: () => OrderStatus.pending,
             )
           : OrderStatus.pending,
+      value: json['value'] as int? ?? 0,
+      isPaid: json['isPaid'] as bool? ?? false,
     );
   }
 
   @override
   String toString() {
-    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status)';
+    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid)';
   }
 
   @override

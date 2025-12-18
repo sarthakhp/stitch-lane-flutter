@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../backend/repositories/order_repository.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../domain/services/order_service.dart';
+import '../domain/state/order_state.dart';
+import '../presentation/widgets/dashboard_stats_card.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadOrders();
+    });
+  }
+
+  Future<void> _loadOrders() async {
+    final orderState = context.read<OrderState>();
+    final orderRepository = context.read<OrderRepository>();
+
+    if (orderState.orders.isEmpty) {
+      await OrderService.loadOrders(orderState, orderRepository);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +43,46 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Consumer<OrderState>(
+              builder: (context, orderState, child) {
+                final orders = orderState.orders;
+                final pendingCount = OrderService.getPendingOrdersCount(orders);
+                final customersWithPendingCount = OrderService.getCustomersWithPendingOrdersCount(orders);
+                final unpaidAmount = OrderService.getTotalUnpaidAmount(orders);
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: DashboardStatsCard(
+                        icon: Icons.pending_actions,
+                        label: 'Pending Orders',
+                        value: pendingCount.toString(),
+                        valueColor: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(width: AppConfig.spacing16),
+                    Expanded(
+                      child: DashboardStatsCard(
+                        icon: Icons.people_outline,
+                        label: 'Customers Pending',
+                        value: customersWithPendingCount.toString(),
+                        valueColor: Theme.of(context).colorScheme.tertiary,
+                      ),
+                    ),
+                    const SizedBox(width: AppConfig.spacing16),
+                    Expanded(
+                      child: DashboardStatsCard(
+                        icon: Icons.currency_rupee,
+                        label: 'Unpaid Amount',
+                        value: '₹$unpaidAmount',
+                        valueColor: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: AppConfig.spacing24),
             Card(
               child: InkWell(
                 onTap: () {

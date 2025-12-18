@@ -47,27 +47,27 @@ class OrderStatusToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<OrderStatus>(
-        segments: const [
-          ButtonSegment<OrderStatus>(
-            value: OrderStatus.pending,
-            label: Text('Pending'),
-            icon: Icon(Icons.pending_outlined),
+    final isDone = order.status == OrderStatus.done;
+
+    return Card(
+      child: SwitchListTile(
+        title: const Text('Order Status'),
+        subtitle: Text(
+          isDone ? 'Done' : 'Pending',
+          style: TextStyle(
+            color: isDone
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.error,
+            fontWeight: FontWeight.w500,
           ),
-          ButtonSegment<OrderStatus>(
-            value: OrderStatus.done,
-            label: Text('Done'),
-            icon: Icon(Icons.check_circle_outline),
-          ),
-        ],
-        selected: {order.status},
-        onSelectionChanged: (Set<OrderStatus> newSelection) {
-          _toggleOrderStatus(context);
-        },
-        style: const ButtonStyle(
-          visualDensity: VisualDensity.comfortable,
+        ),
+        value: isDone,
+        onChanged: (value) => _toggleOrderStatus(context),
+        secondary: Icon(
+          isDone ? Icons.check_circle : Icons.pending,
+          color: isDone
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.error,
         ),
       ),
     );
