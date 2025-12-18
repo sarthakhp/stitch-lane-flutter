@@ -3,6 +3,7 @@ import '../models/customer.dart';
 import '../models/order.dart';
 import '../models/order_status.dart';
 import '../models/app_settings.dart';
+import '../models/measurement.dart';
 import '../../constants/app_constants.dart';
 
 class DatabaseService {
@@ -17,9 +18,11 @@ class DatabaseService {
       Hive.registerAdapter(OrderAdapter());
       Hive.registerAdapter(OrderStatusAdapter());
       Hive.registerAdapter(AppSettingsAdapter());
+      Hive.registerAdapter(MeasurementAdapter());
       await Hive.openBox<Customer>(AppConstants.customersBoxName);
       await Hive.openBox<Order>(AppConstants.ordersBoxName);
       await Hive.openBox<AppSettings>(AppConstants.settingsBoxName);
+      await Hive.openBox<Measurement>(AppConstants.measurementsBoxName);
       _initialized = true;
     } catch (e) {
       throw Exception('Failed to initialize database: $e');
@@ -45,6 +48,13 @@ class DatabaseService {
       throw Exception('Database not initialized. Call initialize() first.');
     }
     return Hive.box<AppSettings>(AppConstants.settingsBoxName);
+  }
+
+  static Box<Measurement> getMeasurementsBox() {
+    if (!_initialized) {
+      throw Exception('Database not initialized. Call initialize() first.');
+    }
+    return Hive.box<Measurement>(AppConstants.measurementsBoxName);
   }
 
   static Future<void> close() async {

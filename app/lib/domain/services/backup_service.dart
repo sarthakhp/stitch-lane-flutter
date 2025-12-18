@@ -14,13 +14,16 @@ class BackupService {
   static const String _metadataKey = 'metadata';
   static const String _customersKey = 'customers';
   static const String _ordersKey = 'orders';
+  static const String _measurementsKey = 'measurements';
   static const String _settingsKey = 'settings';
   static const String _customerCountKey = 'customerCount';
   static const String _orderCountKey = 'orderCount';
+  static const String _measurementCountKey = 'measurementCount';
 
   static Future<String> createBackup() async {
     final customersBox = DatabaseService.getCustomersBox();
     final ordersBox = DatabaseService.getOrdersBox();
+    final measurementsBox = DatabaseService.getMeasurementsBox();
     final settingsBox = DatabaseService.getSettingsBox();
 
     final settings = settingsBox.get(AppConstants.settingsKey);
@@ -32,11 +35,13 @@ class BackupService {
       _boxesKey: {
         _customersKey: customersBox.values.map((c) => c.toJson()).toList(),
         _ordersKey: ordersBox.values.map((o) => o.toJson()).toList(),
+        _measurementsKey: measurementsBox.values.map((m) => m.toJson()).toList(),
         _settingsKey: settings?.toJson(),
       },
       _metadataKey: {
         _customerCountKey: customersBox.length,
         _orderCountKey: ordersBox.length,
+        _measurementCountKey: measurementsBox.length,
       },
     };
 
@@ -49,17 +54,20 @@ class BackupService {
 
     final customersBox = DatabaseService.getCustomersBox();
     final ordersBox = DatabaseService.getOrdersBox();
+    final measurementsBox = DatabaseService.getMeasurementsBox();
     final settingsBox = DatabaseService.getSettingsBox();
 
     await Future.wait([
       customersBox.clear(),
       ordersBox.clear(),
+      measurementsBox.clear(),
     ]);
 
     final boxes = backupData[_boxesKey] as Map<String, dynamic>;
 
     await _restoreCustomers(boxes, customersBox);
     await _restoreOrders(boxes, ordersBox);
+    await _restoreMeasurements(boxes, measurementsBox);
     await _restoreSettings(boxes, settingsBox);
   }
 
@@ -86,6 +94,19 @@ class BackupService {
     for (var json in ordersList) {
       final order = Order.fromJson(json as Map<String, dynamic>);
       await ordersBox.put(order.id, order);
+    }
+  }
+
+  static Future<void> _restoreMeasurements(
+    Map<String, dynamic> boxes,
+    Box<Measurement> measurementsBox,
+  ) async {
+    final measurementsList = boxes[_measurementsKey] as List?;
+    if (measurementsList == null) return;
+
+    for (var json in measurementsList) {
+      final measurement = Measurement.fromJson(json as Map<String, dynamic>);
+      await measurementsBox.put(measurement.id, measurement);
     }
   }
 
@@ -125,6 +146,7 @@ class BackupService {
       _appVersionKey: backupData[_appVersionKey],
       _customerCountKey: metadata?[_customerCountKey] ?? 0,
       _orderCountKey: metadata?[_orderCountKey] ?? 0,
+      _measurementCountKey: metadata?[_measurementCountKey] ?? 0,
     };
   }
 }

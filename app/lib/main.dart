@@ -35,6 +35,10 @@ class StitchLaneApp extends StatelessWidget {
         Provider<OrderRepository>(
           create: (_) => HiveOrderRepository(),
         ),
+        ChangeNotifierProvider(create: (_) => MeasurementState()),
+        Provider<MeasurementRepository>(
+          create: (_) => HiveMeasurementRepository(),
+        ),
         ChangeNotifierProvider(create: (_) => SettingsState()),
         Provider<SettingsRepository>(
           create: (_) => HiveSettingsRepository(),

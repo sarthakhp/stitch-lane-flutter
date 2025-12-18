@@ -407,7 +407,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final confirmed = await ConfirmationDialog.show(
         context: context,
         title: 'Restore from Backup',
-        content: 'This will replace all current data with the backup from ${_formatDate(DateTime.parse(metadata['timestamp']))}.\n\nBackup contains:\n• ${metadata['customerCount']} customers\n• ${metadata['orderCount']} orders\n\nThis action cannot be undone.',
+        content: 'This will replace all current data with the backup from ${_formatDate(DateTime.parse(metadata['timestamp']))}.\n\nBackup contains:\n• ${metadata['customerCount']} customers\n• ${metadata['orderCount']} orders\n• ${metadata['measurementCount']} measurements\n\nThis action cannot be undone.',
         confirmText: 'Restore',
         cancelText: 'Cancel',
       );
@@ -419,9 +419,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final customerState = context.read<CustomerState>();
       final orderState = context.read<OrderState>();
+      final measurementState = context.read<MeasurementState>();
       final settingsState = context.read<SettingsState>();
       final customerRepository = context.read<CustomerRepository>();
       final orderRepository = context.read<OrderRepository>();
+      final measurementRepository = context.read<MeasurementRepository>();
       final settingsRepository = context.read<SettingsRepository>();
 
       backupState.setProgress(0.6);
@@ -432,6 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       await CustomerService.loadCustomers(customerState, customerRepository);
       await OrderService.loadOrders(orderState, orderRepository);
+      await MeasurementService.loadMeasurements(measurementState, measurementRepository);
       await SettingsService.loadSettings(settingsState, settingsRepository);
 
       _thresholdController.text = settingsState.dueDateWarningThreshold.toString();

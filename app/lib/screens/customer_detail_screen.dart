@@ -5,6 +5,7 @@ import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/widgets/contact_action_buttons.dart';
+import '../presentation/widgets/measurement_card.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final Customer customer;
@@ -25,6 +26,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   void initState() {
     super.initState();
     _customerId = widget.customer.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMeasurements();
+    });
+  }
+
+  Future<void> _loadMeasurements() async {
+    final state = context.read<MeasurementState>();
+    final repository = context.read<MeasurementRepository>();
+    await MeasurementService.loadMeasurementsByCustomerId(
+      state,
+      repository,
+      _customerId,
+    );
   }
 
   Future<void> _deleteCustomer(BuildContext context, String customerId) async {
@@ -148,6 +162,29 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: AppConfig.spacing16),
+            Consumer<MeasurementState>(
+              builder: (context, measurementState, child) {
+                final latestMeasurement = measurementState.getLatestMeasurementForCustomer(_customerId);
+                return MeasurementCard(
+                  latestMeasurement: latestMeasurement,
+                  onCreateNew: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.measurementFormRoute,
+                      arguments: {'customer': customer},
+                    );
+                  },
+                  onViewAll: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.measurementsListRoute,
+                      arguments: customer,
+                    );
+                  },
+                );
+              },
             ),
             if (customer.phoneNumber != null && customer.phoneNumber!.isNotEmpty) ...[
               const SizedBox(height: AppConfig.spacing16),
