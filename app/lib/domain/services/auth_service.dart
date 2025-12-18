@@ -1,13 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
+import 'package:hive/hive.dart';
 import '../../config/auth_config.dart';
+import '../../backend/backend.dart';
 import '../state/auth_state.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: AuthConfig.googleClientId,
+    scopes: [
+      drive.DriveApi.driveAppdataScope,
+    ],
   );
+
+  static GoogleSignIn get googleSignIn => _googleSignIn;
+
+  static Future<void> initializeAuthPersistence() async {
+    await _auth.setPersistence(Persistence.LOCAL);
+  }
 
   static Future<void> signInWithGoogle(AuthState authState) async {
     try {
@@ -42,14 +54,38 @@ class AuthService {
       authState.setLoading(true);
       authState.clearError();
 
+      print('[AuthService] Signing out and clearing local data...');
+
       await Future.wait([
         _auth.signOut(),
         _googleSignIn.signOut(),
       ]);
 
+      await _clearLocalDatabases();
+
       authState.signOut();
+      print('[AuthService] Sign out complete');
     } catch (e) {
       authState.setError('Failed to sign out: ${e.toString()}');
+    }
+  }
+
+  static Future<void> _clearLocalDatabases() async {
+    try {
+      print('[AuthService] Clearing Hive databases...');
+
+      final customersBox = Hive.box<Customer>('customers_box');
+      final ordersBox = Hive.box<Order>('orders_box');
+      final settingsBox = Hive.box<AppSettings>('settings_box');
+
+      await customersBox.clear();
+      await ordersBox.clear();
+      await settingsBox.clear();
+
+      print('[AuthService] Local databases cleared');
+    } catch (e) {
+      print('[AuthService] Error clearing databases: $e');
+      rethrow;
     }
   }
 

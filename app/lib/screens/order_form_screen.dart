@@ -181,6 +181,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 800),
             content: Text(
               _isEditing
                   ? 'Order updated successfully'

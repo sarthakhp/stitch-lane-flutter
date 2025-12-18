@@ -2,6 +2,7 @@ class AppConstants {
   static const String customersBoxName = 'customers_box';
   static const String ordersBoxName = 'orders_box';
   static const String settingsBoxName = 'settings_box';
+  static const String settingsKey = 'app_settings';
 
   static const String loginRoute = '/login';
   static const String homeRoute = '/';

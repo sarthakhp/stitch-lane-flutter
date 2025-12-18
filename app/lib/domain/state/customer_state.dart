@@ -47,5 +47,12 @@ class CustomerState extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  void clearCustomers() {
+    _customers = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
 }
 

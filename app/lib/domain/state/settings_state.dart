@@ -25,5 +25,12 @@ class SettingsState extends ChangeNotifier {
     _error = error;
     notifyListeners();
   }
+
+  void reset() {
+    _settings = AppSettings();
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
 }
 

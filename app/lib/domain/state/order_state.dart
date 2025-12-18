@@ -56,5 +56,12 @@ class OrderState extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
+
+  void clearOrders() {
+    _orders = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
 }
 

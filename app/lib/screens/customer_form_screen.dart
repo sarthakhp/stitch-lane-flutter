@@ -122,6 +122,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 700),
             content: Text(
               _isEditing
                   ? 'Customer updated successfully'

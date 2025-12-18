@@ -51,6 +51,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(milliseconds: 800),
             content: Text(
               newStatus == OrderStatus.done
                   ? 'Order marked as done'

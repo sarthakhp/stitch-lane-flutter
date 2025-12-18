@@ -5,13 +5,15 @@ import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
-import 'constants/app_constants.dart';
+import 'screens/login_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await AuthService.initializeAuthPersistence();
   await DatabaseService.initialize();
   runApp(const StitchLaneApp());
 }
@@ -24,6 +26,7 @@ class StitchLaneApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthState()),
+        ChangeNotifierProvider(create: (_) => BackupState()),
         ChangeNotifierProvider(create: (_) => CustomerState()),
         Provider<CustomerRepository>(
           create: (_) => HiveCustomerRepository(),
@@ -50,16 +53,33 @@ class AppInitializer extends StatefulWidget {
 }
 
 class _AppInitializerState extends State<AppInitializer> {
+  bool _isInitializing = true;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeApp();
+    _initializeApp();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    AuthService.authStateChanges().listen((user) {
+      if (mounted) {
+        final authState = context.read<AuthState>();
+        if (user != null) {
+          authState.setUser(user);
+        } else {
+          authState.signOut();
+        }
+      }
     });
   }
 
   Future<void> _initializeApp() async {
     final authState = context.read<AuthState>();
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
     final currentUser = AuthService.getCurrentUser();
 
     if (currentUser != null) {
@@ -69,17 +89,27 @@ class _AppInitializerState extends State<AppInitializer> {
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
     await SettingsService.loadSettings(settingsState, settingsRepository);
-  }
 
-  String _getInitialRoute() {
-    final authState = context.watch<AuthState>();
-    return authState.isAuthenticated
-        ? AppConstants.homeRoute
-        : AppConstants.loginRoute;
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
       title: 'Stitch Lane',
       debugShowCheckedModeBanner: false,
@@ -106,9 +136,24 @@ class _AppInitializerState extends State<AppInitializer> {
         ),
       ),
       themeMode: ThemeMode.system,
-      initialRoute: _getInitialRoute(),
+      home: const AuthGate(),
       onGenerateRoute: AppRoutes.generateRoute,
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = context.watch<AuthState>();
+
+    if (authState.isAuthenticated) {
+      return const HomeScreen();
+    } else {
+      return const LoginScreen();
+    }
   }
 }
 
