@@ -22,13 +22,14 @@ class MeasurementAdapter extends TypeAdapter<Measurement> {
       description: fields[2] as String,
       created: fields[3] as DateTime,
       modified: fields[4] as DateTime,
+      audioFilePath: fields[5] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Measurement obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class MeasurementAdapter extends TypeAdapter<Measurement> {
       ..writeByte(3)
       ..write(obj.created)
       ..writeByte(4)
-      ..write(obj.modified);
+      ..write(obj.modified)
+      ..writeByte(5)
+      ..write(obj.audioFilePath);
   }
 
   @override

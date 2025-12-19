@@ -7,12 +7,14 @@ class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
   final VoidCallback onCreateNew;
   final VoidCallback onViewAll;
+  final VoidCallback? onTapLatest;
 
   const MeasurementCard({
     super.key,
     this.latestMeasurement,
     required this.onCreateNew,
     required this.onViewAll,
+    this.onTapLatest,
   });
 
   @override
@@ -46,55 +48,71 @@ class MeasurementCard extends StatelessWidget {
             ),
             if (latestMeasurement != null) ...[
               const SizedBox(height: AppConfig.spacing16),
-              Container(
-                padding: const EdgeInsets.all(AppConfig.spacing12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Latest Measurement',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+              InkWell(
+                onTap: onTapLatest,
+                borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+                child: Container(
+                  padding: const EdgeInsets.all(AppConfig.spacing12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Latest Measurement',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          if (onTapLatest != null)
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: AppConfig.spacing8),
-                    Text(
-                      _getPreviewText(latestMeasurement!.description),
-                      style: textTheme.bodyMedium,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppConfig.spacing12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Created: ${DateFormat('MMM d, y').format(latestMeasurement!.created)}',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                      const SizedBox(height: AppConfig.spacing8),
+                      Text(
+                        _getPreviewText(latestMeasurement!.description),
+                        style: textTheme.bodyMedium,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: AppConfig.spacing12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Created: ${DateFormat('MMM d, y').format(latestMeasurement!.created)}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppConfig.spacing4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Modified: ${DateFormat('MMM d, y').format(latestMeasurement!.modified)}',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                        ],
+                      ),
+                      const SizedBox(height: AppConfig.spacing4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Modified: ${DateFormat('MMM d, y').format(latestMeasurement!.modified)}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ] else ...[

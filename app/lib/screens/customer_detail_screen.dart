@@ -183,6 +183,18 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                       arguments: customer,
                     );
                   },
+                  onTapLatest: latestMeasurement != null
+                      ? () {
+                          Navigator.pushNamed(
+                            context,
+                            AppConstants.measurementDetailRoute,
+                            arguments: {
+                              'measurement': latestMeasurement,
+                              'customer': customer,
+                            },
+                          );
+                        }
+                      : null,
                 );
               },
             ),

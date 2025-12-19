@@ -347,9 +347,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       await DriveService.uploadBackup(backupJson);
 
-      backupState.setProgress(0.6);
+      backupState.setProgress(0.5);
 
       await ImageSyncService.syncImagesToDrive();
+
+      backupState.setProgress(0.7);
+
+      await AudioSyncService.syncAudiosToDrive();
 
       backupState.setProgress(0.9);
 

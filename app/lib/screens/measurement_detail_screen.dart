@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
+import '../presentation/widgets/audio_player_widget.dart';
 
 class MeasurementDetailScreen extends StatefulWidget {
   final Measurement measurement;
@@ -28,6 +30,13 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
   void initState() {
     super.initState();
     _measurementId = widget.measurement.id;
+  }
+
+  String _getAudioPlayerKey() {
+    if (widget.measurement.audioFilePath == null) return '';
+    final file = File(widget.measurement.audioFilePath!);
+    if (!file.existsSync()) return widget.measurement.audioFilePath!;
+    return '${widget.measurement.audioFilePath}_${file.lastModifiedSync().millisecondsSinceEpoch}';
   }
 
   Future<void> _deleteMeasurement(BuildContext context, String measurementId) async {
@@ -130,6 +139,38 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: AppConfig.spacing16),
+                if (measurement.audioFilePath != null && File(measurement.audioFilePath!).existsSync())
+                  Column(
+                    children: [
+                      AudioPlayerWidget(
+                        key: ValueKey(_getAudioPlayerKey()),
+                        audioFilePath: measurement.audioFilePath!,
+                      ),
+                      const SizedBox(height: AppConfig.spacing16),
+                    ],
+                  )
+                else
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppConfig.spacing16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.mic_off,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: AppConfig.spacing16),
+                          Text(
+                            'No audio recording',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: AppConfig.spacing16),
                 Card(
                   child: Padding(

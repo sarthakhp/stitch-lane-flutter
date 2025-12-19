@@ -7,6 +7,7 @@ class StickyBottomActionBar extends StatelessWidget {
   final String cancelLabel;
   final String saveLabel;
   final bool isLoading;
+  final Widget? topWidget;
 
   const StickyBottomActionBar({
     super.key,
@@ -15,6 +16,7 @@ class StickyBottomActionBar extends StatelessWidget {
     this.cancelLabel = 'Cancel',
     this.saveLabel = 'Save',
     this.isLoading = false,
+    this.topWidget,
   });
 
   @override
@@ -33,26 +35,35 @@ class StickyBottomActionBar extends StatelessWidget {
       padding: const EdgeInsets.all(AppConfig.spacing16),
       child: SafeArea(
         top: false,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: isLoading ? null : onCancel,
-                child: Text(cancelLabel),
-              ),
-            ),
-            const SizedBox(width: AppConfig.spacing16),
-            Expanded(
-              child: FilledButton(
-                onPressed: isLoading ? null : onSave,
-                child: isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(saveLabel),
-              ),
+            if (topWidget != null) ...[
+              topWidget!,
+              const SizedBox(height: AppConfig.spacing16),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isLoading ? null : onCancel,
+                    child: Text(cancelLabel),
+                  ),
+                ),
+                const SizedBox(width: AppConfig.spacing16),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: isLoading ? null : onSave,
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(saveLabel),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import 'image_sync_service.dart';
+import 'audio_sync_service.dart';
 import '../../utils/app_logger.dart';
 
 class BackupService {
@@ -78,6 +79,14 @@ class BackupService {
       AppLogger.info('Images restored successfully');
     } catch (e) {
       AppLogger.error('Failed to restore images from Drive', e);
+    }
+
+    try {
+      AppLogger.info('Starting audio download from Drive after restore');
+      await AudioSyncService.downloadAudiosFromDrive();
+      AppLogger.info('Audio files restored successfully');
+    } catch (e) {
+      AppLogger.error('Failed to restore audio files from Drive', e);
     }
   }
 

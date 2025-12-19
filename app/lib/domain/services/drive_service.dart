@@ -9,6 +9,7 @@ class DriveService {
   static const String appFolderName = 'Stitch Lane';
   static const String backupFileName = 'stitch_lane_backup.json';
   static const String imagesFolderName = 'images';
+  static const String audiosFolderName = 'audios';
 
   static Future<drive.DriveApi> getDriveApi() async {
     try {
@@ -158,9 +159,15 @@ class DriveService {
         (sum, img) => sum + (int.tryParse(img['size']?.toString() ?? '0') ?? 0),
       );
 
+      final audios = await DriveServiceAudioOperations.listAudiosInFolder(driveApi);
+      final audiosSize = audios.fold<int>(
+        0,
+        (sum, audio) => sum + (int.tryParse(audio['size']?.toString() ?? '0') ?? 0),
+      );
+
       return BackupInfo(
         lastModified: file.modifiedTime ?? DateTime.now(),
-        size: backupSize + imagesSize,
+        size: backupSize + imagesSize + audiosSize,
       );
     } catch (e) {
       return null;
@@ -297,6 +304,124 @@ extension DriveServiceImageOperations on DriveService {
       AppLogger.info('Deleted image from Drive: $fileId');
     } catch (e) {
       AppLogger.error('Failed to delete image from Drive', e);
+      rethrow;
+    }
+  }
+}
+
+extension DriveServiceAudioOperations on DriveService {
+  static Future<String?> _getAudiosFolderId(drive.DriveApi driveApi) async {
+    final folderId = await DriveService._getAppDataFolderId(driveApi);
+    if (folderId == null) return null;
+
+    final fileList = await driveApi.files.list(
+      q: "name='${DriveService.audiosFolderName}' and '$folderId' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id, name)',
+    );
+
+    if (fileList.files != null && fileList.files!.isNotEmpty) {
+      return fileList.files!.first.id;
+    }
+
+    final folderMetadata = drive.File()
+      ..name = DriveService.audiosFolderName
+      ..mimeType = 'application/vnd.google-apps.folder'
+      ..parents = [folderId];
+
+    final folder = await driveApi.files.create(
+      folderMetadata,
+      $fields: 'id',
+    );
+
+    AppLogger.info('Created audios folder: ${folder.id}');
+    return folder.id;
+  }
+
+  static Future<List<Map<String, dynamic>>> listAudiosInFolder(drive.DriveApi driveApi) async {
+    final audiosFolderId = await _getAudiosFolderId(driveApi);
+    if (audiosFolderId == null) return [];
+
+    final fileList = await driveApi.files.list(
+      q: "'$audiosFolderId' in parents and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id, name, size, modifiedTime)',
+    );
+
+    if (fileList.files == null || fileList.files!.isEmpty) {
+      return [];
+    }
+
+    return fileList.files!.map((file) => {
+      'id': file.id,
+      'name': file.name,
+      'size': file.size,
+      'modifiedTime': file.modifiedTime,
+    }).toList();
+  }
+
+  static Future<void> uploadAudio(drive.DriveApi driveApi, String fileName, List<int> audioBytes) async {
+    final audiosFolderId = await _getAudiosFolderId(driveApi);
+    if (audiosFolderId == null) {
+      throw Exception('Failed to access audios folder');
+    }
+
+    final fileList = await driveApi.files.list(
+      q: "name='$fileName' and '$audiosFolderId' in parents and trashed=false",
+      spaces: 'appDataFolder',
+      $fields: 'files(id)',
+    );
+
+    final media = drive.Media(
+      Stream.value(audioBytes),
+      audioBytes.length,
+    );
+
+    if (fileList.files != null && fileList.files!.isNotEmpty) {
+      await driveApi.files.update(
+        drive.File(),
+        fileList.files!.first.id!,
+        uploadMedia: media,
+      );
+      AppLogger.info('Updated existing audio: $fileName');
+    } else {
+      final fileMetadata = drive.File()
+        ..name = fileName
+        ..parents = [audiosFolderId];
+
+      await driveApi.files.create(
+        fileMetadata,
+        uploadMedia: media,
+      );
+      AppLogger.info('Uploaded new audio: $fileName');
+    }
+  }
+
+  static Future<List<int>?> downloadAudio(drive.DriveApi driveApi, String fileId) async {
+    try {
+      final media = await driveApi.files.get(
+        fileId,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media;
+
+      final List<int> dataStore = [];
+      await for (var data in media.stream) {
+        dataStore.addAll(data);
+      }
+
+      return dataStore;
+    } catch (e) {
+      AppLogger.error('Failed to download audio', e);
+      return null;
+    }
+  }
+
+  static Future<void> deleteAudioFromDrive(drive.DriveApi driveApi, String fileId) async {
+    try {
+      await driveApi.files.delete(fileId);
+      AppLogger.info('Deleted audio from Drive: $fileId');
+    } catch (e) {
+      AppLogger.error('Failed to delete audio from Drive', e);
       rethrow;
     }
   }

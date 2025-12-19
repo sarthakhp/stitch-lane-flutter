@@ -19,12 +19,16 @@ class Measurement {
   @HiveField(4)
   final DateTime modified;
 
+  @HiveField(5)
+  final String? audioFilePath;
+
   Measurement({
     required this.id,
     required this.customerId,
     required this.description,
     required this.created,
     required this.modified,
+    this.audioFilePath,
   });
 
   Measurement copyWith({
@@ -33,6 +37,7 @@ class Measurement {
     String? description,
     DateTime? created,
     DateTime? modified,
+    String? audioFilePath,
   }) {
     return Measurement(
       id: id ?? this.id,
@@ -40,6 +45,7 @@ class Measurement {
       description: description ?? this.description,
       created: created ?? this.created,
       modified: modified ?? this.modified,
+      audioFilePath: audioFilePath ?? this.audioFilePath,
     );
   }
 
@@ -50,6 +56,7 @@ class Measurement {
       'description': description,
       'created': created.toIso8601String(),
       'modified': modified.toIso8601String(),
+      'audioFilePath': audioFilePath,
     };
   }
 
@@ -60,12 +67,13 @@ class Measurement {
       description: json['description'] as String,
       created: DateTime.parse(json['created'] as String),
       modified: DateTime.parse(json['modified'] as String),
+      audioFilePath: json['audioFilePath'] as String?,
     );
   }
 
   @override
   String toString() {
-    return 'Measurement(id: $id, customerId: $customerId, description: $description, created: $created, modified: $modified)';
+    return 'Measurement(id: $id, customerId: $customerId, description: $description, created: $created, modified: $modified, audioFilePath: $audioFilePath)';
   }
 
   @override

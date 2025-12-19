@@ -1,6 +1,7 @@
 import '../../backend/models/measurement.dart';
 import '../../backend/repositories/measurement_repository.dart';
 import '../state/measurement_state.dart';
+import 'audio_recording_service.dart';
 
 class MeasurementService {
   static Future<void> loadMeasurements(
@@ -85,10 +86,37 @@ class MeasurementService {
     state.clearError();
 
     try {
+      await AudioRecordingService.deleteRecording(id);
       await repository.deleteMeasurement(id);
       state.removeMeasurement(id);
     } catch (e) {
       state.setError('Failed to delete measurement: $e');
+      rethrow;
+    } finally {
+      state.setLoading(false);
+    }
+  }
+
+  static Future<void> deleteMeasurementsByCustomerId(
+    MeasurementState state,
+    MeasurementRepository repository,
+    String customerId,
+  ) async {
+    state.setLoading(true);
+    state.clearError();
+
+    try {
+      final measurements = await repository.getMeasurementsByCustomerId(customerId);
+      for (final measurement in measurements) {
+        await AudioRecordingService.deleteRecording(measurement.id);
+      }
+      await repository.deleteMeasurementsByCustomerId(customerId);
+      final remainingMeasurements = state.measurements
+          .where((m) => m.customerId != customerId)
+          .toList();
+      state.setMeasurements(remainingMeasurements);
+    } catch (e) {
+      state.setError('Failed to delete measurements: $e');
       rethrow;
     } finally {
       state.setLoading(false);

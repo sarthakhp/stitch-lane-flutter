@@ -232,6 +232,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               arguments: customer,
                             );
                           },
+                          onTapLatest: latestMeasurement != null
+                              ? () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppConstants.measurementDetailRoute,
+                                    arguments: {
+                                      'measurement': latestMeasurement,
+                                      'customer': customer,
+                                    },
+                                  );
+                                }
+                              : null,
                         );
                       },
                     ),
