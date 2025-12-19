@@ -6,7 +6,7 @@ class DateHelper {
     Order order,
     int dueDateWarningThreshold,
   ) {
-    if (order.status == OrderStatus.done) {
+    if (order.status == OrderStatus.done || order.status == OrderStatus.ready) {
       return false;
     }
 
@@ -18,8 +18,8 @@ class DateHelper {
       order.dueDate.day,
     );
     final difference = dueDate.difference(today).inDays;
-    
-    return difference <= dueDateWarningThreshold && difference >= 0;
+
+    return difference <= dueDateWarningThreshold;
   }
 }
 

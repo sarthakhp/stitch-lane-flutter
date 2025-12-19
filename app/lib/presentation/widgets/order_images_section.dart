@@ -209,7 +209,7 @@ class OrderImagesSection extends StatelessWidget {
             top: 4,
             right: 4,
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.black54,
                 shape: BoxShape.circle,
               ),
@@ -236,7 +236,9 @@ class OrderImagesSection extends StatelessWidget {
           initialIndex: initialIndex,
           onDelete: (index) async {
             await _deleteImage(context, index);
-            Navigator.pop(context);
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
           },
         ),
       ),

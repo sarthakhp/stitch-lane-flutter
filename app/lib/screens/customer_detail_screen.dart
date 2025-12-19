@@ -186,6 +186,73 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 );
               },
             ),
+            const SizedBox(height: AppConfig.spacing16),
+            Consumer<OrderState>(
+              builder: (context, orderState, child) {
+                final totalUnpaidAmount = orderState.getTotalUnpaidAmount(customer.id);
+                final hasUnpaidAmount = totalUnpaidAmount > 0;
+                final colorScheme = Theme.of(context).colorScheme;
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppConfig.spacing16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.currency_rupee,
+                          color: hasUnpaidAmount
+                              ? colorScheme.error
+                              : colorScheme.primary,
+                        ),
+                        const SizedBox(width: AppConfig.spacing16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total Unpaid Amount',
+                                style: Theme.of(context).textTheme.labelMedium,
+                              ),
+                              const SizedBox(height: AppConfig.spacing8),
+                              Text(
+                                '$totalUnpaidAmount',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: hasUnpaidAmount
+                                      ? colorScheme.error
+                                      : colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppConfig.spacing12,
+                            vertical: AppConfig.spacing8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: hasUnpaidAmount
+                                ? colorScheme.errorContainer
+                                : colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(AppConfig.spacing12),
+                          ),
+                          child: Text(
+                            hasUnpaidAmount ? 'Unpaid' : 'All Paid',
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: hasUnpaidAmount
+                                  ? colorScheme.onErrorContainer
+                                  : colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
             if (customer.phoneNumber != null && customer.phoneNumber!.isNotEmpty) ...[
               const SizedBox(height: AppConfig.spacing16),
               Card(

@@ -23,10 +23,10 @@ class OrderAdapter extends TypeAdapter<Order> {
       dueDate: fields[3] as DateTime,
       description: fields[4] as String?,
       created: fields[5] as DateTime,
-      status: fields[6] as OrderStatus? ?? OrderStatus.pending,
-      value: fields[7] as int? ?? 0,
-      isPaid: fields[8] as bool? ?? false,
-      imagePaths: fields[9] != null ? (fields[9] as List).cast<String>() : [],
+      status: fields[6] as OrderStatus,
+      value: fields[7] as int,
+      isPaid: fields[8] as bool,
+      imagePaths: (fields[9] as List).cast<String>(),
     );
   }
 

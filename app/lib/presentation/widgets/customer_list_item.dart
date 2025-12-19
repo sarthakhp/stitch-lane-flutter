@@ -6,45 +6,100 @@ class CustomerListItem extends StatelessWidget {
   final Customer customer;
   final VoidCallback onTap;
   final int pendingOrderCount;
+  final int totalUnpaidAmount;
 
   const CustomerListItem({
     super.key,
     required this.customer,
     required this.onTap,
     this.pendingOrderCount = 0,
+    this.totalUnpaidAmount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool hasNoPendingOrders = pendingOrderCount == 0;
+    final bool hasUnpaidAmount = totalUnpaidAmount > 0;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       margin: const EdgeInsets.symmetric(
         horizontal: AppConfig.spacing16,
         vertical: AppConfig.spacing8,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppConfig.spacing16,
-          vertical: AppConfig.spacing8,
-        ),
-        leading: CircleAvatar(
-          backgroundColor: hasNoPendingOrders
-              ? Colors.green.shade100
-              : Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(
-            hasNoPendingOrders ? Icons.check_circle : Icons.person,
-            color: hasNoPendingOrders
-                ? Colors.green.shade700
-                : Theme.of(context).colorScheme.onPrimaryContainer,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppConfig.spacing16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: hasNoPendingOrders
+                    ? Colors.green.shade100
+                    : Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(
+                  hasNoPendingOrders ? Icons.check_circle : Icons.person,
+                  color: hasNoPendingOrders
+                      ? Colors.green.shade700
+                      : Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: AppConfig.spacing16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppConfig.spacing4),
+                    _buildSubtitle(context),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppConfig.spacing16),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '₹$totalUnpaidAmount',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: hasUnpaidAmount
+                          ? colorScheme.error
+                          : colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConfig.spacing4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConfig.spacing8,
+                      vertical: AppConfig.spacing4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: hasUnpaidAmount
+                          ? colorScheme.errorContainer
+                          : colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppConfig.spacing12),
+                    ),
+                    child: Text(
+                      hasUnpaidAmount ? 'Unpaid' : 'All Paid',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: hasUnpaidAmount
+                            ? colorScheme.onErrorContainer
+                            : colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        title: Text(
-          customer.name,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: _buildSubtitle(context),
-        onTap: onTap,
       ),
     );
   }

@@ -19,6 +19,14 @@ class OrderState extends ChangeNotifier {
         .length;
   }
 
+  int getTotalUnpaidAmount(String customerId) {
+    return _orders
+        .where((order) =>
+            order.customerId == customerId &&
+            !order.isPaid)
+        .fold(0, (sum, order) => sum + order.value);
+  }
+
   void setOrders(List<Order> orders) {
     _orders = orders;
     notifyListeners();

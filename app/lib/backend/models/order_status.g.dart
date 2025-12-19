@@ -16,6 +16,8 @@ class OrderStatusAdapter extends TypeAdapter<OrderStatus> {
       case 0:
         return OrderStatus.pending;
       case 1:
+        return OrderStatus.ready;
+      case 2:
         return OrderStatus.done;
       default:
         return OrderStatus.pending;
@@ -28,8 +30,11 @@ class OrderStatusAdapter extends TypeAdapter<OrderStatus> {
       case OrderStatus.pending:
         writer.writeByte(0);
         break;
-      case OrderStatus.done:
+      case OrderStatus.ready:
         writer.writeByte(1);
+        break;
+      case OrderStatus.done:
+        writer.writeByte(2);
         break;
     }
   }

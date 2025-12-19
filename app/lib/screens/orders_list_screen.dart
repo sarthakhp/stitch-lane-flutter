@@ -3,13 +3,16 @@ import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../presentation/presentation.dart';
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../utils/utils.dart';
 
 enum OrderFilter {
   all,
   pending,
+  ready,
   unpaid,
+  unpaidDone,
 }
 
 class OrdersListScreen extends StatefulWidget {
@@ -74,9 +77,23 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     final repository = context.read<OrderRepository>();
 
     try {
-      final newStatus = order.status == OrderStatus.done
-          ? OrderStatus.pending
-          : OrderStatus.done;
+      final OrderStatus newStatus;
+      final String statusMessage;
+
+      switch (order.status) {
+        case OrderStatus.pending:
+          newStatus = OrderStatus.ready;
+          statusMessage = 'Order marked as ready';
+          break;
+        case OrderStatus.ready:
+          newStatus = OrderStatus.done;
+          statusMessage = 'Order marked as done';
+          break;
+        case OrderStatus.done:
+          newStatus = OrderStatus.pending;
+          statusMessage = 'Order marked as pending';
+          break;
+      }
 
       final updatedOrder = order.copyWith(status: newStatus);
 
@@ -86,11 +103,7 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 800),
-            content: Text(
-              newStatus == OrderStatus.done
-                  ? 'Order marked as done'
-                  : 'Order marked as pending',
-            ),
+            content: Text(statusMessage),
           ),
         );
       }
@@ -140,8 +153,16 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                               child: Text('Pending Orders'),
                             ),
                             DropdownMenuItem(
+                              value: OrderFilter.ready,
+                              child: Text('Ready Orders'),
+                            ),
+                            DropdownMenuItem(
                               value: OrderFilter.unpaid,
                               child: Text('Unpaid Orders'),
+                            ),
+                            DropdownMenuItem(
+                              value: OrderFilter.unpaidDone,
+                              child: Text('Unpaid Done Orders'),
                             ),
                           ],
                           onChanged: (OrderFilter? value) {
@@ -161,7 +182,10 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
           ),
         ),
       ),
-      body: Consumer3<OrderState, CustomerState, SettingsState>(
+      body: Column(
+        children: [
+          Expanded(
+            child: Consumer3<OrderState, CustomerState, SettingsState>(
         builder: (context, orderState, customerState, settingsState, child) {
           final state = orderState;
           if (state.isLoading && state.orders.isEmpty) {
@@ -199,9 +223,19 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
                   .where((order) => order.status == OrderStatus.pending)
                   .toList();
               break;
+            case OrderFilter.ready:
+              filteredOrders = filteredOrders
+                  .where((order) => order.status == OrderStatus.ready)
+                  .toList();
+              break;
             case OrderFilter.unpaid:
               filteredOrders = filteredOrders
                   .where((order) => !order.isPaid)
+                  .toList();
+              break;
+            case OrderFilter.unpaidDone:
+              filteredOrders = filteredOrders
+                  .where((order) => !order.isPaid && order.status == OrderStatus.done)
                   .toList();
               break;
             case OrderFilter.all:
@@ -264,19 +298,41 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.pushNamed(
-            context,
-            AppConstants.orderFormRoute,
-            arguments: widget.customer != null
-                ? <String, dynamic>{'customer': widget.customer}
-                : <String, dynamic>{},
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Create Order'),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(AppConfig.spacing16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.orderFormRoute,
+                      arguments: widget.customer != null
+                          ? <String, dynamic>{'customer': widget.customer}
+                          : <String, dynamic>{},
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Order'),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

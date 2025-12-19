@@ -9,19 +9,46 @@ class OrderStatusAvatar extends StatelessWidget {
     required this.status,
   });
 
+  Color _getBackgroundColor(BuildContext context) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Theme.of(context).colorScheme.secondaryContainer;
+      case OrderStatus.ready:
+        return Colors.orange.shade100;
+      case OrderStatus.done:
+        return Colors.green.shade100;
+    }
+  }
+
+  IconData _getIcon() {
+    switch (status) {
+      case OrderStatus.pending:
+        return Icons.assignment;
+      case OrderStatus.ready:
+        return Icons.schedule;
+      case OrderStatus.done:
+        return Icons.check_circle;
+    }
+  }
+
+  Color _getIconColor(BuildContext context) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Theme.of(context).colorScheme.onSecondaryContainer;
+      case OrderStatus.ready:
+        return Colors.orange.shade700;
+      case OrderStatus.done:
+        return Colors.green.shade700;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDone = status == OrderStatus.done;
-    
     return CircleAvatar(
-      backgroundColor: isDone
-          ? Colors.green.shade100
-          : Theme.of(context).colorScheme.secondaryContainer,
+      backgroundColor: _getBackgroundColor(context),
       child: Icon(
-        isDone ? Icons.check_circle : Icons.assignment,
-        color: isDone
-            ? Colors.green.shade700
-            : Theme.of(context).colorScheme.onSecondaryContainer,
+        _getIcon(),
+        color: _getIconColor(context),
       ),
     );
   }

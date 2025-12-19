@@ -6,6 +6,7 @@ class AppConstants {
   static const String settingsKey = 'app_settings';
 
   static const String loginRoute = '/login';
+  static const String backupRestoreCheckRoute = '/backup-restore-check';
   static const String homeRoute = '/';
   static const String customersListRoute = '/customers';
   static const String customerDetailRoute = '/customer/detail';

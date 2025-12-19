@@ -6,6 +6,7 @@ import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
 import 'screens/login_screen.dart';
+import 'screens/backup_restore_check_screen.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -147,15 +148,43 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _hasCheckedBackup = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authState = context.watch<AuthState>();
+
+    if (!authState.isAuthenticated) {
+      _hasCheckedBackup = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
 
     if (authState.isAuthenticated) {
-      return const HomeScreen();
+      if (_hasCheckedBackup) {
+        return const HomeScreen();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _hasCheckedBackup = true;
+            });
+          }
+        });
+        return const BackupRestoreCheckScreen();
+      }
     } else {
       return const LoginScreen();
     }

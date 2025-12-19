@@ -16,9 +16,23 @@ class OrderStatusToggle extends StatelessWidget {
     final repository = context.read<OrderRepository>();
 
     try {
-      final newStatus = order.status == OrderStatus.done
-          ? OrderStatus.pending
-          : OrderStatus.done;
+      final OrderStatus newStatus;
+      final String statusMessage;
+
+      switch (order.status) {
+        case OrderStatus.pending:
+          newStatus = OrderStatus.ready;
+          statusMessage = 'Order marked as ready';
+          break;
+        case OrderStatus.ready:
+          newStatus = OrderStatus.done;
+          statusMessage = 'Order marked as done';
+          break;
+        case OrderStatus.done:
+          newStatus = OrderStatus.pending;
+          statusMessage = 'Order marked as pending';
+          break;
+      }
 
       final updatedOrder = order.copyWith(status: newStatus);
 
@@ -28,11 +42,7 @@ class OrderStatusToggle extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 800),
-            content: Text(
-              newStatus == OrderStatus.done
-                  ? 'Order marked as done'
-                  : 'Order marked as pending',
-            ),
+            content: Text(statusMessage),
           ),
         );
       }
@@ -45,30 +55,57 @@ class OrderStatusToggle extends StatelessWidget {
     }
   }
 
+  String _getStatusText(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 'Pending';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.done:
+        return 'Done';
+    }
+  }
+
+  IconData _getStatusIcon(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Icons.pending;
+      case OrderStatus.ready:
+        return Icons.schedule;
+      case OrderStatus.done:
+        return Icons.check_circle;
+    }
+  }
+
+  Color _getStatusColor(BuildContext context, OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Theme.of(context).colorScheme.error;
+      case OrderStatus.ready:
+        return Colors.orange;
+      case OrderStatus.done:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDone = order.status == OrderStatus.done;
-
     return Card(
-      child: SwitchListTile(
+      child: ListTile(
         title: const Text('Order Status'),
         subtitle: Text(
-          isDone ? 'Done' : 'Pending',
+          _getStatusText(order.status),
           style: TextStyle(
-            color: isDone
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.error,
+            color: _getStatusColor(context, order.status),
             fontWeight: FontWeight.w500,
           ),
         ),
-        value: isDone,
-        onChanged: (value) => _toggleOrderStatus(context),
-        secondary: Icon(
-          isDone ? Icons.check_circle : Icons.pending,
-          color: isDone
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.error,
+        leading: Icon(
+          _getStatusIcon(order.status),
+          color: _getStatusColor(context, order.status),
         ),
+        trailing: const Icon(Icons.touch_app),
+        onTap: () => _toggleOrderStatus(context),
       ),
     );
   }

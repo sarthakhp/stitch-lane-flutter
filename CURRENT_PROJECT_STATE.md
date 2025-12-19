@@ -30,8 +30,8 @@
 | Model | TypeId | Key Fields | Notes |
 |-------|--------|------------|-------|
 | Customer | 0 | id, name, phone?, description?, created | Cascade deletes orders |
-| Order | 1 | id, customerId, title, dueDate, description?, status, created | Status: pending/done |
-| OrderStatus | 2 | pending, done | Enum |
+| Order | 1 | id, customerId, title, dueDate, description?, status, created | Status: pending/ready/done |
+| OrderStatus | 2 | pending, ready, done | Enum |
 | AppSettings | 3 | dueDateWarningThreshold | Stored as 'app_settings' |
 
 ---
@@ -107,10 +107,11 @@ utils/                 # Helper utilities
 
 ### Order Management
 - CRUD operations with validation
-- Status toggle (pending/done)
-- Due date tracking
+- Status toggle (pending → ready → done)
+- Due date tracking (warnings only for pending orders)
 - Search by title/description
 - Dual mode list (all orders / customer-specific)
+- Filter by status (all/pending/ready/unpaid)
 
 ### Settings
 - Due date warning threshold configuration

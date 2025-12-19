@@ -6,7 +6,6 @@ import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/widgets/order_detail_card.dart';
-import '../presentation/widgets/order_status_toggle.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
 import '../presentation/widgets/order_images_section.dart';
@@ -51,6 +50,92 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   String _formatDate(DateTime date) {
     return DateFormat('MMMM d, y').format(date);
+  }
+
+  String _getStatusText(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return 'Pending';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.done:
+        return 'Done';
+    }
+  }
+
+  IconData _getStatusIcon(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Icons.pending;
+      case OrderStatus.ready:
+        return Icons.schedule;
+      case OrderStatus.done:
+        return Icons.check_circle;
+    }
+  }
+
+  Color _getStatusColor(BuildContext context, OrderStatus status) {
+    switch (status) {
+      case OrderStatus.pending:
+        return Theme.of(context).colorScheme.error;
+      case OrderStatus.ready:
+        return Colors.orange;
+      case OrderStatus.done:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  Future<void> _toggleOrderStatus(BuildContext context, Order order) async {
+    final state = context.read<OrderState>();
+    final repository = context.read<OrderRepository>();
+
+    try {
+      final OrderStatus newStatus;
+
+      switch (order.status) {
+        case OrderStatus.pending:
+          newStatus = OrderStatus.ready;
+          break;
+        case OrderStatus.ready:
+          newStatus = OrderStatus.done;
+          break;
+        case OrderStatus.done:
+          newStatus = OrderStatus.pending;
+          break;
+      }
+
+      final updatedOrder = order.copyWith(status: newStatus);
+      await OrderService.updateOrder(state, repository, updatedOrder);
+
+      if (context.mounted) {
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update order status: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _togglePaymentStatus(BuildContext context, Order order) async {
+    final state = context.read<OrderState>();
+    final repository = context.read<OrderRepository>();
+
+    try {
+      final newValue = !order.isPaid;
+      final updatedOrder = order.copyWith(isPaid: newValue);
+      await OrderService.updateOrder(state, repository, updatedOrder);
+
+      if (context.mounted) {
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update payment status: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _deleteOrder(BuildContext context, String orderId) async {
@@ -100,7 +185,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             return Scaffold(
               appBar: AppBar(
-                title: const Text('Order Details'),
+                title: Text('Order for ${customer.name}'),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.edit),
@@ -159,8 +244,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ),
                       const SizedBox(height: AppConfig.spacing16),
                     ],
-                    OrderStatusToggle(order: order),
-                    const SizedBox(height: AppConfig.spacing16),
                     OrderDetailCard(
                       icon: Icons.calendar_today,
                       label: 'Due Date',
@@ -171,52 +254,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       icon: Icons.currency_rupee,
                       label: 'Order Value',
                       value: '${order.value}',
-                    ),
-                    const SizedBox(height: AppConfig.spacing16),
-                    Card(
-                      child: SwitchListTile(
-                        title: const Text('Payment Status'),
-                        subtitle: Text(
-                          order.isPaid ? 'Paid' : 'Not Paid',
-                          style: TextStyle(
-                            color: order.isPaid
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.error,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        value: order.isPaid,
-                        onChanged: (value) async {
-                          final state = context.read<OrderState>();
-                          final repository = context.read<OrderRepository>();
-                          final updatedOrder = order.copyWith(isPaid: value);
-                          try {
-                            await OrderService.updateOrder(state, repository, updatedOrder);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  duration: const Duration(milliseconds: 800),
-                                  content: Text(
-                                    value ? 'Marked as paid' : 'Marked as not paid',
-                                  ),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to update payment status: $e')),
-                              );
-                            }
-                          }
-                        },
-                        secondary: Icon(
-                          order.isPaid ? Icons.check_circle : Icons.pending,
-                          color: order.isPaid
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.error,
-                        ),
-                      ),
                     ),
                     if (order.description != null && order.description!.isNotEmpty) ...[
                       const SizedBox(height: AppConfig.spacing16),
@@ -268,19 +305,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                     child: SafeArea(
                       top: false,
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.pushNamed(
-                              context,
-                              AppConstants.customerDetailRoute,
-                              arguments: customer,
-                            );
-                          },
-                          icon: const Icon(Icons.person),
-                          label: Text('View Customer: ${customer.name}'),
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.tonalIcon(
+                                  onPressed: () => _toggleOrderStatus(context, order),
+                                  icon: Icon(_getStatusIcon(order.status)),
+                                  label: Text(_getStatusText(order.status)),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: _getStatusColor(context, order.status).withValues(alpha: 0.2),
+                                    foregroundColor: _getStatusColor(context, order.status),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppConfig.spacing8),
+                              Expanded(
+                                child: FilledButton.tonalIcon(
+                                  onPressed: () => _togglePaymentStatus(context, order),
+                                  icon: Icon(order.isPaid ? Icons.check_circle : Icons.pending),
+                                  label: Text(order.isPaid ? 'Paid' : 'Not Paid'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: order.isPaid
+                                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                                        : Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
+                                    foregroundColor: order.isPaid
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppConfig.spacing8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppConstants.customerDetailRoute,
+                                  arguments: customer,
+                                );
+                              },
+                              icon: const Icon(Icons.person),
+                              label: Text('View Customer: ${customer.name}'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

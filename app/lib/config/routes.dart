@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
+import '../screens/backup_restore_check_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/customers_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
@@ -20,6 +21,11 @@ class AppRoutes {
       case AppConstants.loginRoute:
         return MaterialPageRoute(
           builder: (_) => const LoginScreen(),
+        );
+
+      case AppConstants.backupRestoreCheckRoute:
+        return MaterialPageRoute(
+          builder: (_) => const BackupRestoreCheckScreen(),
         );
 
       case AppConstants.homeRoute:

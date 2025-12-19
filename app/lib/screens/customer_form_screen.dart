@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 
 class CustomerFormScreen extends StatefulWidget {
@@ -186,17 +187,29 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         setState(() {
           _hasUnsavedChanges = false;
         });
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: const Duration(milliseconds: 700),
-            content: Text(
-              _isEditing
-                  ? 'Customer updated successfully'
-                  : 'Customer added successfully',
+
+        if (_isEditing) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(milliseconds: 700),
+              content: Text('Customer updated successfully'),
             ),
-          ),
-        );
+          );
+        } else {
+          Navigator.pop(context);
+          Navigator.pushNamed(
+            context,
+            AppConstants.customerDetailRoute,
+            arguments: customer,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(milliseconds: 700),
+              content: Text('Customer added successfully'),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

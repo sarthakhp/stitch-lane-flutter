@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:stitch_lane_app/utils/app_logger.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../presentation/presentation.dart';
@@ -232,6 +231,7 @@ class _CustomersListScreenState extends State<CustomersListScreen> {
                 return CustomerListItem(
                   customer: customer,
                   pendingOrderCount: orderState.getPendingOrderCount(customer.id),
+                  totalUnpaidAmount: orderState.getTotalUnpaidAmount(customer.id),
                   onTap: () {
                     Navigator.pushNamed(
                       context,

@@ -62,7 +62,7 @@ class LoginScreen extends StatelessWidget {
     await AuthService.signInWithGoogle(authState);
 
     if (context.mounted && authState.isAuthenticated) {
-      Navigator.of(context).pushReplacementNamed(AppConstants.homeRoute);
+      Navigator.of(context).pushReplacementNamed(AppConstants.backupRestoreCheckRoute);
     }
   }
 }

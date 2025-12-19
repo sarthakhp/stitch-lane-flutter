@@ -8,6 +8,9 @@ enum OrderStatus {
   pending,
 
   @HiveField(1)
+  ready,
+
+  @HiveField(2)
   done,
 }
 
