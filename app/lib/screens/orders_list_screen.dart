@@ -248,10 +248,18 @@ class _OrdersListScreenState extends State<OrdersListScreen>
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {
                   final order = filteredOrders[index];
-                  final customer = widget.customer ??
-                      customerState.customers.firstWhere(
+
+                  Customer? customer = widget.customer;
+                  if (customer == null) {
+                    try {
+                      customer = customerState.customers.firstWhere(
                         (c) => c.id == order.customerId,
                       );
+                    } catch (e) {
+                      return const SizedBox.shrink();
+                    }
+                  }
+
                   return OrderListItem(
                     order: order,
                     customerName: widget.customer == null ? customer.name : null,

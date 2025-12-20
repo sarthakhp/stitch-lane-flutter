@@ -18,12 +18,20 @@ class GeminiService {
     }
 
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       apiKey: apiKey,
       systemInstruction: Content.system(
         'You are a professional transcription assistant for a tailoring and stitching business. '
-        'The audio may be in English or Gujarati - transcribe in the same language spoken.'
-        'Highest language preference is English, then Gujarati when detecting language',
+        'The audio contains mixed English and Gujarati words (code-switching). '
+        'CRITICAL LANGUAGE RULES:\n'
+        '1. Transcribe EACH word in its ORIGINAL language - do NOT translate\n'
+        '2. If a word is spoken in English, write it in English\n'
+        '3. If a word is spoken in Gujarati, write it in Gujarati script (ગુજરાતી)\n'
+        '4. Preserve the exact mix of languages as spoken\n'
+        '5. Do NOT force everything into one language\n\n'
+        'EXAMPLE: If someone says "Length 40 inches છે and Waist 32 છે", transcribe exactly as:\n'
+        '"Length 40 inches છે and Waist 32 છે"\n\n'
+        'Accurately identify and transcribe each word in the language it was spoken.',
       ),
     );
 
@@ -35,10 +43,11 @@ class GeminiService {
       audioFilePath: audioFilePath,
       prompt: 'Transcribe and Format this audio recording containing garment measurements and stitching instructions. '
           'The audio may include measurements like Length, Bust, Waist, Hip, Shoulder, Armhole, Sleeve Length, Neck, etc.\n\n'
+          'One measurement can have multiple values'
           'CRITICAL FORMATTING RULES:\n'
           '1. ALWAYS put each measurement on a NEW LINE\n'
           '2. ALWAYS use this exact format for each measurement:\n'
-          '   MeasurementName: Value Unit\n'
+          '   MeasurementName: Value1, Value2\n'
           '3. NEVER combine multiple measurements on the same line\n'
           '4. Use a blank line between different sections if needed\n\n'
           'EXAMPLE OUTPUT FORMAT:\n'
@@ -63,12 +72,9 @@ class GeminiService {
   static Future<String?> transcribeOrderAudio(String audioFilePath) async {
     return _transcribe(
       audioFilePath: audioFilePath,
-      prompt: 'Transcribe this audio recording containing order details, garment descriptions, and customer requirements. '
+      prompt: 'Transcribe and Format this audio recording containing order details, garment descriptions, and customer requirements. '
           'IMPORTANT: Format the transcription clearly with proper punctuation and use line breaks as much as possible.'
-          'Include details about garment types, styles, colors, fabrics, special instructions, and any customer preferences. '
-          'Preserve all specific details, numbers, and requirements accurately. '
           'Provide only the transcription without any additional commentary, explanations, or meta-text.'
-          'If no one is speaking in the recording, respond: "No one is speaking".',
     );
   }
 
