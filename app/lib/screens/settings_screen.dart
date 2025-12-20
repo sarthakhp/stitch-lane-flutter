@@ -6,6 +6,7 @@ import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/presentation.dart';
 import 'widgets/confirmation_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -101,8 +102,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
+      appBar: const CustomAppBar(
+        title: Text('Settings'),
       ),
       body: Consumer<SettingsState>(
         builder: (context, settingsState, child) {

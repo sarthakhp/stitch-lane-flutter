@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -7,11 +6,11 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../utils/app_logger.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/voice_recorder_button.dart';
 import '../presentation/widgets/audio_player_widget.dart';
-import '../presentation/widgets/transcription_progress_dialog.dart';
-import '../presentation/widgets/transcription_action_dialog.dart';
+import '../presentation/widgets/measurement_text_field.dart';
 
 class MeasurementFormScreen extends StatefulWidget {
   final Measurement? measurement;
@@ -34,7 +33,6 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
   String? _audioFilePath;
-  Completer<void>? _transcriptionCompleter;
 
   bool get _isEditing => widget.measurement != null;
 
@@ -82,85 +80,19 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
   }
 
   Future<void> _transcribeAudio(String audioFilePath) async {
-    _transcriptionCompleter = Completer<void>();
+    final newText = await TranscriptionService.transcribeAndGetAction(
+      context: context,
+      audioFilePath: audioFilePath,
+      currentText: _descriptionController.text,
+      type: TranscriptionType.measurement,
+    );
 
-    try {
-      if (!mounted) return;
-
-      TranscriptionProgressDialog.show(
-        context,
-        onCancel: () {
-          _transcriptionCompleter?.complete();
-          Navigator.of(context).pop();
-        },
-      );
-
-      String? transcription;
-      try {
-        transcription = await GeminiService.transcribeAudio(audioFilePath);
-      } catch (e) {
-        if (!_transcriptionCompleter!.isCompleted) {
-          _transcriptionCompleter!.complete();
-        }
-        if (mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-        return;
-      }
-
-      if (!_transcriptionCompleter!.isCompleted) {
-        _transcriptionCompleter!.complete();
-      }
-
-      if (!mounted) return;
-      Navigator.of(context).pop();
-
-      if (transcription == null || transcription.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No transcription available'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        return;
-      }
-
-      final hasExistingDescription = _descriptionController.text.trim().isNotEmpty;
-
-      final action = await TranscriptionActionDialog.show(
-        context,
-        transcribedText: transcription,
-        hasExistingDescription: hasExistingDescription,
-      );
-
-      if (action == null || action == TranscriptionAction.cancel) {
-        return;
-      }
-
-      if (action == TranscriptionAction.replace) {
-        _descriptionController.text = transcription;
-      } else if (action == TranscriptionAction.append) {
-        final currentText = _descriptionController.text.trim();
-        _descriptionController.text = currentText.isEmpty
-            ? transcription
-            : '$currentText\n\n$transcription';
-      }
-
+    if (newText != null) {
+      _descriptionController.text = newText;
       if (mounted) {
         setState(() {
           _hasUnsavedChanges = true;
         });
-      }
-    } finally {
-      _transcriptionCompleter = null;
-      if (mounted) {
-        setState(() {});
       }
     }
   }
@@ -294,7 +226,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
+        appBar: CustomAppBar(
           title: Text(_isEditing ? 'Edit Measurement' : 'New Measurement'),
         ),
         body: _buildBody(),
@@ -338,35 +270,15 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                     ),
                   ),
                   const SizedBox(height: AppConfig.spacing16),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _descriptionController,
-                    builder: (context, value, child) {
-                      return TextFormField(
-                        controller: _descriptionController,
-                        decoration: InputDecoration(
-                          labelText: 'Measurement Description',
-                          hintText: 'Enter measurement details...',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: value.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _descriptionController.clear();
-                                    if (!_hasUnsavedChanges) {
-                                      setState(() {
-                                        _hasUnsavedChanges = true;
-                                      });
-                                    }
-                                  },
-                                  tooltip: 'Clear description',
-                                )
-                              : null,
-                        ),
-                        minLines: 3,
-                        maxLines: null,
-                        validator: MeasurementValidators.validateDescription,
-                        textCapitalization: TextCapitalization.sentences,
-                      );
+                  MeasurementTextField(
+                    controller: _descriptionController,
+                    validator: MeasurementValidators.validateDescription,
+                    onChanged: () {
+                      if (!_hasUnsavedChanges) {
+                        setState(() {
+                          _hasUnsavedChanges = true;
+                        });
+                      }
                     },
                   ),
                   const SizedBox(height: AppConfig.spacing16),
@@ -444,7 +356,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
             }
           },
           onSave: _saveMeasurement,
-          saveLabel: _isEditing ? 'Update Measurement' : 'Create Measurement',
+          saveLabel: _isEditing ? 'Update' : 'Create',
           isLoading: _isLoading,
         ),
       ],

@@ -6,8 +6,10 @@ import 'package:intl/intl.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/order_images_section.dart';
+import '../presentation/widgets/transcription_voice_button.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -53,9 +55,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _selectedDueDate = widget.order!.dueDate;
       _imagePaths = List.from(widget.order!.imagePaths);
     } else {
-      _valueController.text = '0';
+      _valueController.text = '';
       _isPaid = false;
-      _selectedDueDate = DateTime.now();
+      _selectedDueDate = null;
       _imagePaths = [];
     }
     _titleController.addListener(_onFieldChanged);
@@ -114,6 +116,30 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     );
 
     return shouldPop ?? false;
+  }
+
+  Future<void> _handleTranscription(String? audioFilePath) async {
+    if (audioFilePath == null) return;
+
+    final newText = await TranscriptionService.transcribeAndGetAction(
+      context: context,
+      audioFilePath: audioFilePath,
+      currentText: _descriptionController.text,
+      type: TranscriptionType.order,
+    );
+
+    if (newText != null) {
+      _descriptionController.text = newText;
+      setState(() {
+        _hasUnsavedChanges = true;
+      });
+    }
+
+    try {
+      await AudioRecordingService.deleteTemporaryAudio();
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -238,7 +264,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
+        appBar: CustomAppBar(
           title: Text(_isEditing ? 'Edit Order' : 'Add Order'),
         ),
         body: GestureDetector(
@@ -365,18 +391,46 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                   enabled: !_isLoading,
                 ),
             const SizedBox(height: AppConfig.spacing16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (Optional)',
-                hintText: 'Enter order description',
-                prefixIcon: Icon(Icons.notes),
-                border: OutlineInputBorder(),
-              ),
-              validator: OrderValidators.validateDescription,
-              maxLines: 3,
-              textInputAction: TextInputAction.newline,
-              enabled: !_isLoading,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _descriptionController,
+                    builder: (context, value, child) {
+                      return TextFormField(
+                        controller: _descriptionController,
+                        decoration: InputDecoration(
+                          labelText: 'Description (Optional)',
+                          hintText: 'Enter order description',
+                          prefixIcon: const Icon(Icons.notes),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: value.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _descriptionController.clear();
+                                  },
+                                )
+                              : null,
+                        ),
+                        validator: OrderValidators.validateDescription,
+                        minLines: 3,
+                        maxLines: null,
+                        textInputAction: TextInputAction.newline,
+                        enabled: !_isLoading,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppConfig.spacing8),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppConfig.spacing8),
+                  child: TranscriptionVoiceButton(
+                    onRecordingComplete: _handleTranscription,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppConfig.spacing16),
             TextFormField(
@@ -393,6 +447,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
               ],
               validator: (value) {
+                if (!_hasAttemptedSubmit) {
+                  return null;
+                }
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a value';
                 }

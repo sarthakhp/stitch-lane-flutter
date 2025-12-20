@@ -5,12 +5,14 @@ class SearchBarWidget extends StatefulWidget {
   final String hintText;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback? onClear;
+  final bool autofocus;
 
   const SearchBarWidget({
     super.key,
     required this.hintText,
     required this.onSearchChanged,
     this.onClear,
+    this.autofocus = false,
   });
 
   @override
@@ -19,18 +21,29 @@ class SearchBarWidget extends StatefulWidget {
 
 class _SearchBarWidgetState extends State<SearchBarWidget> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  bool _hasRequestedInitialFocus = false;
 
   @override
   void initState() {
     super.initState();
+
     _controller.addListener(() {
       setState(() {});
     });
+
+    if (widget.autofocus && !_hasRequestedInitialFocus) {
+      _hasRequestedInitialFocus = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -46,6 +59,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       padding: const EdgeInsets.all(AppConfig.spacing8),
       child: TextField(
         controller: _controller,
+        focusNode: _focusNode,
         onChanged: widget.onSearchChanged,
         decoration: InputDecoration(
           hintText: widget.hintText,

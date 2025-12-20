@@ -120,5 +120,40 @@ class OrderService {
         .where((order) => !order.isPaid)
         .fold(0, (sum, order) => sum + order.value);
   }
+
+  static Future<Order> toggleOrderStatus(
+    OrderState state,
+    OrderRepository repository,
+    Order order,
+  ) async {
+    final OrderStatus newStatus;
+
+    switch (order.status) {
+      case OrderStatus.pending:
+        newStatus = OrderStatus.ready;
+        break;
+      case OrderStatus.ready:
+        newStatus = OrderStatus.done;
+        break;
+      case OrderStatus.done:
+        newStatus = OrderStatus.pending;
+        break;
+    }
+
+    final updatedOrder = order.copyWith(status: newStatus);
+    await updateOrder(state, repository, updatedOrder);
+    return updatedOrder;
+  }
+
+  static String getStatusToggleMessage(OrderStatus newStatus) {
+    switch (newStatus) {
+      case OrderStatus.ready:
+        return 'Order marked as ready';
+      case OrderStatus.done:
+        return 'Order marked as done';
+      case OrderStatus.pending:
+        return 'Order marked as pending';
+    }
+  }
 }
 

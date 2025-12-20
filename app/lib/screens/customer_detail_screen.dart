@@ -4,6 +4,7 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/contact_action_buttons.dart';
 import '../presentation/widgets/measurement_card.dart';
 
@@ -99,7 +100,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         );
 
         return Scaffold(
-          appBar: AppBar(
+          appBar: CustomAppBar(
             title: Text(customer.name),
             actions: [
               IconButton(

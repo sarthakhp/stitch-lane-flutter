@@ -19,12 +19,50 @@ class OrderState extends ChangeNotifier {
         .length;
   }
 
+  int getReadyOrderCount(String customerId) {
+    return _orders
+        .where((order) =>
+            order.customerId == customerId &&
+            order.status == OrderStatus.ready)
+        .length;
+  }
+
   int getTotalUnpaidAmount(String customerId) {
     return _orders
         .where((order) =>
             order.customerId == customerId &&
             !order.isPaid)
         .fold(0, (sum, order) => sum + order.value);
+  }
+
+  bool hasCustomerPendingOrders(String customerId) {
+    return _orders.any((order) =>
+        order.customerId == customerId &&
+        order.status == OrderStatus.pending);
+  }
+
+  bool hasCustomerReadyOrders(String customerId) {
+    return _orders.any((order) =>
+        order.customerId == customerId &&
+        order.status == OrderStatus.ready);
+  }
+
+  bool hasCustomerDoneOrders(String customerId) {
+    return _orders.any((order) =>
+        order.customerId == customerId &&
+        order.status == OrderStatus.done);
+  }
+
+  bool hasCustomerPaidOrders(String customerId) {
+    return _orders.any((order) =>
+        order.customerId == customerId &&
+        order.isPaid);
+  }
+
+  bool hasCustomerUnpaidOrders(String customerId) {
+    return _orders.any((order) =>
+        order.customerId == customerId &&
+        !order.isPaid);
   }
 
   void setOrders(List<Order> orders) {

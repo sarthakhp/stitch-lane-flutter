@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../backend/models/measurement.dart';
 import '../../config/app_config.dart';
+import 'measurement_description_text.dart';
 
 class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
@@ -79,9 +80,8 @@ class MeasurementCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppConfig.spacing8),
-                      Text(
-                        _getPreviewText(latestMeasurement!.description),
-                        style: textTheme.bodyMedium,
+                      MeasurementDescriptionText(
+                        text: _getPreviewText(latestMeasurement!.description),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -131,7 +131,7 @@ class MeasurementCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onCreateNew,
                     icon: const Icon(Icons.add),
-                    label: const Text('Create New'),
+                    label: const Text('New'),
                   ),
                 ),
                 const SizedBox(width: AppConfig.spacing12),

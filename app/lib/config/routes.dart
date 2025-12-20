@@ -34,8 +34,12 @@ class AppRoutes {
         );
 
       case AppConstants.customersListRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => const CustomersListScreen(),
+          builder: (_) => CustomersListScreen(
+            initialFilterPreset: args?['initialFilterPreset'],
+            autoFocusSearch: args?['autoFocusSearch'] ?? false,
+          ),
         );
 
       case AppConstants.customerDetailRoute:
@@ -63,8 +67,12 @@ class AppRoutes {
         );
 
       case AppConstants.allOrdersListRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => const OrdersListScreen(customer: null),
+          builder: (_) => OrdersListScreen(
+            customer: null,
+            initialFilterPreset: args?['initialFilterPreset'],
+          ),
         );
 
       case AppConstants.orderDetailRoute:

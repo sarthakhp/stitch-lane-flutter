@@ -6,6 +6,7 @@ class CustomerListItem extends StatelessWidget {
   final Customer customer;
   final VoidCallback onTap;
   final int pendingOrderCount;
+  final int readyOrderCount;
   final int totalUnpaidAmount;
 
   const CustomerListItem({
@@ -13,12 +14,15 @@ class CustomerListItem extends StatelessWidget {
     required this.customer,
     required this.onTap,
     this.pendingOrderCount = 0,
+    this.readyOrderCount = 0,
     this.totalUnpaidAmount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool hasNoPendingOrders = pendingOrderCount == 0;
+    final bool hasNoReadyOrders = readyOrderCount == 0;
+    final bool allOrdersDone = hasNoPendingOrders && hasNoReadyOrders;
     final bool hasUnpaidAmount = totalUnpaidAmount > 0;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -34,12 +38,12 @@ class CustomerListItem extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: hasNoPendingOrders
+                backgroundColor: allOrdersDone
                     ? Colors.green.shade100
                     : Theme.of(context).colorScheme.primaryContainer,
                 child: Icon(
-                  hasNoPendingOrders ? Icons.check_circle : Icons.person,
-                  color: hasNoPendingOrders
+                  allOrdersDone ? Icons.check_circle : Icons.person,
+                  color: allOrdersDone
                       ? Colors.green.shade700
                       : Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
@@ -114,10 +118,26 @@ class CustomerListItem extends StatelessWidget {
             );
 
     final bool hasNoPendingOrders = pendingOrderCount == 0;
-    final pendingText = hasNoPendingOrders ? 'All done' : '$pendingOrderCount pending';
-    final pendingColor = hasNoPendingOrders
-        ? Colors.green.shade700
-        : Theme.of(context).colorScheme.primary;
+    final bool hasNoReadyOrders = readyOrderCount == 0;
+    final bool allOrdersDone = hasNoPendingOrders && hasNoReadyOrders;
+
+    String statusText;
+    Color statusColor;
+
+    if (allOrdersDone) {
+      statusText = 'All done';
+      statusColor = Colors.green.shade700;
+    } else {
+      final List<String> statusParts = [];
+      if (!hasNoPendingOrders) {
+        statusParts.add('$pendingOrderCount pending');
+      }
+      if (!hasNoReadyOrders) {
+        statusParts.add('$readyOrderCount ready');
+      }
+      statusText = statusParts.join(', ');
+      statusColor = Theme.of(context).colorScheme.primary;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,9 +149,9 @@ class CustomerListItem extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          pendingText,
+          statusText,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: pendingColor,
+                color: statusColor,
                 fontWeight: FontWeight.w600,
               ),
         ),

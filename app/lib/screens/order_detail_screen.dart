@@ -5,6 +5,7 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/order_detail_card.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
@@ -66,22 +67,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   IconData _getStatusIcon(OrderStatus status) {
     switch (status) {
       case OrderStatus.pending:
-        return Icons.pending;
+        return Icons.access_time_outlined;
       case OrderStatus.ready:
-        return Icons.schedule;
+        return Icons.check;
       case OrderStatus.done:
-        return Icons.check_circle;
+        return Icons.done_all;
     }
   }
 
   Color _getStatusColor(BuildContext context, OrderStatus status) {
     switch (status) {
       case OrderStatus.pending:
-        return Theme.of(context).colorScheme.error;
+        return Theme.of(context).colorScheme.onSecondaryContainer;
       case OrderStatus.ready:
-        return Colors.orange;
+        return Colors.orange.shade700;
       case OrderStatus.done:
-        return Theme.of(context).colorScheme.primary;
+        return Colors.green.shade700;
     }
   }
 
@@ -184,7 +185,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             );
 
             return Scaffold(
-              appBar: AppBar(
+              appBar: CustomAppBar(
                 title: Text('Order for ${customer.name}'),
                 actions: [
                   IconButton(

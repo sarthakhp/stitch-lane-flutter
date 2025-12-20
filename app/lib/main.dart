@@ -10,6 +10,8 @@ import 'screens/login_screen.dart';
 import 'screens/backup_restore_check_screen.dart';
 import 'screens/home_screen.dart';
 
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
@@ -121,6 +123,7 @@ class _AppInitializerState extends State<AppInitializer> {
     return MaterialApp(
       title: 'Stitch Lane',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [routeObserver],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,

@@ -26,5 +26,7 @@ class AppConfig {
 
   static const int descriptionPreviewLength = 50;
   static const int orderIdPreviewLength = 8;
+
+  static const double measurementDescriptionFontSize = 24.0;
 }
 

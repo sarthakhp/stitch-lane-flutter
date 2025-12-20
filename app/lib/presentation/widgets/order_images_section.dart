@@ -55,6 +55,26 @@ class OrderImagesSection extends StatelessWidget {
   }
 
   Future<void> _deleteImage(BuildContext context, int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Image'),
+        content: const Text('Are you sure you want to delete this image?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final imagePath = imagePaths[index];
       await ImageStorageService.deleteImage(imagePath);
@@ -170,61 +190,10 @@ class OrderImagesSection extends StatelessWidget {
   Widget _buildImageThumbnail(BuildContext context, int index) {
     final imagePath = imagePaths[index];
 
-    return GestureDetector(
+    return _ImageThumbnail(
+      imagePath: imagePath,
       onTap: () => _showFullImage(context, index),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: kIsWeb
-                ? Image.network(
-                    imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                    },
-                  )
-                : Image.file(
-                    File(imagePath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        child: Icon(
-                          Icons.broken_image,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                onPressed: () => _deleteImage(context, index),
-                icon: const Icon(Icons.delete, size: 18),
-                iconSize: 18,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+      onDelete: () => _deleteImage(context, index),
     );
   }
 
@@ -240,6 +209,93 @@ class OrderImagesSection extends StatelessWidget {
               Navigator.pop(context);
             }
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageThumbnail extends StatelessWidget {
+  final String imagePath;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _ImageThumbnail({
+    required this.imagePath,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppConfig.spacing8),
+            child: _buildImage(context),
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: _DeleteButton(onDelete: onDelete),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImage(BuildContext context) {
+    return kIsWeb
+        ? Image.network(
+            imagePath,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildErrorWidget(context),
+          )
+        : Image.file(
+            File(imagePath),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildErrorWidget(context),
+          );
+  }
+
+  Widget _buildErrorWidget(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.errorContainer,
+      child: Icon(
+        Icons.broken_image,
+        color: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+}
+
+class _DeleteButton extends StatelessWidget {
+  final VoidCallback onDelete;
+
+  const _DeleteButton({required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onDelete,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(
+            Icons.close,
+            size: 16,
+            color: Colors.white,
+          ),
         ),
       ),
     );

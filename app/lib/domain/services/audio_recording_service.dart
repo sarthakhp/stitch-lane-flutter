@@ -113,6 +113,19 @@ class AudioRecordingService {
     }
   }
 
+  static Future<void> deleteTemporaryAudio() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final tempFile = File('${directory.path}/temp_order_transcription.m4a');
+
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   static bool get isRecording => _isRecording;
 
   static Future<void> dispose() async {

@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/measurement_list_item.dart';
 import '../presentation/widgets/empty_measurements_state.dart';
-import '../presentation/widgets/loading_widget.dart';
-import '../presentation/widgets/error_widget.dart';
 import '../constants/app_constants.dart';
 
 class MeasurementsListScreen extends StatefulWidget {
@@ -46,7 +45,7 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: CustomAppBar(
         title: Text('${widget.customer.name} - Measurements'),
       ),
       body: Consumer<MeasurementState>(
@@ -104,7 +103,7 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
           );
         },
         icon: const Icon(Icons.add),
-        label: const Text('Create Measurement'),
+        label: const Text('Create'),
       ),
     );
   }

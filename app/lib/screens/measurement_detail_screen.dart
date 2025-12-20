@@ -6,8 +6,10 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/audio_player_widget.dart';
+import '../presentation/widgets/measurement_description_text.dart';
 
 class MeasurementDetailScreen extends StatefulWidget {
   final Measurement measurement;
@@ -78,7 +80,7 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
         );
 
         return Scaffold(
-          appBar: AppBar(
+          appBar: CustomAppBar(
             title: const Text('Measurement Details'),
             actions: [
               IconButton(
@@ -131,9 +133,8 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: AppConfig.spacing16),
-                        Text(
-                          measurement.description,
-                          style: Theme.of(context).textTheme.bodyLarge,
+                        MeasurementDescriptionText(
+                          text: measurement.description,
                         ),
                       ],
                     ),

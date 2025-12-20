@@ -40,14 +40,14 @@ class OrderSubtitle extends StatelessWidget {
         const SizedBox(height: AppConfig.spacing4),
         Text(
           'Created: ${_formatDate(order.created)}',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
         ),
         const SizedBox(height: AppConfig.spacing4),
         Text(
           'Due: ${_formatDate(order.dueDate)}',
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: isDueSoon ? colorScheme.error : null,
             fontWeight: FontWeight.w600,
           ),

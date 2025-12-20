@@ -5,7 +5,10 @@ import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../domain/services/order_service.dart';
 import '../domain/state/order_state.dart';
-import '../presentation/widgets/dashboard_stats_card.dart';
+import '../domain/models/filter_preset.dart';
+import '../domain/models/customer_filter_preset.dart';
+import '../presentation/presentation.dart';
+import '../presentation/widgets/home_action_tile.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,11 +35,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  int _getCrossAxisCount(double width) {
+    if (width > 1200) return 4;
+    if (width > 900) return 3;
+    return 2;
+  }
+
+  double _getChildAspectRatio(double width) {
+    if (width > 1200) return 1.0;
+    if (width > 900) return 0.95;
+    return 0.9;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = _getCrossAxisCount(screenWidth);
+    final childAspectRatio = _getChildAspectRatio(screenWidth);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Stitch Lane'),
+      appBar: const CustomAppBar(
+        title: Text('Stitch Lane'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConfig.spacing16),
@@ -49,33 +68,103 @@ class _HomeScreenState extends State<HomeScreen> {
                 final pendingCount = OrderService.getPendingOrdersCount(orders);
                 final customersWithPendingCount = OrderService.getCustomersWithPendingOrdersCount(orders);
                 final unpaidAmount = OrderService.getTotalUnpaidAmount(orders);
+                final theme = Theme.of(context);
 
-                return Row(
+                return Column(
                   children: [
-                    Expanded(
-                      child: DashboardStatsCard(
-                        icon: Icons.pending_actions,
-                        label: 'Pending Orders',
-                        value: pendingCount.toString(),
-                        valueColor: Theme.of(context).colorScheme.error,
+                    Card(
+                      elevation: 1,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppConstants.allOrdersListRoute,
+                            arguments: {
+                              'initialFilterPreset': FilterPreset.allPending(),
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.pending_actions,
+                            color: theme.colorScheme.error,
+                          ),
+                          title: Text(
+                            pendingCount.toString(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: theme.colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text('Pending Orders'),
+                          trailing: const Icon(Icons.chevron_right, size: 20),
+                          dense: true,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppConfig.spacing16),
-                    Expanded(
-                      child: DashboardStatsCard(
-                        icon: Icons.people_outline,
-                        label: 'Customers Pending',
-                        value: customersWithPendingCount.toString(),
-                        valueColor: Theme.of(context).colorScheme.tertiary,
+                    const SizedBox(height: AppConfig.spacing8),
+                    Card(
+                      elevation: 1,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppConstants.customersListRoute,
+                            arguments: {
+                              'initialFilterPreset': CustomerFilterPreset.pending(),
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.people_outline,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                          title: Text(
+                            customersWithPendingCount.toString(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: theme.colorScheme.tertiary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text('Customers with Pending Orders'),
+                          trailing: const Icon(Icons.chevron_right, size: 20),
+                          dense: true,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppConfig.spacing16),
-                    Expanded(
-                      child: DashboardStatsCard(
-                        icon: Icons.currency_rupee,
-                        label: 'Unpaid Amount',
-                        value: '$unpaidAmount',
-                        valueColor: Theme.of(context).colorScheme.error,
+                    const SizedBox(height: AppConfig.spacing8),
+                    Card(
+                      elevation: 1,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppConstants.allOrdersListRoute,
+                            arguments: {
+                              'initialFilterPreset': FilterPreset.unpaid(),
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.currency_rupee,
+                            color: theme.colorScheme.error,
+                          ),
+                          title: Text(
+                            unpaidAmount.toString(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: theme.colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: const Text('Unpaid Amount'),
+                          trailing: const Icon(Icons.chevron_right, size: 20),
+                          dense: true,
+                        ),
                       ),
                     ),
                   ],
@@ -83,116 +172,61 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             const SizedBox(height: AppConfig.spacing24),
-            Card(
-              child: InkWell(
-                onTap: () {
-                  Navigator.pushNamed(context, AppConstants.customersListRoute);
-                },
-                borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConfig.spacing24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.people,
-                        size: AppConfig.largeIconSize,
-                        color: Theme
-                            .of(context)
-                            .colorScheme
-                            .primary,
-                      ),
-                      const SizedBox(height: AppConfig.spacing16),
-                      Text(
-                        'Show Customers',
-                        style: Theme
-                            .of(context)
-                            .textTheme
-                            .titleLarge,
-                      ),
-                      const SizedBox(height: AppConfig.spacing8),
-                      Text(
-                        'Manage your customer list',
-                        style: Theme
-                            .of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(
-                          color: Theme
-                              .of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+            GridView.count(
+              crossAxisCount: crossAxisCount,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: AppConfig.spacing16,
+              crossAxisSpacing: AppConfig.spacing16,
+              childAspectRatio: childAspectRatio,
+              children: [
+                HomeActionTile(
+                  icon: Icons.note_add,
+                  title: 'Create Order',
+                  subtitle: 'Add a new order',
+                  isCreateAction: true,
+                  onTap: () {
+                    Navigator.pushNamed(context, AppConstants.orderFormRoute);
+                  },
                 ),
-              ),
-            ),
-            const SizedBox(height: AppConfig.spacing16),
-            Card(
-              child: InkWell(
-                onTap: () {
-                  Navigator.pushNamed(context, AppConstants.allOrdersListRoute);
-                },
-                borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConfig.spacing24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.assignment,
-                        size: AppConfig.largeIconSize,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: AppConfig.spacing16),
-                      Text(
-                        'Show Orders',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppConfig.spacing8),
-                      Text(
-                        'View all orders',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
+                HomeActionTile(
+                  icon: Icons.assignment,
+                  title: 'Show Orders',
+                  subtitle: 'View all orders',
+                  onTap: () {
+                    Navigator.pushNamed(context, AppConstants.allOrdersListRoute);
+                  },
                 ),
-              ),
-            ),
-            const SizedBox(height: AppConfig.spacing16),
-            Card(
-              child: InkWell(
-                onTap: () {
-                  Navigator.pushNamed(context, AppConstants.settingsRoute);
-                },
-                borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppConfig.spacing24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.settings,
-                        size: AppConfig.largeIconSize,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: AppConfig.spacing16),
-                      Text(
-                        'Settings',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppConfig.spacing8),
-                      Text(
-                        'Configure app preferences',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
+                HomeActionTile(
+                  icon: Icons.person_add,
+                  title: 'Create Customer',
+                  subtitle: 'Add a new customer',
+                  isCreateAction: true,
+                  onTap: () {
+                    Navigator.pushNamed(context, AppConstants.customerFormRoute);
+                  },
                 ),
-              ),
+                HomeActionTile(
+                  icon: Icons.people,
+                  title: 'Show Customers',
+                  subtitle: 'Manage your customer list',
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.customersListRoute,
+                      arguments: {'autoFocusSearch': true},
+                    );
+                  },
+                ),
+                HomeActionTile(
+                  icon: Icons.settings,
+                  title: 'Settings',
+                  subtitle: 'Configure app preferences',
+                  onTap: () {
+                    Navigator.pushNamed(context, AppConstants.settingsRoute);
+                  },
+                ),
+              ],
             ),
           ],
         ),

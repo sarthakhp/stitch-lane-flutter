@@ -18,16 +18,12 @@ class GeminiService {
     }
 
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash',
       apiKey: apiKey,
       systemInstruction: Content.system(
         'You are a professional transcription assistant for a tailoring and stitching business. '
-        'Your task is to accurately transcribe audio recordings that contain garment measurements and stitching instructions. '
-        'The audio may include measurements like Length, Bust, Waist, Hip, Shoulder, Armhole, Sleeve Length, Neck, etc. '
-        'Transcribe numbers, measurements, and garment details clearly and accurately. '
-        'Maintain proper formatting with clear separation between different measurements. '
-        'The audio may be in English, Gujarati, or Hindi - transcribe in the same language spoken.'
-        'Highest language preference is English, followed by Gujarati, and then Hindi when detecting language',
+        'The audio may be in English or Gujarati - transcribe in the same language spoken.'
+        'Highest language preference is English, then Gujarati when detecting language',
       ),
     );
 
@@ -35,6 +31,51 @@ class GeminiService {
   }
 
   static Future<String?> transcribeAudio(String audioFilePath) async {
+    return _transcribe(
+      audioFilePath: audioFilePath,
+      prompt: 'Transcribe and Format this audio recording containing garment measurements and stitching instructions. '
+          'The audio may include measurements like Length, Bust, Waist, Hip, Shoulder, Armhole, Sleeve Length, Neck, etc.\n\n'
+          'CRITICAL FORMATTING RULES:\n'
+          '1. ALWAYS put each measurement on a NEW LINE\n'
+          '2. ALWAYS use this exact format for each measurement:\n'
+          '   MeasurementName: Value Unit\n'
+          '3. NEVER combine multiple measurements on the same line\n'
+          '4. Use a blank line between different sections if needed\n\n'
+          'EXAMPLE OUTPUT FORMAT:\n'
+          'Length: 40 inches\n'
+          'Bust: 36 inches\n'
+          'Waist: 32 inches\n'
+          'Hip: 38 inches\n\n'
+          'NUMBER CONVERSION RULES:\n'
+          '- "10 and half" or "10 and a half" → write as "10.5"\n'
+          '- "15 and quarter" or "15 and a quarter" → write as "15.25"\n'
+          '- "20 and three quarters" → write as "20.75"\n'
+          '- Any similar conversational fractions → convert to decimal equivalents\n\n'
+          'IMPORTANT:\n'
+          '- Preserve all numbers, units, and measurement details accurately\n'
+          '- Use proper punctuation\n'
+          '- Each measurement MUST be on its own line\n'
+          '- Provide only the transcription without any additional commentary, explanations, or meta-text\n'
+          '- If no one is speaking in the recording, respond: "No one is speaking"',
+    );
+  }
+
+  static Future<String?> transcribeOrderAudio(String audioFilePath) async {
+    return _transcribe(
+      audioFilePath: audioFilePath,
+      prompt: 'Transcribe this audio recording containing order details, garment descriptions, and customer requirements. '
+          'IMPORTANT: Format the transcription clearly with proper punctuation and use line breaks as much as possible.'
+          'Include details about garment types, styles, colors, fabrics, special instructions, and any customer preferences. '
+          'Preserve all specific details, numbers, and requirements accurately. '
+          'Provide only the transcription without any additional commentary, explanations, or meta-text.'
+          'If no one is speaking in the recording, respond: "No one is speaking".',
+    );
+  }
+
+  static Future<String?> _transcribe({
+    required String audioFilePath,
+    required String prompt,
+  }) async {
     try {
       AppLogger.info('Starting audio transcription for: $audioFilePath');
 
@@ -49,22 +90,17 @@ class GeminiService {
 
       final model = _getModel();
 
-      final prompt = TextPart(
-        'Transcribe this audio recording containing garment measurements and stitching instructions. '
-        'Format the transcription clearly with proper punctuation and line breaks where appropriate. '
-        'If measurements are mentioned (e.g., Length: 40 inches, Bust: 36 inches, Hip, Waist, Shoulder, Arm Hole etc.), format them clearly. '
-        'Preserve all numbers, units, and measurement details accurately. '
-        'Provide only the transcription without any additional commentary, explanations, or meta-text.'
-        'If no one is speaking in the recording, respond: "No one is speaking".',
-      );
+      final promptPart = TextPart(prompt);
 
-      AppLogger.info('Prompt: ${prompt.text}');
+      AppLogger.info('Prompt: $prompt');
 
       final audioPart = DataPart('audio/m4a', audioBytes);
 
       final response = await model.generateContent([
-        Content.multi([prompt, audioPart])
+        Content.multi([promptPart, audioPart])
       ]);
+
+      AppLogger.info('Response: ${response.text}');
 
       if (response.text == null || response.text!.isEmpty) {
         AppLogger.warning('Gemini returned empty transcription');

@@ -3,40 +3,49 @@ import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../presentation/presentation.dart';
-import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../utils/utils.dart';
-
-enum OrderFilter {
-  all,
-  pending,
-  ready,
-  unpaid,
-  unpaidDone,
-}
+import '../domain/models/order_filter_options.dart';
+import '../domain/models/filter_preset.dart';
+import '../presentation/widgets/order_filter_dialog.dart';
 
 class OrdersListScreen extends StatefulWidget {
   final Customer? customer;
+  final FilterPreset? initialFilterPreset;
 
   const OrdersListScreen({
     super.key,
     this.customer,
+    this.initialFilterPreset,
   });
 
   @override
   State<OrdersListScreen> createState() => _OrdersListScreenState();
 }
 
-class _OrdersListScreenState extends State<OrdersListScreen> {
+class _OrdersListScreenState extends State<OrdersListScreen>
+    with UnfocusOnNavigationBackMixin {
   String _searchQuery = '';
-  OrderFilter _selectedFilter = OrderFilter.all;
+  late OrderFilterOptions _filterOptions;
+  FilterPreset? _selectedPreset;
 
   @override
   void initState() {
     super.initState();
+    _initializeFilters();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDataIfNeeded();
     });
+  }
+
+  void _initializeFilters() {
+    if (widget.initialFilterPreset != null) {
+      _selectedPreset = widget.initialFilterPreset;
+      _filterOptions = widget.initialFilterPreset!.options;
+    } else {
+      _filterOptions = const OrderFilterOptions();
+      _selectedPreset = null;
+    }
   }
 
   Future<void> _loadDataIfNeeded() async {
@@ -72,38 +81,80 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
     });
   }
 
+  FilterPreset? _findMatchingPreset(OrderFilterOptions options) {
+    for (final preset in FilterPreset.allPresets) {
+      if (preset.options == options) {
+        return preset;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openFilterDialog() async {
+    final result = await showDialog<OrderFilterOptions>(
+      context: context,
+      builder: (context) => OrderFilterDialog(
+        initialOptions: _filterOptions,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _filterOptions = result;
+        _selectedPreset = _findMatchingPreset(result);
+      });
+    }
+  }
+
+  void _applyPreset(FilterPreset preset) {
+    setState(() {
+      if (_selectedPreset == preset) {
+        _filterOptions = const OrderFilterOptions();
+        _selectedPreset = null;
+      } else {
+        _filterOptions = preset.options;
+        _selectedPreset = preset;
+      }
+    });
+  }
+
+  List<Order> _getFilteredAndSortedOrders(
+    List<Order> orders,
+    List<Customer> customers,
+  ) {
+    var filteredOrders = List<Order>.from(
+      SearchHelper.filterOrders(
+        orders,
+        _searchQuery,
+        customers: customers,
+      ),
+    );
+
+    filteredOrders = filteredOrders
+        .where((order) => _filterOptions.matchesOrder(order))
+        .toList();
+
+    filteredOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+    return filteredOrders;
+  }
+
   Future<void> _toggleOrderStatus(Order order) async {
     final state = context.read<OrderState>();
     final repository = context.read<OrderRepository>();
 
     try {
-      final OrderStatus newStatus;
-      final String statusMessage;
-
-      switch (order.status) {
-        case OrderStatus.pending:
-          newStatus = OrderStatus.ready;
-          statusMessage = 'Order marked as ready';
-          break;
-        case OrderStatus.ready:
-          newStatus = OrderStatus.done;
-          statusMessage = 'Order marked as done';
-          break;
-        case OrderStatus.done:
-          newStatus = OrderStatus.pending;
-          statusMessage = 'Order marked as pending';
-          break;
-      }
-
-      final updatedOrder = order.copyWith(status: newStatus);
-
-      await OrderService.updateOrder(state, repository, updatedOrder);
+      final updatedOrder = await OrderService.toggleOrderStatus(
+        state,
+        repository,
+        order,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 800),
-            content: Text(statusMessage),
+            content: Text(OrderService.getStatusToggleMessage(updatedOrder.status)),
           ),
         );
       }
@@ -119,71 +170,35 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: CustomAppBar(
         title: Text(widget.customer != null
             ? '${widget.customer!.name}\'s Orders'
             : 'All Orders'),
+        actions: [
+          Badge(
+            isLabelVisible: _filterOptions.isFilterActive,
+            child: IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _openFilterDialog,
+              tooltip: 'Filter orders',
+            ),
+          ),
+        ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(120),
-          child: Column(
-            children: [
-              SearchBarWidget(
-                hintText: 'Search orders...',
-                onSearchChanged: _onSearchChanged,
-                onClear: _onClearSearch,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.filter_list, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<OrderFilter>(
-                          value: _selectedFilter,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(
-                              value: OrderFilter.all,
-                              child: Text('All Orders'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderFilter.pending,
-                              child: Text('Pending Orders'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderFilter.ready,
-                              child: Text('Ready Orders'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderFilter.unpaid,
-                              child: Text('Unpaid Orders'),
-                            ),
-                            DropdownMenuItem(
-                              value: OrderFilter.unpaidDone,
-                              child: Text('Unpaid Done Orders'),
-                            ),
-                          ],
-                          onChanged: (OrderFilter? value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedFilter = value;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          preferredSize: const Size.fromHeight(60),
+          child: SearchBarWidget(
+            hintText: 'Search orders...',
+            onSearchChanged: _onSearchChanged,
+            onClear: _onClearSearch,
           ),
         ),
       ),
       body: Column(
         children: [
+          OrderFilterPresetChips(
+            selectedPreset: _selectedPreset,
+            onPresetSelected: _applyPreset,
+          ),
           Expanded(
             child: Consumer3<OrderState, CustomerState, SettingsState>(
         builder: (context, orderState, customerState, settingsState, child) {
@@ -209,128 +224,66 @@ class _OrdersListScreenState extends State<OrdersListScreen> {
             return const EmptyOrdersState();
           }
 
-          var filteredOrders = List<Order>.from(
-            SearchHelper.filterOrders(
-              displayOrders,
-              _searchQuery,
-              customers: customerState.customers,
-            ),
+          final filteredOrders = _getFilteredAndSortedOrders(
+            displayOrders,
+            customerState.customers,
           );
 
-          switch (_selectedFilter) {
-            case OrderFilter.pending:
-              filteredOrders = filteredOrders
-                  .where((order) => order.status == OrderStatus.pending)
-                  .toList();
-              break;
-            case OrderFilter.ready:
-              filteredOrders = filteredOrders
-                  .where((order) => order.status == OrderStatus.ready)
-                  .toList();
-              break;
-            case OrderFilter.unpaid:
-              filteredOrders = filteredOrders
-                  .where((order) => !order.isPaid)
-                  .toList();
-              break;
-            case OrderFilter.unpaidDone:
-              filteredOrders = filteredOrders
-                  .where((order) => !order.isPaid && order.status == OrderStatus.done)
-                  .toList();
-              break;
-            case OrderFilter.all:
-              break;
-          }
-
-          filteredOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
-
           if (filteredOrders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.search_off,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No orders found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Try a different search term',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
+            return const EmptySearchState(
+              message: 'No orders found',
             );
           }
 
-          return RefreshIndicator(
-            onRefresh: _refreshOrders,
-            child: ListView.builder(
-              itemCount: filteredOrders.length,
-              itemBuilder: (context, index) {
-                final order = filteredOrders[index];
-                final customer = widget.customer ??
-                    customerState.customers.firstWhere(
-                      (c) => c.id == order.customerId,
-                    );
-                return OrderListItem(
-                  order: order,
-                  customerName: widget.customer == null ? customer.name : null,
-                  dueDateWarningThreshold: settingsState.dueDateWarningThreshold,
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppConstants.orderDetailRoute,
-                      arguments: {'order': order, 'customer': customer},
-                    );
-                  },
-                  onStatusToggle: () => _toggleOrderStatus(order),
-                );
-              },
+          return NotificationListener<ScrollNotification>(
+            onNotification: (scrollNotification) {
+              if (scrollNotification is ScrollStartNotification) {
+                FocusScope.of(context).unfocus();
+              }
+              return false;
+            },
+            child: RefreshIndicator(
+              onRefresh: _refreshOrders,
+              child: ListView.builder(
+                itemCount: filteredOrders.length,
+                itemBuilder: (context, index) {
+                  final order = filteredOrders[index];
+                  final customer = widget.customer ??
+                      customerState.customers.firstWhere(
+                        (c) => c.id == order.customerId,
+                      );
+                  return OrderListItem(
+                    order: order,
+                    customerName: widget.customer == null ? customer.name : null,
+                    dueDateWarningThreshold: settingsState.dueDateWarningThreshold,
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppConstants.orderDetailRoute,
+                        arguments: {'order': order, 'customer': customer},
+                      );
+                    },
+                    onStatusToggle: () => _toggleOrderStatus(order),
+                  );
+                },
+              ),
             ),
           );
         },
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(AppConfig.spacing16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppConstants.orderFormRoute,
-                      arguments: widget.customer != null
-                          ? <String, dynamic>{'customer': widget.customer}
-                          : <String, dynamic>{},
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create Order'),
-                ),
-              ),
-            ),
+          StickyActionButton(
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppConstants.orderFormRoute,
+                arguments: widget.customer != null
+                    ? <String, dynamic>{'customer': widget.customer}
+                    : <String, dynamic>{},
+              );
+            },
+            icon: Icons.add,
+            label: 'Create Order',
           ),
         ],
       ),

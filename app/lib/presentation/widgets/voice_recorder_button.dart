@@ -138,11 +138,15 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: AppConfig.spacing8),
-                Text(
-                  widget.hasExistingRecording
-                      ? 'Re-record Audio (Hold to Record)'
-                      : 'Record Audio (Hold to Record)',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Expanded(
+                  child: Text(
+                    widget.hasExistingRecording
+                        ? 'Re-record Audio (Hold to Record)'
+                        : 'Record Audio (Hold to Record)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
               ],
             ),
@@ -182,47 +186,54 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
                         width: _isRecording ? 2 + (_animationController.value * 2) : 2,
                       ),
                     ),
-                    child: Center(
-                      child: _isLoading
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 32,
-                                  height: 32,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppConfig.spacing8),
+                      child: Center(
+                        child: _isLoading
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      color: contentColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppConfig.spacing8),
+                                  Text(
+                                    'Starting...',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: contentColor,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _isRecording ? Icons.stop : Icons.mic,
+                                    size: 32 + (_isRecording ? _animationController.value * 8 : 0),
                                     color: contentColor,
                                   ),
-                                ),
-                                const SizedBox(height: AppConfig.spacing8),
-                                Text(
-                                  'Starting...',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: contentColor,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _isRecording ? Icons.stop : Icons.mic,
-                                  size: 32 + (_isRecording ? _animationController.value * 8 : 0),
-                                  color: contentColor,
-                                ),
-                                const SizedBox(height: AppConfig.spacing8),
-                                Text(
-                                  _isRecording ? 'Recording...' : 'Hold to Record',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: contentColor,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ],
-                            ),
+                                  const SizedBox(height: AppConfig.spacing8),
+                                  Text(
+                                    _isRecording ? 'Recording...' : 'Hold to Record',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: contentColor,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ],
+                              ),
+                      ),
                     ),
                   );
                 },

@@ -23,11 +23,11 @@ class OrderStatusAvatar extends StatelessWidget {
   IconData _getIcon() {
     switch (status) {
       case OrderStatus.pending:
-        return Icons.assignment;
+        return Icons.access_time_outlined;
       case OrderStatus.ready:
-        return Icons.schedule;
+        return Icons.check;
       case OrderStatus.done:
-        return Icons.check_circle;
+        return Icons.done_all;
     }
   }
 

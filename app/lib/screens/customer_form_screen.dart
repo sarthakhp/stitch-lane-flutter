@@ -5,6 +5,7 @@ import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 
 class CustomerFormScreen extends StatefulWidget {
@@ -239,7 +240,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
+        appBar: CustomAppBar(
           title: Text(_isEditing ? 'Edit Customer' : 'Add Customer'),
         ),
         body: GestureDetector(
