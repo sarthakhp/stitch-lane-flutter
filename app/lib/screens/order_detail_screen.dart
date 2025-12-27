@@ -10,6 +10,7 @@ import '../presentation/widgets/order_detail_card.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
 import '../presentation/widgets/order_images_section.dart';
+import '../presentation/widgets/markdown_description_text.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
@@ -273,7 +274,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       OrderDetailCard(
                         icon: Icons.notes,
                         label: 'Description',
-                        value: order.description!,
+                        child: MarkdownDescriptionText(
+                          text: order.description!,
+                        ),
                       ),
                     ],
                     const SizedBox(height: AppConfig.spacing16),

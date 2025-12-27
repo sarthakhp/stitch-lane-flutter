@@ -7,6 +7,7 @@ import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/contact_action_buttons.dart';
 import '../presentation/widgets/measurement_card.dart';
+import '../presentation/widgets/markdown_description_text.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final Customer customer;
@@ -329,9 +330,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                   style: Theme.of(context).textTheme.labelMedium,
                                 ),
                                 const SizedBox(height: AppConfig.spacing8),
-                                Text(
-                                  customer.description!,
-                                  style: Theme.of(context).textTheme.bodyLarge,
+                                MarkdownDescriptionText(
+                                  text: customer.description!,
                                 ),
                               ],
                             ),

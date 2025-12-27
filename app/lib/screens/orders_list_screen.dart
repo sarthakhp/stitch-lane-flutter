@@ -98,7 +98,7 @@ class _OrdersListScreenState extends State<OrdersListScreen>
       ),
     );
 
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() {
         _filterOptions = result;
         _selectedPreset = _findMatchingPreset(result);
@@ -134,7 +134,11 @@ class _OrdersListScreenState extends State<OrdersListScreen>
         .where((order) => _filterOptions.matchesOrder(order))
         .toList();
 
-    filteredOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    if (_filterOptions.sortMode == OrderSortMode.createdDate) {
+      filteredOrders.sort((a, b) => b.created.compareTo(a.created));
+    } else {
+      filteredOrders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    }
 
     return filteredOrders;
   }

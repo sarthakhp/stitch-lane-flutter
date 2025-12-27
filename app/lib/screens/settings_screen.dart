@@ -41,7 +41,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
     await SettingsService.loadSettings(settingsState, settingsRepository);
-    _thresholdController.text = settingsState.dueDateWarningThreshold.toString();
+    if (mounted) {
+      _thresholdController.text = settingsState.dueDateWarningThreshold.toString();
+    }
   }
 
   Future<void> _loadBackupInfo() async {
@@ -75,6 +77,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       settingsRepository,
       newSettings,
     );
+
+    if (!mounted) return;
 
     setState(() {
       _isSaving = false;
@@ -450,7 +454,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await MeasurementService.loadMeasurements(measurementState, measurementRepository);
       await SettingsService.loadSettings(settingsState, settingsRepository);
 
-      _thresholdController.text = settingsState.dueDateWarningThreshold.toString();
+      if (mounted) {
+        _thresholdController.text = settingsState.dueDateWarningThreshold.toString();
+      }
 
       backupState.setProgress(1.0);
       backupState.setLoading(false);

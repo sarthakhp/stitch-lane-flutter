@@ -2,12 +2,15 @@ import '../../backend/models/customer.dart';
 import '../../backend/models/order.dart';
 import '../../backend/models/order_status.dart';
 
+enum CustomerSortMode { dueDate, createdDate }
+
 class CustomerFilterOptions {
   final bool showPending;
   final bool showReady;
   final bool showDone;
   final bool showPaid;
   final bool showNotPaid;
+  final CustomerSortMode sortMode;
 
   const CustomerFilterOptions({
     this.showPending = true,
@@ -15,6 +18,7 @@ class CustomerFilterOptions {
     this.showDone = true,
     this.showPaid = true,
     this.showNotPaid = true,
+    this.sortMode = CustomerSortMode.dueDate,
   });
 
   const CustomerFilterOptions.doneButNotPaid()
@@ -22,21 +26,32 @@ class CustomerFilterOptions {
         showReady = false,
         showDone = true,
         showPaid = false,
-        showNotPaid = true;
+        showNotPaid = true,
+        sortMode = CustomerSortMode.dueDate;
 
   const CustomerFilterOptions.pending()
       : showPending = true,
         showReady = false,
         showDone = false,
         showPaid = true,
-        showNotPaid = true;
+        showNotPaid = true,
+        sortMode = CustomerSortMode.dueDate;
 
   const CustomerFilterOptions.ready()
       : showPending = false,
         showReady = true,
         showDone = false,
         showPaid = true,
-        showNotPaid = true;
+        showNotPaid = true,
+        sortMode = CustomerSortMode.dueDate;
+
+  const CustomerFilterOptions.recent()
+      : showPending = true,
+        showReady = true,
+        showDone = true,
+        showPaid = true,
+        showNotPaid = true,
+        sortMode = CustomerSortMode.createdDate;
 
   CustomerFilterOptions copyWith({
     bool? showPending,
@@ -44,6 +59,7 @@ class CustomerFilterOptions {
     bool? showDone,
     bool? showPaid,
     bool? showNotPaid,
+    CustomerSortMode? sortMode,
   }) {
     return CustomerFilterOptions(
       showPending: showPending ?? this.showPending,
@@ -51,6 +67,7 @@ class CustomerFilterOptions {
       showDone: showDone ?? this.showDone,
       showPaid: showPaid ?? this.showPaid,
       showNotPaid: showNotPaid ?? this.showNotPaid,
+      sortMode: sortMode ?? this.sortMode,
     );
   }
 
@@ -103,7 +120,8 @@ class CustomerFilterOptions {
         other.showReady == showReady &&
         other.showDone == showDone &&
         other.showPaid == showPaid &&
-        other.showNotPaid == showNotPaid;
+        other.showNotPaid == showNotPaid &&
+        other.sortMode == sortMode;
   }
 
   @override
@@ -114,12 +132,13 @@ class CustomerFilterOptions {
       showDone,
       showPaid,
       showNotPaid,
+      sortMode,
     );
   }
 
   @override
   String toString() {
-    return 'CustomerFilterOptions(showPending: $showPending, showReady: $showReady, showDone: $showDone, showPaid: $showPaid, showNotPaid: $showNotPaid)';
+    return 'CustomerFilterOptions(showPending: $showPending, showReady: $showReady, showDone: $showDone, showPaid: $showPaid, showNotPaid: $showNotPaid, sortMode: $sortMode)';
   }
 }
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../backend/models/measurement.dart';
 import '../../config/app_config.dart';
-import 'measurement_description_text.dart';
 
 class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
@@ -80,10 +79,13 @@ class MeasurementCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppConfig.spacing8),
-                      MeasurementDescriptionText(
-                        text: _getPreviewText(latestMeasurement!.description),
+                      Text(
+                        _getPreviewText(latestMeasurement!.description),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: AppConfig.measurementDescriptionFontSize,
+                        ),
                       ),
                       const SizedBox(height: AppConfig.spacing12),
                       Row(

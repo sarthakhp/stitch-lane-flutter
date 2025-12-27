@@ -9,7 +9,7 @@ import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/audio_player_widget.dart';
-import '../presentation/widgets/measurement_description_text.dart';
+import '../presentation/widgets/markdown_description_text.dart';
 
 class MeasurementDetailScreen extends StatefulWidget {
   final Measurement measurement;
@@ -133,7 +133,7 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: AppConfig.spacing16),
-                        MeasurementDescriptionText(
+                        MarkdownDescriptionText(
                           text: measurement.description,
                         ),
                       ],

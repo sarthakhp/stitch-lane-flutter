@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import '../../constants/gemini_prompts.dart';
 import '../../utils/app_logger.dart';
 
 class GeminiService {
@@ -20,68 +21,13 @@ class GeminiService {
     _model = GenerativeModel(
       model: 'gemini-3-flash-preview',
       apiKey: apiKey,
-      systemInstruction: Content.system(
-        'You are a professional transcription assistant for a tailoring and stitching business. '
-        'The audio contains mixed English and Gujarati words (code-switching). '
-        'CRITICAL LANGUAGE RULES:\n'
-        '1. Transcribe EACH word in its ORIGINAL language - do NOT translate\n'
-        '2. If a word is spoken in English, write it in English\n'
-        '3. If a word is spoken in Gujarati, write it in Gujarati script (ગુજરાતી)\n'
-        '4. Preserve the exact mix of languages as spoken\n'
-        '5. Do NOT force everything into one language\n\n'
-        'EXAMPLE: If someone says "Length 40 inches છે and Waist 32 છે", transcribe exactly as:\n'
-        '"Length 40 inches છે and Waist 32 છે"\n\n'
-        'Accurately identify and transcribe each word in the language it was spoken.',
-      ),
+      systemInstruction: Content.system(GeminiPrompts.systemInstruction),
     );
 
     return _model!;
   }
 
   static Future<String?> transcribeAudio(String audioFilePath) async {
-    return _transcribe(
-      audioFilePath: audioFilePath,
-      prompt: 'Transcribe and Format this audio recording containing garment measurements and stitching instructions. '
-          'The audio may include measurements like Length, Bust, Waist, Hip, Shoulder, Armhole, Sleeve Length, Neck, etc.\n\n'
-          'One measurement can have multiple values'
-          'CRITICAL FORMATTING RULES:\n'
-          '1. ALWAYS put each measurement on a NEW LINE\n'
-          '2. ALWAYS use this exact format for each measurement:\n'
-          '   MeasurementName: Value1, Value2\n'
-          '3. NEVER combine multiple measurements on the same line\n'
-          '4. Use a blank line between different sections if needed\n\n'
-          'EXAMPLE OUTPUT FORMAT:\n'
-          'Length: 40 inches\n'
-          'Bust: 36 inches\n'
-          'Waist: 32 inches\n'
-          'Hip: 38 inches\n\n'
-          'NUMBER CONVERSION RULES:\n'
-          '- "10 and half" or "10 and a half" → write as "10.5"\n'
-          '- "15 and quarter" or "15 and a quarter" → write as "15.25"\n'
-          '- "20 and three quarters" → write as "20.75"\n'
-          '- Any similar conversational fractions → convert to decimal equivalents\n\n'
-          'IMPORTANT:\n'
-          '- Preserve all numbers, units, and measurement details accurately\n'
-          '- Use proper punctuation\n'
-          '- Each measurement MUST be on its own line\n'
-          '- Provide only the transcription without any additional commentary, explanations, or meta-text\n'
-          '- If no one is speaking in the recording, respond: "No one is speaking"',
-    );
-  }
-
-  static Future<String?> transcribeOrderAudio(String audioFilePath) async {
-    return _transcribe(
-      audioFilePath: audioFilePath,
-      prompt: 'Transcribe and Format this audio recording containing order details, garment descriptions, and customer requirements. '
-          'IMPORTANT: Format the transcription clearly with proper punctuation and use line breaks as much as possible.'
-          'Provide only the transcription without any additional commentary, explanations, or meta-text.'
-    );
-  }
-
-  static Future<String?> _transcribe({
-    required String audioFilePath,
-    required String prompt,
-  }) async {
     try {
       AppLogger.info('Starting audio transcription for: $audioFilePath');
 
@@ -96,9 +42,7 @@ class GeminiService {
 
       final model = _getModel();
 
-      final promptPart = TextPart(prompt);
-
-      AppLogger.info('Prompt: $prompt');
+      final promptPart = TextPart(GeminiPrompts.transcriptionPrompt);
 
       final audioPart = DataPart('audio/m4a', audioBytes);
 

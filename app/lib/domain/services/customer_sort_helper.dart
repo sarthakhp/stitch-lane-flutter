@@ -1,5 +1,6 @@
 import '../../backend/backend.dart';
 import '../models/customer_sort.dart';
+import '../models/customer_filter_options.dart';
 
 class CustomerSortHelper {
   static DateTime? getEarliestDueDate(String customerId, List<Order> orders) {
@@ -61,6 +62,24 @@ class CustomerSortHelper {
     }
 
     return sortedCustomers;
+  }
+
+  static List<Customer> sortByCreatedDate(List<Customer> customers) {
+    final sortedCustomers = List<Customer>.from(customers);
+    sortedCustomers.sort((a, b) => b.created.compareTo(a.created));
+    return sortedCustomers;
+  }
+
+  static List<Customer> sortCustomersWithMode(
+    List<Customer> customers,
+    List<Order> orders,
+    CustomerSort sortType,
+    CustomerSortMode sortMode,
+  ) {
+    if (sortMode == CustomerSortMode.createdDate) {
+      return sortByCreatedDate(customers);
+    }
+    return sortCustomers(customers, orders, sortType);
   }
 }
 

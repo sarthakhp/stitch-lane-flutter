@@ -9,7 +9,7 @@ import '../config/app_config.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/order_images_section.dart';
-import '../presentation/widgets/transcription_voice_button.dart';
+import '../presentation/widgets/rich_description_input_field.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -28,7 +28,7 @@ class OrderFormScreen extends StatefulWidget {
 class _OrderFormScreenState extends State<OrderFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _descriptionKey = GlobalKey<RichDescriptionInputFieldState>();
   final _valueController = TextEditingController();
   DateTime? _selectedDueDate;
   bool _isLoading = false;
@@ -37,6 +37,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
   List<String> _imagePaths = [];
+  String _descriptionValue = '';
 
   bool get _isEditing => widget.order != null;
 
@@ -49,7 +50,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     });
     if (_isEditing) {
       _titleController.text = widget.order!.title ?? '';
-      _descriptionController.text = widget.order!.description ?? '';
+      _descriptionValue = widget.order!.description ?? '';
       _valueController.text = widget.order!.value.toString();
       _isPaid = widget.order!.isPaid;
       _selectedDueDate = widget.order!.dueDate;
@@ -61,7 +62,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _imagePaths = [];
     }
     _titleController.addListener(_onFieldChanged);
-    _descriptionController.addListener(_onFieldChanged);
     _valueController.addListener(_onFieldChanged);
   }
 
@@ -84,10 +84,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   @override
   void dispose() {
     _titleController.removeListener(_onFieldChanged);
-    _descriptionController.removeListener(_onFieldChanged);
     _valueController.removeListener(_onFieldChanged);
     _titleController.dispose();
-    _descriptionController.dispose();
     _valueController.dispose();
     super.dispose();
   }
@@ -118,30 +116,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return shouldPop ?? false;
   }
 
-  Future<void> _handleTranscription(String? audioFilePath) async {
-    if (audioFilePath == null) return;
-
-    final newText = await TranscriptionService.transcribeAndGetAction(
-      context: context,
-      audioFilePath: audioFilePath,
-      currentText: _descriptionController.text,
-      type: TranscriptionType.order,
-    );
-
-    if (newText != null) {
-      _descriptionController.text = newText;
-      setState(() {
-        _hasUnsavedChanges = true;
-      });
-    }
-
-    try {
-      await AudioRecordingService.deleteTemporaryAudio();
-    } catch (e) {
-      // Ignore cleanup errors
-    }
-  }
-
   String _formatDate(DateTime date) {
     return DateFormat('MMM d, y').format(date);
   }
@@ -158,7 +132,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       lastDate: DateTime(2100),
     );
 
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedDueDate = picked;
         _hasUnsavedChanges = true;
@@ -198,7 +172,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       final repository = context.read<OrderRepository>();
 
       final titleText = _titleController.text.trim();
-      final descriptionText = _descriptionController.text.trim();
+      final descriptionText = _descriptionValue.trim();
       final valueInt = int.parse(_valueController.text.trim());
 
       final order = Order(
@@ -391,46 +365,20 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                   enabled: !_isLoading,
                 ),
             const SizedBox(height: AppConfig.spacing16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _descriptionController,
-                    builder: (context, value, child) {
-                      return TextFormField(
-                        controller: _descriptionController,
-                        decoration: InputDecoration(
-                          labelText: 'Description (Optional)',
-                          hintText: 'Enter order description',
-                          prefixIcon: const Icon(Icons.notes),
-                          border: const OutlineInputBorder(),
-                          suffixIcon: value.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _descriptionController.clear();
-                                  },
-                                )
-                              : null,
-                        ),
-                        validator: OrderValidators.validateDescription,
-                        minLines: 3,
-                        maxLines: null,
-                        textInputAction: TextInputAction.newline,
-                        enabled: !_isLoading,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: AppConfig.spacing8),
-                Padding(
-                  padding: const EdgeInsets.only(top: AppConfig.spacing8),
-                  child: TranscriptionVoiceButton(
-                    onRecordingComplete: _handleTranscription,
-                  ),
-                ),
-              ],
+            RichDescriptionInputField(
+              key: _descriptionKey,
+              initialValue: _descriptionValue,
+              labelText: 'Description (Optional)',
+              hintText: 'Enter order description',
+              enabled: !_isLoading,
+              onChanged: (value) {
+                _descriptionValue = value;
+                if (!_hasUnsavedChanges) {
+                  setState(() {
+                    _hasUnsavedChanges = true;
+                  });
+                }
+              },
             ),
             const SizedBox(height: AppConfig.spacing16),
             TextFormField(

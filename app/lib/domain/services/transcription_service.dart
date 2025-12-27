@@ -4,17 +4,11 @@ import 'gemini_service.dart';
 import '../../presentation/widgets/transcription_progress_dialog.dart';
 import '../../presentation/widgets/transcription_action_dialog.dart';
 
-enum TranscriptionType {
-  measurement,
-  order,
-}
-
 class TranscriptionService {
   static Future<String?> transcribeAndGetAction({
     required BuildContext context,
     required String audioFilePath,
     required String currentText,
-    required TranscriptionType type,
   }) async {
     Completer<void>? transcriptionCompleter = Completer<void>();
 
@@ -31,11 +25,7 @@ class TranscriptionService {
 
       String? transcription;
       try {
-        if (type == TranscriptionType.measurement) {
-          transcription = await GeminiService.transcribeAudio(audioFilePath);
-        } else {
-          transcription = await GeminiService.transcribeOrderAudio(audioFilePath);
-        }
+        transcription = await GeminiService.transcribeAudio(audioFilePath);
       } catch (e) {
         if (!transcriptionCompleter.isCompleted) {
           transcriptionCompleter.complete();

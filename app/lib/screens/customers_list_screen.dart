@@ -84,7 +84,7 @@ class _CustomersListScreenState extends State<CustomersListScreen>
       ),
     );
 
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() {
         _filterOptions = result;
         _selectedPreset = _findMatchingPreset(result);
@@ -127,10 +127,11 @@ class _CustomersListScreenState extends State<CustomersListScreen>
       }).toList();
     }
 
-    return CustomerSortHelper.sortCustomers(
+    return CustomerSortHelper.sortCustomersWithMode(
       filteredCustomers,
       orders,
       _selectedSort,
+      _filterOptions.sortMode,
     );
   }
 

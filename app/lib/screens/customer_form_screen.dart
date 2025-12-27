@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
+import '../presentation/widgets/rich_description_input_field.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final Customer? customer;
@@ -24,10 +25,11 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _descriptionKey = GlobalKey<RichDescriptionInputFieldState>();
   bool _isLoading = false;
   bool _hasUnsavedChanges = false;
   bool _importedFromContacts = false;
+  String _descriptionValue = '';
 
   bool get _isEditing => widget.customer != null;
 
@@ -37,11 +39,10 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     if (_isEditing) {
       _nameController.text = widget.customer!.name;
       _phoneController.text = widget.customer!.phoneNumber ?? '';
-      _descriptionController.text = widget.customer!.description ?? '';
+      _descriptionValue = widget.customer!.description ?? '';
     }
     _nameController.addListener(_onFieldChanged);
     _phoneController.addListener(_onFieldChanged);
-    _descriptionController.addListener(_onFieldChanged);
   }
 
   void _onFieldChanged() {
@@ -61,10 +62,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   void dispose() {
     _nameController.removeListener(_onFieldChanged);
     _phoneController.removeListener(_onFieldChanged);
-    _descriptionController.removeListener(_onFieldChanged);
     _nameController.dispose();
     _phoneController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -157,7 +156,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       final repository = context.read<CustomerRepository>();
 
       final phoneText = _phoneController.text.trim();
-      final descriptionText = _descriptionController.text.trim();
+      final descriptionText = _descriptionValue.trim();
 
       final customer = Customer(
         id: _isEditing ? widget.customer!.id : const Uuid().v4(),
@@ -290,18 +289,20 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               enabled: !_isLoading,
             ),
             const SizedBox(height: AppConfig.spacing16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description (Optional)',
-                hintText: 'Enter customer description',
-                prefixIcon: Icon(Icons.description),
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 4,
-              validator: CustomerValidators.validateDescription,
-              textInputAction: TextInputAction.newline,
+            RichDescriptionInputField(
+              key: _descriptionKey,
+              initialValue: _descriptionValue,
+              labelText: 'Description (Optional)',
+              hintText: 'Enter customer description',
               enabled: !_isLoading,
+              onChanged: (value) {
+                _descriptionValue = value;
+                if (!_hasUnsavedChanges) {
+                  setState(() {
+                    _hasUnsavedChanges = true;
+                  });
+                }
+              },
             ),
           ],
                   ),

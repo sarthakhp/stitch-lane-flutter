@@ -43,7 +43,7 @@ class CustomerFilterPreset {
   static CustomerFilterPreset ready() {
     return const CustomerFilterPreset(
       name: 'Ready',
-      icon: Icons.schedule,
+      icon: Icons.check_circle_outline,
       options: CustomerFilterOptions(
         showPending: false,
         showReady: true,
@@ -54,7 +54,16 @@ class CustomerFilterPreset {
     );
   }
 
+  static CustomerFilterPreset recent() {
+    return const CustomerFilterPreset(
+      name: 'Recent',
+      icon: Icons.schedule,
+      options: CustomerFilterOptions.recent(),
+    );
+  }
+
   static List<CustomerFilterPreset> get allPresets => [
+        recent(),
         doneButNotPaid(),
         pending(),
         ready(),

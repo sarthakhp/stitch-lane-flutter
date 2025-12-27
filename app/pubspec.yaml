@@ -30,6 +30,12 @@ dependencies:
   audioplayers: ^6.0.0
   google_generative_ai: ^0.4.7
   flutter_dotenv: ^6.0.0
+  flutter_quill: ^11.5.0
+  markdown_quill: ^4.3.0
+  flutter_markdown_plus: ^1.0.6
+  markdown: ^7.3.0
+  flutter_localizations:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:

@@ -68,7 +68,16 @@ class FilterPreset {
     );
   }
 
+  static FilterPreset recent() {
+    return const FilterPreset(
+      name: 'Recent',
+      icon: Icons.schedule,
+      options: OrderFilterOptions.recent(),
+    );
+  }
+
   static List<FilterPreset> get allPresets => [
+        recent(),
         doneButNotPaid(),
         allPending(),
         allReady(),

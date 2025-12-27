@@ -4,14 +4,16 @@ import '../../config/app_config.dart';
 class OrderDetailCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
+  final String? value;
+  final Widget? child;
 
   const OrderDetailCard({
     super.key,
     required this.icon,
     required this.label,
-    required this.value,
-  });
+    this.value,
+    this.child,
+  }) : assert(value != null || child != null, 'Either value or child must be provided');
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +37,13 @@ class OrderDetailCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
                   const SizedBox(height: AppConfig.spacing8),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
+                  if (child != null)
+                    child!
+                  else
+                    Text(
+                      value!,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                 ],
               ),
             ),
