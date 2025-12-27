@@ -18,15 +18,21 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
     };
     return AppSettings(
       dueDateWarningThreshold: fields[0] as int,
+      pendingOrdersReminderEnabledRaw: fields[1] as bool?,
+      pendingOrdersReminderTimeRaw: fields[2] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(1)
+      ..writeByte(3)
       ..writeByte(0)
-      ..write(obj.dueDateWarningThreshold);
+      ..write(obj.dueDateWarningThreshold)
+      ..writeByte(1)
+      ..write(obj.pendingOrdersReminderEnabledRaw)
+      ..writeByte(2)
+      ..write(obj.pendingOrdersReminderTimeRaw);
   }
 
   @override

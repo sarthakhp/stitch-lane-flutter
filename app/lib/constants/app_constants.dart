@@ -19,5 +19,6 @@ class AppConstants {
   static const String measurementDetailRoute = '/measurement/detail';
   static const String measurementFormRoute = '/measurement/form';
   static const String settingsRoute = '/settings';
+  static const String notificationSettingsRoute = '/settings/notifications';
 }
 

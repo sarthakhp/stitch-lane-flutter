@@ -10,6 +10,8 @@ class SettingsState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   int get dueDateWarningThreshold => _settings.dueDateWarningThreshold;
+  bool get pendingOrdersReminderEnabled => _settings.pendingOrdersReminderEnabled;
+  String get pendingOrdersReminderTime => _settings.pendingOrdersReminderTime;
 
   void setSettings(AppSettings settings) {
     _settings = settings;
