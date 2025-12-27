@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'gemini_service.dart';
 import '../../presentation/widgets/transcription_progress_dialog.dart';
@@ -10,7 +9,7 @@ class TranscriptionService {
     required String audioFilePath,
     required String currentText,
   }) async {
-    Completer<void>? transcriptionCompleter = Completer<void>();
+    bool isCancelled = false;
 
     try {
       if (!context.mounted) return null;
@@ -18,7 +17,7 @@ class TranscriptionService {
       TranscriptionProgressDialog.show(
         context,
         onCancel: () {
-          transcriptionCompleter?.complete();
+          isCancelled = true;
           Navigator.of(context).pop();
         },
       );
@@ -27,10 +26,7 @@ class TranscriptionService {
       try {
         transcription = await GeminiService.transcribeAudio(audioFilePath);
       } catch (e) {
-        if (!transcriptionCompleter.isCompleted) {
-          transcriptionCompleter.complete();
-        }
-        if (context.mounted) {
+        if (context.mounted && !isCancelled) {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -42,8 +38,8 @@ class TranscriptionService {
         return null;
       }
 
-      if (!transcriptionCompleter.isCompleted) {
-        transcriptionCompleter.complete();
+      if (isCancelled) {
+        return null;
       }
 
       if (!context.mounted) return null;
@@ -82,7 +78,7 @@ class TranscriptionService {
 
       return null;
     } finally {
-      transcriptionCompleter = null;
+      // Cleanup if needed
     }
   }
 }

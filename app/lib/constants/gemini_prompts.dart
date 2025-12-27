@@ -26,7 +26,7 @@ OUTPUT FORMAT: Markdown
 Use Markdown formatting for rich text display:
 
 FORMATTING RULES:
-1. Use **bold** for measurement names and important labels (e.g., **Length:** 40 inches)
+1. Use **bold** for numbers (e.g., Length: **40** inches)
 2. Use bullet points (- ) for lists of items or measurements
 3. Put each distinct item or measurement on a NEW LINE
 4. Group related information together with blank lines between sections
@@ -35,13 +35,13 @@ FORMATTING RULES:
 NUMBER CONVERSION RULES:
 - "10 and half" or "10 and a half" → write as "10.5"
 - "15 and quarter" or "15 and a quarter" → write as "15.25"
-- "20 and three quarters" → write as "20.75"
+- "20 into 13" → write as "20 x 13"
 - Any similar conversational fractions → convert to decimal equivalents
 
 EXAMPLE OUTPUT:
 - **Length:** 40.5 inches
 - **Waist:** 32 inches
-- **Chest:** 38 inches
+- **Sleeve:** 14 x 15.5 inches
 
 **Notes:** Customer prefers loose fitting
 

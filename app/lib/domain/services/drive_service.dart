@@ -77,9 +77,10 @@ class DriveService {
     AppLogger.info('Checking for existing backup file...');
     final existingFileId = await _findBackupFile(driveApi, folderId);
 
+    final bytes = utf8.encode(jsonData);
     final media = drive.Media(
-      Stream.value(utf8.encode(jsonData)),
-      jsonData.length,
+      Stream.value(bytes),
+      bytes.length,
     );
 
     if (existingFileId != null) {

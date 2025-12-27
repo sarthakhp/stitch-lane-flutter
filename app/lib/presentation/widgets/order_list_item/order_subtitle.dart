@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../backend/models/order.dart';
 import '../../../config/app_config.dart';
+import '../../../utils/markdown_helper.dart';
 
 class OrderSubtitle extends StatelessWidget {
   final Order order;
@@ -21,10 +22,10 @@ class OrderSubtitle extends StatelessWidget {
 
   String? _getDescriptionPreview() {
     if (order.description != null && order.description!.isNotEmpty) {
-      const maxLength = AppConfig.descriptionPreviewLength;
-      return order.description!.length > maxLength
-          ? '${order.description!.substring(0, maxLength)}...'
-          : order.description!;
+      return MarkdownHelper.getPreviewText(
+        order.description!,
+        maxLength: AppConfig.descriptionPreviewLength,
+      );
     }
     return null;
   }

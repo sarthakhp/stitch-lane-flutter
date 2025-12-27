@@ -176,7 +176,7 @@ class OrderImagesSection extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+        crossAxisCount: 2,
         crossAxisSpacing: AppConfig.spacing8,
         mainAxisSpacing: AppConfig.spacing8,
       ),

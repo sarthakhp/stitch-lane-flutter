@@ -6,6 +6,7 @@ import 'package:record/record.dart';
 class AudioRecordingService {
   static final AudioRecorder _recorder = AudioRecorder();
   static bool _isRecording = false;
+  static bool _isPaused = false;
 
   static Future<bool> requestPermission() async {
     final status = await Permission.microphone.request();
@@ -45,11 +46,25 @@ class AudioRecordingService {
       );
 
       _isRecording = true;
+      _isPaused = false;
       return filePath;
     } catch (e) {
       _isRecording = false;
+      _isPaused = false;
       rethrow;
     }
+  }
+
+  static Future<void> pauseRecording() async {
+    if (!_isRecording || _isPaused) return;
+    await _recorder.pause();
+    _isPaused = true;
+  }
+
+  static Future<void> resumeRecording() async {
+    if (!_isRecording || !_isPaused) return;
+    await _recorder.resume();
+    _isPaused = false;
   }
 
   static Future<String?> stopRecording() async {
@@ -60,9 +75,11 @@ class AudioRecordingService {
 
       final path = await _recorder.stop();
       _isRecording = false;
+      _isPaused = false;
       return path;
     } catch (e) {
       _isRecording = false;
+      _isPaused = false;
       rethrow;
     }
   }
@@ -127,6 +144,7 @@ class AudioRecordingService {
   }
 
   static bool get isRecording => _isRecording;
+  static bool get isPaused => _isPaused;
 
   static Future<void> dispose() async {
     if (_isRecording) {

@@ -151,32 +151,31 @@ class _CustomersListScreenState extends State<CustomersListScreen>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(180),
-          child: Column(
-            children: [
-              SearchBarWidget(
-                hintText: 'Search customers...',
-                onSearchChanged: _onSearchChanged,
-                onClear: _onClearSearch,
-                autofocus: widget.autoFocusSearch,
-              ),
-              FilterPresetChips(
-                selectedPreset: _selectedPreset,
-                onPresetSelected: _applyPreset,
-              ),
-              CustomerSortDropdown(
-                selectedSort: _selectedSort,
-                onSortChanged: (value) {
-                  setState(() {
-                    _selectedSort = value;
-                  });
-                },
-              ),
-            ],
+          preferredSize: const Size.fromHeight(60),
+          child: SearchBarWidget(
+            hintText: 'Search customers...',
+            onSearchChanged: _onSearchChanged,
+            onClear: _onClearSearch,
+            autofocus: widget.autoFocusSearch,
           ),
         ),
       ),
-      body: Consumer2<CustomerState, OrderState>(
+      body: Column(
+        children: [
+          FilterPresetChips(
+            selectedPreset: _selectedPreset,
+            onPresetSelected: _applyPreset,
+          ),
+          CustomerSortDropdown(
+            selectedSort: _selectedSort,
+            onSortChanged: (value) {
+              setState(() {
+                _selectedSort = value;
+              });
+            },
+          ),
+          Expanded(
+            child: Consumer2<CustomerState, OrderState>(
         builder: (context, customerState, orderState, child) {
           if (customerState.isLoading && customerState.customers.isEmpty) {
             return const LoadingWidget();
@@ -236,6 +235,9 @@ class _CustomersListScreenState extends State<CustomersListScreen>
             ),
           );
         },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

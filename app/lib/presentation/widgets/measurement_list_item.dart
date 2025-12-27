@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../backend/models/measurement.dart';
 import '../../config/app_config.dart';
+import '../../utils/markdown_helper.dart';
+import 'measurement_description_text.dart';
 
 class MeasurementListItem extends StatelessWidget {
   final Measurement measurement;
@@ -28,13 +30,16 @@ class MeasurementListItem extends StatelessWidget {
           horizontal: AppConfig.spacing16,
           vertical: AppConfig.spacing12,
         ),
-        title: Text(
-          _getPreviewText(),
-          style: textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
+        title: MeasurementDescriptionText(
+          text: MarkdownHelper.getPreviewText(
+            measurement.description,
+            maxLength: 100,
           ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
+          baseStyle: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,13 +60,6 @@ class MeasurementListItem extends StatelessWidget {
         onTap: onTap,
       ),
     );
-  }
-
-  String _getPreviewText() {
-    if (measurement.description.length <= 100) {
-      return measurement.description;
-    }
-    return '${measurement.description.substring(0, 100)}...';
   }
 }
 

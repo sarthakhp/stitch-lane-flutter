@@ -142,8 +142,17 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
                     color: colorScheme.onSurfaceVariant,
                   ),
             ),
-            TranscriptionVoiceButton(
-              onRecordingComplete: _handleTranscription,
+            ListenableBuilder(
+              listenable: _quillController,
+              builder: (context, _) {
+                if (isEmpty) return const SizedBox.shrink();
+                return IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: clear,
+                  tooltip: 'Clear',
+                  visualDensity: VisualDensity.compact,
+                );
+              },
             ),
           ],
         ),
@@ -151,6 +160,11 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
         _buildToolbar(colorScheme),
         const SizedBox(height: AppConfig.spacing8),
         _buildEditor(colorScheme),
+        const SizedBox(height: AppConfig.spacing8),
+        TranscriptionVoiceButton(
+          onRecordingComplete: _handleTranscription,
+          expandWidth: true,
+        ),
       ],
     );
   }

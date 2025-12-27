@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../backend/models/measurement.dart';
 import '../../config/app_config.dart';
+import 'markdown_description_text.dart';
 
 class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
@@ -79,12 +80,14 @@ class MeasurementCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppConfig.spacing8),
-                      Text(
-                        _getPreviewText(latestMeasurement!.description),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontSize: AppConfig.measurementDescriptionFontSize,
+                      SizedBox(
+                        height: 80,
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: MarkdownDescriptionText(
+                            text: latestMeasurement!.description,
+                            selectable: false,
+                          ),
                         ),
                       ),
                       const SizedBox(height: AppConfig.spacing12),
@@ -150,13 +153,6 @@ class MeasurementCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getPreviewText(String description) {
-    if (description.length <= 150) {
-      return description;
-    }
-    return '${description.substring(0, 150)}...';
   }
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
+import 'markdown_description_text.dart';
 
 enum TranscriptionAction {
   append,
@@ -42,9 +43,9 @@ class TranscriptionActionDialog extends StatelessWidget {
                   color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                 ),
               ),
-              child: Text(
-                transcribedText,
-                style: Theme.of(context).textTheme.bodyMedium,
+              child: MarkdownDescriptionText(
+                text: transcribedText,
+                selectable: false,
               ),
             ),
             if (hasExistingDescription) ...[

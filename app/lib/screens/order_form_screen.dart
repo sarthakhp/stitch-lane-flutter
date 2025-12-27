@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/order_images_section.dart';
@@ -163,6 +164,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       return;
     }
 
+    final valueText = _valueController.text.trim();
+    if (valueText.isEmpty || int.tryParse(valueText) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter order value')),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -198,7 +207,17 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         setState(() {
           _hasUnsavedChanges = false;
         });
-        Navigator.pop(context);
+
+        if (_isEditing) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushReplacementNamed(
+            context,
+            AppConstants.orderDetailRoute,
+            arguments: {'order': order, 'customer': _selectedCustomer},
+          );
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             duration: const Duration(milliseconds: 800),
@@ -319,25 +338,53 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                         elevation: 4.0,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(
-                            maxHeight: 200,
+                            maxHeight: 250,
                             maxWidth: 400,
                           ),
-                          child: ListView.builder(
-                            padding: EdgeInsets.zero,
-                            shrinkWrap: true,
-                            itemCount: options.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              final Customer customer = options.elementAt(index);
-                              return ListTile(
-                                title: Text(customer.name),
-                                subtitle: customer.phoneNumber != null
-                                    ? Text(customer.phoneNumber!)
-                                    : null,
-                                onTap: () {
-                                  onSelected(customer);
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.person_add),
+                                title: const Text('Create new customer'),
+                                onTap: () async {
+                                  FocusScope.of(context).unfocus();
+                                  final customerState = context.read<CustomerState>();
+                                  final previousCount = customerState.customers.length;
+                                  await Navigator.pushNamed(
+                                    context,
+                                    AppConstants.customerFormRoute,
+                                  );
+                                  if (mounted && customerState.customers.length > previousCount) {
+                                    final newCustomer = customerState.customers.last;
+                                    setState(() {
+                                      _selectedCustomer = newCustomer;
+                                      _hasUnsavedChanges = true;
+                                    });
+                                  }
                                 },
-                              );
-                            },
+                              ),
+                              const Divider(height: 1),
+                              Flexible(
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final Customer customer = options.elementAt(index);
+                                    return ListTile(
+                                      title: Text(customer.name),
+                                      subtitle: customer.phoneNumber != null
+                                          ? Text(customer.phoneNumber!)
+                                          : null,
+                                      onTap: () {
+                                        onSelected(customer);
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -394,19 +441,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
               ],
-              validator: (value) {
-                if (!_hasAttemptedSubmit) {
-                  return null;
-                }
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a value';
-                }
-                final intValue = int.tryParse(value.trim());
-                if (intValue == null) {
-                  return 'Please enter a valid integer';
-                }
-                return null;
-              },
               textInputAction: TextInputAction.next,
               enabled: !_isLoading,
             ),
