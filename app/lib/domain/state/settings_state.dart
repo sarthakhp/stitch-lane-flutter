@@ -12,6 +12,9 @@ class SettingsState extends ChangeNotifier {
   int get dueDateWarningThreshold => _settings.dueDateWarningThreshold;
   bool get pendingOrdersReminderEnabled => _settings.pendingOrdersReminderEnabled;
   String get pendingOrdersReminderTime => _settings.pendingOrdersReminderTime;
+  bool get autoBackupEnabled => _settings.autoBackupEnabled;
+  String get autoBackupTime => _settings.autoBackupTime;
+  DateTime? get lastAutoBackupTime => _settings.lastAutoBackupTime;
 
   void setSettings(AppSettings settings) {
     _settings = settings;

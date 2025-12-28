@@ -25,7 +25,12 @@ class DriveService {
       var account = googleSignIn.currentUser;
 
       if (account == null) {
-        AppLogger.warning('No GoogleSignIn user, requesting sign-in...');
+        AppLogger.info('No GoogleSignIn user, attempting silent sign-in...');
+        account = await googleSignIn.signInSilently();
+      }
+
+      if (account == null) {
+        AppLogger.warning('Silent sign-in failed, user needs to re-authenticate');
         throw Exception('Drive access requires re-authentication. Please sign out and sign in again to enable backup/restore.');
       }
 

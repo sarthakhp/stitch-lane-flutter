@@ -6,6 +6,7 @@ import '../presentation/presentation.dart';
 import 'widgets/settings/due_date_warning_card.dart';
 import 'widgets/settings/notification_settings_card.dart';
 import 'widgets/settings/backup_restore_card.dart';
+import 'widgets/settings/auto_backup_settings_card.dart';
 import 'widgets/settings/account_card.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -50,6 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             NotificationSettingsCard(),
             SizedBox(height: AppConfig.spacing24),
             BackupRestoreCard(),
+            SizedBox(height: AppConfig.spacing24),
+            AutoBackupSettingsCard(),
             SizedBox(height: AppConfig.spacing24),
             AccountCard(),
           ],

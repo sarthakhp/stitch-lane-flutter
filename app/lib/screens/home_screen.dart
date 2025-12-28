@@ -4,6 +4,7 @@ import '../backend/repositories/order_repository.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../domain/services/order_service.dart';
+import '../domain/services/permission_service.dart';
 import '../domain/state/order_state.dart';
 import '../domain/models/filter_preset.dart';
 import '../domain/models/customer_filter_preset.dart';
@@ -23,7 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadOrders();
+      _requestPermissions();
     });
+  }
+
+  Future<void> _requestPermissions() async {
+    await PermissionService.requestAllPermissions();
   }
 
   Future<void> _loadOrders() async {

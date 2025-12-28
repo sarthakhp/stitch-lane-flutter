@@ -67,6 +67,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       pendingOrdersReminderEnabled: enabled,
     );
     await _saveSettings(newSettings);
+
+    if (enabled) {
+      await PendingOrdersReminderService.scheduleReminder(
+        settingsState.pendingOrdersReminderTime,
+      );
+    } else {
+      await PendingOrdersReminderService.cancelReminder();
+    }
   }
 
   Future<void> _onTimeSelected() async {
@@ -90,6 +98,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         pendingOrdersReminderTime: timeString,
       );
       await _saveSettings(newSettings);
+
+      if (settingsState.pendingOrdersReminderEnabled) {
+        await PendingOrdersReminderService.scheduleReminder(timeString);
+      }
     }
   }
 
@@ -181,6 +193,26 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                               ),
                             ],
                           ),
+                          const SizedBox(height: AppConfig.spacing16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isSaving ? null : _onTestReminderNow,
+                                  icon: const Icon(Icons.bug_report, size: 18),
+                                  label: const Text('Test Now'),
+                                ),
+                              ),
+                              const SizedBox(width: AppConfig.spacing8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _isSaving ? null : _onTestWorkmanager,
+                                  icon: const Icon(Icons.schedule, size: 18),
+                                  label: const Text('Test WM (15s)'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ],
                     ),
@@ -192,6 +224,78 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         },
       ),
     );
+  }
+
+  Future<void> _onTestReminderNow() async {
+    debugPrint('[TEST DEBUG] Test Reminder Now button pressed');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Testing reminder... Check notification in a moment.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      debugPrint('[TEST DEBUG] Calling PendingOrdersReminderService.performReminder()');
+      await PendingOrdersReminderService.performReminder();
+      debugPrint('[TEST DEBUG] performReminder() completed successfully');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reminder triggered successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[TEST DEBUG] performReminder() FAILED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reminder failed: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _onTestWorkmanager() async {
+    debugPrint('[TEST DEBUG] Test Workmanager button pressed');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Scheduling Workmanager task in 15 seconds...'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+
+    try {
+      await PendingOrdersReminderService.scheduleTest(delaySeconds: 15);
+      debugPrint('[TEST DEBUG] One-off task scheduled successfully');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Workmanager task scheduled! Check notification in ~15-30 seconds.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[TEST DEBUG] scheduleOneOffTest() FAILED: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to schedule: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 

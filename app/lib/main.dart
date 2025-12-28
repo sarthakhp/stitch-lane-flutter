@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
@@ -11,8 +12,34 @@ import 'config/routes.dart';
 import 'screens/login_screen.dart';
 import 'screens/backup_restore_check_screen.dart';
 import 'screens/home_screen.dart';
+import 'constants/app_constants.dart';
+import 'utils/app_logger.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      AppLogger.info('[Workmanager] Task triggered: $task');
+
+      if (task == autoBackupTaskName) {
+        await AutoBackupService.performBackup();
+      } else if (task == pendingOrdersReminderTaskName) {
+        await PendingOrdersReminderService.performReminder();
+      } else {
+        AppLogger.warning('[Workmanager] Unknown task: $task');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      AppLogger.error('[Workmanager] Task failed: $task', e);
+      return false;
+    }
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +49,22 @@ void main() async {
   );
   await AuthService.initializeAuthPersistence();
   await DatabaseService.initialize();
+  await NotificationService.initialize(
+    onNotificationTap: _handleNotificationTap,
+  );
+  await BackgroundTaskDispatcher.initialize(callbackDispatcher);
   runApp(const StitchLaneApp());
+}
+
+void _handleNotificationTap(String? payload) {
+  if (payload == pendingOrdersReminderPayload) {
+    navigatorKey.currentState?.pushNamed(
+      AppConstants.customersListRoute,
+      arguments: {
+        'initialFilterPreset': CustomerFilterPreset.pending(),
+      },
+    );
+  }
 }
 
 class StitchLaneApp extends StatelessWidget {
@@ -102,10 +144,39 @@ class _AppInitializerState extends State<AppInitializer> {
 
     await SettingsService.loadSettings(settingsState, settingsRepository);
 
+    await _initializeAutoBackup(settingsState);
+    await _initializePendingOrdersReminder(settingsState);
+
     if (mounted) {
       setState(() {
         _isInitializing = false;
       });
+    }
+  }
+
+  Future<void> _initializeAutoBackup(SettingsState settingsState) async {
+    if (settingsState.autoBackupEnabled) {
+      await AutoBackupService.scheduleAutoBackup(settingsState.autoBackupTime);
+      _checkStartupBackup();
+    }
+  }
+
+  void _checkStartupBackup() {
+    final settingsState = context.read<SettingsState>();
+    final settingsRepository = context.read<SettingsRepository>();
+
+    Future.microtask(() => StartupBackupChecker.checkAndPerformBackupIfNeeded(
+          onBackupComplete: () {
+            SettingsService.loadSettings(settingsState, settingsRepository);
+          },
+        ));
+  }
+
+  Future<void> _initializePendingOrdersReminder(SettingsState settingsState) async {
+    if (settingsState.pendingOrdersReminderEnabled) {
+      await PendingOrdersReminderService.scheduleReminder(
+        settingsState.pendingOrdersReminderTime,
+      );
     }
   }
 
@@ -125,6 +196,7 @@ class _AppInitializerState extends State<AppInitializer> {
     return MaterialApp(
       title: 'Stitch Lane',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       navigatorObservers: [routeObserver],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
