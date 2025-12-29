@@ -60,8 +60,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final childAspectRatio = _getChildAspectRatio(screenWidth);
 
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: Text('Stitch Lane'),
+      appBar: CustomAppBar(
+        title: const Text('Stitch Lane'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'settings') {
+                Navigator.pushNamed(context, AppConstants.settingsRoute);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'settings',
+                child: ListTile(
+                  leading: Icon(Icons.settings),
+                  title: Text('Settings'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConfig.spacing16),
@@ -189,7 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 HomeActionTile(
                   icon: Icons.note_add,
                   title: 'Create Order',
-                  subtitle: 'Add a new order',
                   isCreateAction: true,
                   onTap: () {
                     Navigator.pushNamed(context, AppConstants.orderFormRoute);
@@ -198,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 HomeActionTile(
                   icon: Icons.assignment,
                   title: 'Show Orders',
-                  subtitle: 'View all orders',
                   onTap: () {
                     Navigator.pushNamed(context, AppConstants.allOrdersListRoute);
                   },
@@ -206,7 +225,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 HomeActionTile(
                   icon: Icons.person_add,
                   title: 'Create Customer',
-                  subtitle: 'Add a new customer',
                   isCreateAction: true,
                   onTap: () {
                     Navigator.pushNamed(context, AppConstants.customerFormRoute);
@@ -215,21 +233,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 HomeActionTile(
                   icon: Icons.people,
                   title: 'Show Customers',
-                  subtitle: 'Manage your customer list',
                   onTap: () {
                     Navigator.pushNamed(
                       context,
                       AppConstants.customersListRoute,
                       arguments: {'autoFocusSearch': true},
                     );
-                  },
-                ),
-                HomeActionTile(
-                  icon: Icons.settings,
-                  title: 'Settings',
-                  subtitle: 'Configure app preferences',
-                  onTap: () {
-                    Navigator.pushNamed(context, AppConstants.settingsRoute);
                   },
                 ),
               ],

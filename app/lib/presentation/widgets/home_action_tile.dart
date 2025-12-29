@@ -4,7 +4,6 @@ import '../../config/app_config.dart';
 class HomeActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
   final Color? iconColor;
   final Color? backgroundColor;
@@ -14,7 +13,6 @@ class HomeActionTile extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
     this.iconColor,
     this.backgroundColor,
@@ -44,43 +42,22 @@ class HomeActionTile extends StatelessWidget {
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Flexible(
-                    child: Icon(
-                      icon,
-                      size: iconSize,
-                      color: effectiveIconColor,
-                    ),
+                  Icon(
+                    icon,
+                    size: iconSize,
+                    color: effectiveIconColor,
                   ),
                   const SizedBox(height: AppConfig.spacing8),
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: constraints.maxWidth > 150 ? null : 14.0,
-                        color: isCreateAction ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onPrimary,
-                        fontWeight: isCreateAction ? null : FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: constraints.maxWidth > 150 ? null : 14.0,
+                      color: isCreateAction ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onPrimary,
+                      fontWeight: isCreateAction ? null : FontWeight.w600,
                     ),
-                  ),
-                  const SizedBox(height: 4.0),
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isCreateAction
-                            ? theme.colorScheme.onSurfaceVariant
-                            : theme.colorScheme.onPrimary,
-                        fontSize: constraints.maxWidth > 150 ? null : 11.0,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               );
