@@ -13,8 +13,8 @@ class BackupRestoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<BackupState>(
-      builder: (context, backupState, child) {
+    return Consumer2<BackupState, SettingsState>(
+      builder: (context, backupState, settingsState, child) {
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(AppConfig.spacing16),
@@ -38,7 +38,9 @@ class BackupRestoreCard extends StatelessWidget {
                     leading: const Icon(Icons.cloud_done),
                     title: const Text('Last Backup'),
                     subtitle: Text(
-                      '${_formatDate(backupState.backupInfo!.lastModified)} • ${backupState.backupInfo!.formattedSize}',
+                      settingsState.lastBackupTime != null
+                          ? '${_formatDate(settingsState.lastBackupTime!)} • ${backupState.backupInfo!.formattedSize}'
+                          : 'Never • ${backupState.backupInfo!.formattedSize}',
                     ),
                     contentPadding: EdgeInsets.zero,
                   ),

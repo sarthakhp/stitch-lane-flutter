@@ -173,10 +173,12 @@ class _AutoBackupSettingsCardState extends State<AutoBackupSettingsCard> {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         const SizedBox(width: AppConfig.spacing8),
-        Text(
-          'Last backup: ${_formatLastBackupTime(lastBackup)}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+        Flexible(
+          child: Text(
+            'Last backup: ${_formatLastBackupTime(lastBackup)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],

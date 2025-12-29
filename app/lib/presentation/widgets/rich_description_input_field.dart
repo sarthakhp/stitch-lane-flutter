@@ -7,6 +7,19 @@ import '../../domain/services/audio_recording_service.dart';
 import '../../domain/services/transcription_service.dart';
 import 'transcription_voice_button.dart';
 
+class _DividerEmbedBuilder extends EmbedBuilder {
+  @override
+  String get key => 'divider';
+
+  @override
+  Widget build(BuildContext context, EmbedContext embedContext) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConfig.spacing8),
+      child: Divider(color: Theme.of(context).colorScheme.outlineVariant),
+    );
+  }
+}
+
 class _MarkdownConverter {
   final md.Document _mdDocument = md.Document(encodeHtml: false);
   late final MarkdownToDelta _mdToDelta = MarkdownToDelta(markdownDocument: _mdDocument);
@@ -263,6 +276,7 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
           scrollable: true,
           readOnlyMouseCursor: SystemMouseCursors.text,
           enableInteractiveSelection: widget.enabled,
+          embedBuilders: [_DividerEmbedBuilder()],
         ),
       ),
     );
