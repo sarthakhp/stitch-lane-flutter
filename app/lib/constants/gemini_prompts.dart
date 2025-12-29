@@ -22,14 +22,15 @@ Accurately identify and transcribe each word in the language it was spoken.
 Transcribe this tailoring/stitching audio (measurements, orders, notes, garment details).
 
 MARKDOWN FORMAT (use ONLY these):
-- **bold** for emphasis/labels
+- **bold** for emphasis/labels/numbers
 - *italic* for notes
-- Bullet lists (- item) or numbered lists (1. item)
+- Bullet lists (- item) or numbered lists with period (1. item)
 - NO headers, horizontal rules, code blocks, links, or blockquotes
 
 RULES:
 - Convert fractions to decimals: "10 and half" → 10.5, "15 and quarter" → 15.25
 - Convert "into" to multiplication: "20 into 13" → 20 x 13
+- Add a blank line between each garment section
 - If silent, respond: "No one is speaking"
 
 EXAMPLE:
