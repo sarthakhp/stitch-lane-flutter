@@ -5,11 +5,13 @@ class AuthState extends ChangeNotifier {
   User? _user;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _pendingBackupCheck = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
+  bool get pendingBackupCheck => _pendingBackupCheck;
 
   String? get userEmail => _user?.email;
   String? get userName => _user?.displayName;
@@ -37,10 +39,21 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPendingBackupCheck({required bool pending}) {
+    _pendingBackupCheck = pending;
+    notifyListeners();
+  }
+
+  void clearBackupCheck() {
+    _pendingBackupCheck = false;
+    notifyListeners();
+  }
+
   void signOut() {
     _user = null;
     _errorMessage = null;
     _isLoading = false;
+    _pendingBackupCheck = false;
     notifyListeners();
   }
 }

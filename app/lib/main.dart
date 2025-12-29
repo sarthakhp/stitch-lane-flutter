@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
+import 'screens/backup_restore_check_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell_screen.dart';
 import 'utils/app_logger.dart';
@@ -251,10 +252,12 @@ class AuthGate extends StatelessWidget {
     final authState = context.watch<AuthState>();
 
     if (authState.isAuthenticated) {
+      if (authState.pendingBackupCheck) {
+        return const BackupRestoreCheckScreen();
+      }
       return const MainShellScreen();
-    } else {
-      return const LoginScreen();
     }
+    return const LoginScreen();
   }
 }
 

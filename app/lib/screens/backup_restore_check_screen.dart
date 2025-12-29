@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
-import '../constants/app_constants.dart';
 import 'widgets/app_logo.dart';
 
 class BackupRestoreCheckScreen extends StatefulWidget {
@@ -113,7 +112,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
-        Navigator.of(context).pushReplacementNamed(AppConstants.homeRoute);
+        context.read<AuthState>().clearBackupCheck();
       }
     } catch (e) {
       backupState.setError(e.toString());
@@ -129,7 +128,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   void _handleSkip() {
-    Navigator.of(context).pushReplacementNamed(AppConstants.homeRoute);
+    context.read<AuthState>().clearBackupCheck();
   }
 
   @override
