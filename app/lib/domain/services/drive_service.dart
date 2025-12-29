@@ -11,6 +11,15 @@ class DriveService {
   static const String imagesFolderName = 'images';
   static const String audiosFolderName = 'audios';
 
+  static Future<bool> isSignedIn() async {
+    final googleSignIn = AuthService.googleSignIn;
+    var account = googleSignIn.currentUser;
+    if (account != null) return true;
+
+    account = await googleSignIn.signInSilently();
+    return account != null;
+  }
+
   static Future<drive.DriveApi> getDriveApi() async {
     try {
       AppLogger.info('Attempting to get Drive API access...');

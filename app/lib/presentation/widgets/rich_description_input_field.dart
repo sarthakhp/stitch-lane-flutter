@@ -7,6 +7,18 @@ import '../../domain/services/audio_recording_service.dart';
 import '../../domain/services/transcription_service.dart';
 import 'transcription_voice_button.dart';
 
+class _MarkdownConverter {
+  final md.Document _mdDocument = md.Document(encodeHtml: false);
+  late final MarkdownToDelta _mdToDelta = MarkdownToDelta(markdownDocument: _mdDocument);
+  final DeltaToMarkdown _deltaToMd = DeltaToMarkdown();
+
+  Document toQuillDocument(String markdown) {
+    return Document.fromDelta(_mdToDelta.convert(markdown));
+  }
+
+  String toMarkdown(Document document) => _deltaToMd.convert(document.toDelta());
+}
+
 class RichDescriptionInputField extends StatefulWidget {
   final String initialValue;
   final ValueChanged<String>? onChanged;
@@ -30,73 +42,67 @@ class RichDescriptionInputField extends StatefulWidget {
 }
 
 class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
-  late QuillController _quillController;
-  late final md.Document _mdDocument;
-  late final MarkdownToDelta _mdToDelta;
-  late final DeltaToMarkdown _deltaToMd;
-  final FocusNode _focusNode = FocusNode();
-  final ScrollController _scrollController = ScrollController();
+  final _converter = _MarkdownConverter();
+  final _focusNode = FocusNode();
+  final _scrollController = ScrollController();
+  late QuillController _controller;
 
   @override
   void initState() {
     super.initState();
-    _mdDocument = md.Document(encodeHtml: false);
-    _mdToDelta = MarkdownToDelta(markdownDocument: _mdDocument);
-    _deltaToMd = DeltaToMarkdown();
-    _initController();
+    _controller = _createController(widget.initialValue);
   }
 
-  void _initController() {
-    if (widget.initialValue.isNotEmpty) {
-      final delta = _mdToDelta.convert(widget.initialValue);
-      _quillController = QuillController(
-        document: Document.fromDelta(delta),
-        selection: const TextSelection.collapsed(offset: 0),
-      );
-    } else {
-      _quillController = QuillController.basic();
-    }
-    _quillController.addListener(_onDocumentChange);
+  @override
+  void dispose() {
+    _controller.removeListener(_notifyChange);
+    _controller.dispose();
+    _focusNode.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
-  void _onDocumentChange() {
-    if (widget.onChanged != null) {
-      widget.onChanged!(getMarkdown());
-    }
+  QuillController _createController(String markdown) {
+    final controller = markdown.isNotEmpty
+        ? QuillController(
+            document: _converter.toQuillDocument(markdown),
+            selection: const TextSelection.collapsed(offset: 0),
+          )
+        : QuillController.basic();
+    controller.addListener(_notifyChange);
+    return controller;
   }
 
-  String getMarkdown() {
-    return _deltaToMd.convert(_quillController.document.toDelta());
+  void _replaceController(QuillController newController) {
+    _controller.removeListener(_notifyChange);
+    _controller.dispose();
+    _controller = newController;
+    if (mounted) setState(() {});
   }
 
-  String getPlainText() {
-    return _quillController.document.toPlainText().trim();
-  }
+  void _notifyChange() => widget.onChanged?.call(getMarkdown());
+
+  String getMarkdown() => _converter.toMarkdown(_controller.document);
+
+  String getPlainText() => _controller.document.toPlainText().trim();
+
+  bool get isEmpty => getPlainText().isEmpty;
 
   void setMarkdown(String markdown) {
-    final delta = _mdToDelta.convert(markdown);
-    _quillController.removeListener(_onDocumentChange);
-    _quillController.document = Document.fromDelta(delta);
-    _quillController.moveCursorToEnd();
-    _quillController.addListener(_onDocumentChange);
+    final newController = _createController(markdown);
+    newController.moveCursorToEnd();
+    _replaceController(newController);
   }
 
   void appendMarkdown(String markdown) {
-    final currentMarkdown = getMarkdown();
-    final newMarkdown = currentMarkdown.isEmpty
-        ? markdown
-        : '$currentMarkdown\n$markdown';
-    setMarkdown(newMarkdown);
+    final current = getMarkdown();
+    setMarkdown(current.isEmpty ? markdown : '$current\n$markdown');
   }
 
   void clear() {
-    _quillController.removeListener(_onDocumentChange);
-    _quillController.document = Document();
-    _quillController.addListener(_onDocumentChange);
+    _replaceController(_createController(''));
     widget.onChanged?.call('');
   }
-
-  bool get isEmpty => getPlainText().isEmpty;
 
   Future<void> _handleTranscription(String? audioFilePath) async {
     if (audioFilePath == null) return;
@@ -118,44 +124,13 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
   }
 
   @override
-  void dispose() {
-    _quillController.removeListener(_onDocumentChange);
-    _quillController.dispose();
-    _focusNode.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              widget.labelText,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            ListenableBuilder(
-              listenable: _quillController,
-              builder: (context, _) {
-                if (isEmpty) return const SizedBox.shrink();
-                return IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: clear,
-                  tooltip: 'Clear',
-                  visualDensity: VisualDensity.compact,
-                );
-              },
-            ),
-          ],
-        ),
+        _buildHeader(colorScheme),
         const SizedBox(height: AppConfig.spacing8),
         _buildToolbar(colorScheme),
         const SizedBox(height: AppConfig.spacing8),
@@ -164,6 +139,32 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
         TranscriptionVoiceButton(
           onRecordingComplete: _handleTranscription,
           expandWidth: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          widget.labelText,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+        ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            if (isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: clear,
+              tooltip: 'Clear',
+              visualDensity: VisualDensity.compact,
+            );
+          },
         ),
       ],
     );
@@ -180,56 +181,56 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
       ),
       child: QuillSimpleToolbar(
-        controller: _quillController,
-        config: QuillSimpleToolbarConfig(
-          showAlignmentButtons: false,
-          showBackgroundColorButton: false,
-          showCenterAlignment: false,
-          showClearFormat: false,
-          showCodeBlock: false,
-          showColorButton: false,
-          showDirection: false,
-          showDividers: false,
-          showFontFamily: false,
-          showFontSize: false,
-          showHeaderStyle: false,
-          showIndent: false,
-          showInlineCode: false,
-          showJustifyAlignment: false,
-          showLeftAlignment: false,
-          showLink: false,
-          showQuote: false,
-          showRightAlignment: false,
-          showSearchButton: false,
-          showSmallButton: false,
-          showStrikeThrough: false,
-          showSubscript: false,
-          showSuperscript: false,
-          showUnderLineButton: false,
-          showBoldButton: true,
-          showItalicButton: true,
-          showListBullets: true,
-          showListNumbers: true,
-          showListCheck: false,
-          showClipboardCopy: false,
-          showClipboardCut: false,
-          showClipboardPaste: false,
-          showRedo: false,
-          showUndo: false,
-          buttonOptions: QuillSimpleToolbarButtonOptions(
-            base: QuillToolbarBaseButtonOptions(
-              iconTheme: QuillIconTheme(
-                iconButtonSelectedData: IconButtonData(
-                  color: colorScheme.onPrimary,
-                  style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                  ),
-                ),
-                iconButtonUnselectedData: IconButtonData(
-                  color: colorScheme.onSurface,
-                ),
-              ),
+        controller: _controller,
+        config: _buildToolbarConfig(colorScheme),
+      ),
+    );
+  }
+
+  QuillSimpleToolbarConfig _buildToolbarConfig(ColorScheme colorScheme) {
+    return QuillSimpleToolbarConfig(
+      showAlignmentButtons: false,
+      showBackgroundColorButton: false,
+      showCenterAlignment: false,
+      showClearFormat: false,
+      showCodeBlock: false,
+      showColorButton: false,
+      showDirection: false,
+      showDividers: false,
+      showFontFamily: false,
+      showFontSize: false,
+      showHeaderStyle: false,
+      showIndent: false,
+      showInlineCode: false,
+      showJustifyAlignment: false,
+      showLeftAlignment: false,
+      showLink: false,
+      showQuote: false,
+      showRightAlignment: false,
+      showSearchButton: false,
+      showSmallButton: false,
+      showStrikeThrough: false,
+      showSubscript: false,
+      showSuperscript: false,
+      showUnderLineButton: false,
+      showBoldButton: true,
+      showItalicButton: true,
+      showListBullets: true,
+      showListNumbers: true,
+      showListCheck: false,
+      showClipboardCopy: false,
+      showClipboardCut: false,
+      showClipboardPaste: false,
+      showRedo: false,
+      showUndo: false,
+      buttonOptions: QuillSimpleToolbarButtonOptions(
+        base: QuillToolbarBaseButtonOptions(
+          iconTheme: QuillIconTheme(
+            iconButtonSelectedData: IconButtonData(
+              color: colorScheme.onPrimary,
+              style: IconButton.styleFrom(backgroundColor: colorScheme.primary),
             ),
+            iconButtonUnselectedData: IconButtonData(color: colorScheme.onSurface),
           ),
         ),
       ),
@@ -251,7 +252,7 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
       ),
       child: QuillEditor(
-        controller: _quillController,
+        controller: _controller,
         focusNode: _focusNode,
         scrollController: _scrollController,
         config: QuillEditorConfig(

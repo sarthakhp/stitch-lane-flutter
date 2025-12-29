@@ -155,7 +155,7 @@ class _AutoBackupSettingsCardState extends State<AutoBackupSettingsCard> {
                   ),
                 ],
                 const SizedBox(height: AppConfig.spacing16),
-                _buildLastBackupInfo(context, settingsState.lastAutoBackupTime),
+                _buildLastBackupInfo(context, settingsState.lastBackupTime),
               ],
             ),
           ),
@@ -174,7 +174,7 @@ class _AutoBackupSettingsCardState extends State<AutoBackupSettingsCard> {
         ),
         const SizedBox(width: AppConfig.spacing8),
         Text(
-          'Last auto-backup: ${_formatLastBackupTime(lastBackup)}',
+          'Last backup: ${_formatLastBackupTime(lastBackup)}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),

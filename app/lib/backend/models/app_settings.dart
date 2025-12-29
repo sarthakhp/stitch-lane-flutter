@@ -20,7 +20,7 @@ class AppSettings {
   final String? autoBackupTimeRaw;
 
   @HiveField(5)
-  final DateTime? lastAutoBackupTime;
+  final DateTime? lastBackupTime;
 
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
@@ -33,7 +33,7 @@ class AppSettings {
     this.pendingOrdersReminderTimeRaw,
     this.autoBackupEnabledRaw,
     this.autoBackupTimeRaw,
-    this.lastAutoBackupTime,
+    this.lastBackupTime,
   });
 
   AppSettings copyWith({
@@ -42,7 +42,7 @@ class AppSettings {
     String? pendingOrdersReminderTime,
     bool? autoBackupEnabled,
     String? autoBackupTime,
-    DateTime? lastAutoBackupTime,
+    DateTime? lastBackupTime,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -50,7 +50,7 @@ class AppSettings {
       pendingOrdersReminderTimeRaw: pendingOrdersReminderTime ?? this.pendingOrdersReminderTime,
       autoBackupEnabledRaw: autoBackupEnabled ?? this.autoBackupEnabled,
       autoBackupTimeRaw: autoBackupTime ?? this.autoBackupTime,
-      lastAutoBackupTime: lastAutoBackupTime ?? this.lastAutoBackupTime,
+      lastBackupTime: lastBackupTime ?? this.lastBackupTime,
     );
   }
 
@@ -61,26 +61,31 @@ class AppSettings {
       'pendingOrdersReminderTime': pendingOrdersReminderTime,
       'autoBackupEnabled': autoBackupEnabled,
       'autoBackupTime': autoBackupTime,
-      'lastAutoBackupTime': lastAutoBackupTime?.toIso8601String(),
+      'lastBackupTime': lastBackupTime?.toIso8601String(),
     };
   }
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
+    DateTime? backupTime;
+    if (json['lastBackupTime'] != null) {
+      backupTime = DateTime.parse(json['lastBackupTime'] as String);
+    } else if (json['lastAutoBackupTime'] != null) {
+      backupTime = DateTime.parse(json['lastAutoBackupTime'] as String);
+    }
+
     return AppSettings(
       dueDateWarningThreshold: json['dueDateWarningThreshold'] as int? ?? 3,
       pendingOrdersReminderEnabledRaw: json['pendingOrdersReminderEnabled'] as bool?,
       pendingOrdersReminderTimeRaw: json['pendingOrdersReminderTime'] as String?,
       autoBackupEnabledRaw: json['autoBackupEnabled'] as bool?,
       autoBackupTimeRaw: json['autoBackupTime'] as String?,
-      lastAutoBackupTime: json['lastAutoBackupTime'] != null
-          ? DateTime.parse(json['lastAutoBackupTime'] as String)
-          : null,
+      lastBackupTime: backupTime,
     );
   }
 
   @override
   String toString() {
-    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastAutoBackupTime: $lastAutoBackupTime)';
+    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime)';
   }
 
   @override
@@ -92,7 +97,7 @@ class AppSettings {
            other.pendingOrdersReminderTime == pendingOrdersReminderTime &&
            other.autoBackupEnabled == autoBackupEnabled &&
            other.autoBackupTime == autoBackupTime &&
-           other.lastAutoBackupTime == lastAutoBackupTime;
+           other.lastBackupTime == lastBackupTime;
   }
 
   @override
@@ -102,7 +107,7 @@ class AppSettings {
     pendingOrdersReminderTime,
     autoBackupEnabled,
     autoBackupTime,
-    lastAutoBackupTime,
+    lastBackupTime,
   );
 }
 

@@ -22,7 +22,7 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       pendingOrdersReminderTimeRaw: fields[2] as String?,
       autoBackupEnabledRaw: fields[3] as bool?,
       autoBackupTimeRaw: fields[4] as String?,
-      lastAutoBackupTime: fields[5] as DateTime?,
+      lastBackupTime: fields[5] as DateTime?,
     );
   }
 
@@ -41,7 +41,7 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(4)
       ..write(obj.autoBackupTimeRaw)
       ..writeByte(5)
-      ..write(obj.lastAutoBackupTime);
+      ..write(obj.lastBackupTime);
   }
 
   @override

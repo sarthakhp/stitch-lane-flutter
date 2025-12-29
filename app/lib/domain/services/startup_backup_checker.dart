@@ -1,9 +1,11 @@
 import '../../backend/backend.dart';
+import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
+import 'app_lifecycle_backup_service.dart';
 import 'auto_backup_service.dart';
 
 class StartupBackupChecker {
-  static const Duration _backupThreshold = Duration(hours: 24);
+  static Duration get _backupThreshold => AppLifecycleBackupService.backupThreshold;
 
   static Future<void> checkAndPerformBackupIfNeeded({
     void Function()? onBackupComplete,
@@ -16,8 +18,8 @@ class StartupBackupChecker {
         return;
       }
 
-      if (!_isBackupOverdue(settings.lastAutoBackupTime)) {
-        AppLogger.info('StartupBackupChecker: Last backup is within 24 hours');
+      if (!_isBackupOverdue(settings.lastBackupTime)) {
+        AppLogger.info('StartupBackupChecker: Last backup is within threshold');
         return;
       }
 
@@ -40,7 +42,7 @@ class StartupBackupChecker {
 
   static Future<AppSettings> _getSettings() async {
     final settingsBox = DatabaseService.getSettingsBox();
-    return settingsBox.get('settings') ?? AppSettings();
+    return settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import '../../backend/backend.dart';
+import '../../constants/app_constants.dart';
 import '../../firebase_options.dart';
 import '../../utils/app_logger.dart';
 import 'backup_service.dart';
@@ -9,6 +10,7 @@ import 'daily_task_scheduler.dart';
 import 'drive_service.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
+import 'backup_time_service.dart';
 import 'notification_service.dart';
 
 const String autoBackupTaskName = 'com.stitchlane.autobackup';
@@ -94,7 +96,7 @@ class AutoBackupService {
 
   static Future<AppSettings> _getSettings() async {
     final settingsBox = DatabaseService.getSettingsBox();
-    return settingsBox.get('settings') ?? AppSettings();
+    return settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
   }
 
   static Future<void> _initializeForBackground() async {
@@ -131,17 +133,7 @@ class AutoBackupService {
   }
 
   static Future<void> _updateLastBackupTime() async {
-    try {
-      final settingsBox = DatabaseService.getSettingsBox();
-      final currentSettings = settingsBox.get('settings') ?? AppSettings();
-      final updatedSettings = currentSettings.copyWith(
-        lastAutoBackupTime: DateTime.now(),
-      );
-      await settingsBox.put('settings', updatedSettings);
-      AppLogger.info('Last auto-backup time updated');
-    } catch (e) {
-      AppLogger.error('Failed to update last backup time', e);
-    }
+    await BackupTimeService.updateLastBackupTime();
   }
 
   static Future<bool> isAutoBackupEnabled() async {

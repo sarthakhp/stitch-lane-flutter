@@ -11,12 +11,14 @@ import 'domain/domain.dart';
 import 'config/routes.dart';
 import 'screens/login_screen.dart';
 import 'screens/backup_restore_check_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_shell_screen.dart';
 import 'constants/app_constants.dart';
 import 'utils/app_logger.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+String? _pendingNotificationPayload;
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -57,13 +59,35 @@ void main() async {
 }
 
 void _handleNotificationTap(String? payload) {
+  if (payload == null) return;
+
+  final navigator = navigatorKey.currentState;
+  if (navigator != null) {
+    _performNotificationNavigation(navigator, payload);
+  } else {
+    _pendingNotificationPayload = payload;
+  }
+}
+
+void _performNotificationNavigation(NavigatorState navigator, String payload) {
   if (payload == pendingOrdersReminderPayload) {
-    navigatorKey.currentState?.pushNamed(
+    navigator.pushNamed(
       AppConstants.customersListRoute,
       arguments: {
         'initialFilterPreset': CustomerFilterPreset.pending(),
       },
     );
+  }
+}
+
+void processPendingNotification() {
+  final payload = _pendingNotificationPayload;
+  if (payload != null) {
+    _pendingNotificationPayload = null;
+    final navigator = navigatorKey.currentState;
+    if (navigator != null) {
+      _performNotificationNavigation(navigator, payload);
+    }
   }
 }
 
@@ -107,12 +131,19 @@ class AppInitializer extends StatefulWidget {
 
 class _AppInitializerState extends State<AppInitializer> {
   bool _isInitializing = true;
+  final AppLifecycleBackupService _lifecycleBackupService = AppLifecycleBackupService();
 
   @override
   void initState() {
     super.initState();
     _initializeApp();
     _setupAuthListener();
+  }
+
+  @override
+  void dispose() {
+    _lifecycleBackupService.dispose();
+    super.dispose();
   }
 
   void _setupAuthListener() {
@@ -144,7 +175,7 @@ class _AppInitializerState extends State<AppInitializer> {
 
     await SettingsService.loadSettings(settingsState, settingsRepository);
 
-    await _initializeAutoBackup(settingsState);
+    await _initializeAutoBackup(settingsState, settingsRepository);
     await _initializePendingOrdersReminder(settingsState);
 
     if (mounted) {
@@ -154,22 +185,21 @@ class _AppInitializerState extends State<AppInitializer> {
     }
   }
 
-  Future<void> _initializeAutoBackup(SettingsState settingsState) async {
+  Future<void> _initializeAutoBackup(
+    SettingsState settingsState,
+    SettingsRepository settingsRepository,
+  ) async {
     if (settingsState.autoBackupEnabled) {
       await AutoBackupService.scheduleAutoBackup(settingsState.autoBackupTime);
-      _checkStartupBackup();
     }
-  }
 
-  void _checkStartupBackup() {
-    final settingsState = context.read<SettingsState>();
-    final settingsRepository = context.read<SettingsRepository>();
+    _lifecycleBackupService.initialize(
+      onBackupComplete: () {
+        SettingsService.loadSettings(settingsState, settingsRepository);
+      },
+    );
 
-    Future.microtask(() => StartupBackupChecker.checkAndPerformBackupIfNeeded(
-          onBackupComplete: () {
-            SettingsService.loadSettings(settingsState, settingsRepository);
-          },
-        ));
+    Future.microtask(() => _lifecycleBackupService.checkOnStartup());
   }
 
   Future<void> _initializePendingOrdersReminder(SettingsState settingsState) async {
@@ -262,7 +292,7 @@ class _AuthGateState extends State<AuthGate> {
 
     if (authState.isAuthenticated) {
       if (_hasCheckedBackup) {
-        return const HomeScreen();
+        return const MainShellScreen();
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {

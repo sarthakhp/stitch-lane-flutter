@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
 import '../screens/backup_restore_check_screen.dart';
-import '../screens/home_screen.dart';
+import '../screens/main_shell_screen.dart';
 import '../screens/customers_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
@@ -31,7 +31,7 @@ class AppRoutes {
 
       case AppConstants.homeRoute:
         return MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
+          builder: (_) => const MainShellScreen(),
         );
 
       case AppConstants.customersListRoute:

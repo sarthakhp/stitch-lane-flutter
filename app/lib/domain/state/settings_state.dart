@@ -14,7 +14,7 @@ class SettingsState extends ChangeNotifier {
   String get pendingOrdersReminderTime => _settings.pendingOrdersReminderTime;
   bool get autoBackupEnabled => _settings.autoBackupEnabled;
   String get autoBackupTime => _settings.autoBackupTime;
-  DateTime? get lastAutoBackupTime => _settings.lastAutoBackupTime;
+  DateTime? get lastBackupTime => _settings.lastBackupTime;
 
   void setSettings(AppSettings settings) {
     _settings = settings;

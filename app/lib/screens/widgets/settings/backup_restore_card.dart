@@ -181,11 +181,19 @@ class BackupRestoreCard extends StatelessWidget {
       await AudioSyncService.syncAudiosToDrive();
       backupState.setProgress(0.9);
 
+      await BackupTimeService.updateLastBackupTime();
+
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
 
       backupState.setProgress(1.0);
       backupState.setLoading(false);
+
+      if (context.mounted) {
+        final settingsState = context.read<SettingsState>();
+        final settingsRepository = context.read<SettingsRepository>();
+        await SettingsService.loadSettings(settingsState, settingsRepository);
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
