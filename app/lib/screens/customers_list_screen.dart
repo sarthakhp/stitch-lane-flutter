@@ -175,8 +175,8 @@ class _CustomersListScreenState extends State<CustomersListScreen>
             },
           ),
           Expanded(
-            child: Consumer2<CustomerState, OrderState>(
-        builder: (context, customerState, orderState, child) {
+            child: Consumer3<CustomerState, OrderState, SettingsState>(
+        builder: (context, customerState, orderState, settingsState, child) {
           if (customerState.isLoading && customerState.customers.isEmpty) {
             return const LoadingWidget();
           }
@@ -222,6 +222,8 @@ class _CustomersListScreenState extends State<CustomersListScreen>
                     pendingOrderCount: orderState.getPendingOrderCount(customer.id),
                     readyOrderCount: orderState.getReadyOrderCount(customer.id),
                     totalUnpaidAmount: orderState.getTotalUnpaidAmount(customer.id),
+                    allOrders: orderState.orders,
+                    dueDateWarningThreshold: settingsState.dueDateWarningThreshold,
                     onTap: () {
                       Navigator.pushNamed(
                         context,

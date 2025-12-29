@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../backend/models/customer.dart';
+import '../../backend/models/order.dart';
 import '../../config/app_config.dart';
+import '../../utils/date_helper.dart';
 
 class CustomerListItem extends StatelessWidget {
   final Customer customer;
@@ -8,6 +10,8 @@ class CustomerListItem extends StatelessWidget {
   final int pendingOrderCount;
   final int readyOrderCount;
   final int totalUnpaidAmount;
+  final List<Order> allOrders;
+  final int dueDateWarningThreshold;
 
   const CustomerListItem({
     super.key,
@@ -16,6 +20,8 @@ class CustomerListItem extends StatelessWidget {
     this.pendingOrderCount = 0,
     this.readyOrderCount = 0,
     this.totalUnpaidAmount = 0,
+    required this.allOrders,
+    required this.dueDateWarningThreshold,
   });
 
   @override
@@ -24,6 +30,11 @@ class CustomerListItem extends StatelessWidget {
     final bool hasNoReadyOrders = readyOrderCount == 0;
     final bool allOrdersDone = hasNoPendingOrders && hasNoReadyOrders;
     final bool hasUnpaidAmount = totalUnpaidAmount > 0;
+    final isDueSoon = DateHelper.hasCustomerPendingOrdersDueSoon(
+      customer.id,
+      allOrders,
+      dueDateWarningThreshold,
+    );
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
@@ -31,6 +42,15 @@ class CustomerListItem extends StatelessWidget {
         horizontal: AppConfig.spacing16,
         vertical: AppConfig.spacing8,
       ),
+      shape: isDueSoon
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+              side: BorderSide(
+                color: colorScheme.error,
+                width: 2.0,
+              ),
+            )
+          : null,
       child: InkWell(
         onTap: onTap,
         child: Padding(

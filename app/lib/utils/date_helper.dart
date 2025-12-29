@@ -21,5 +21,15 @@ class DateHelper {
 
     return difference <= dueDateWarningThreshold;
   }
+
+  static bool hasCustomerPendingOrdersDueSoon(
+    String customerId,
+    List<Order> orders,
+    int dueDateWarningThreshold,
+  ) {
+    final customerOrders = orders.where((order) => order.customerId == customerId);
+
+    return customerOrders.any((order) => isDueSoon(order, dueDateWarningThreshold));
+  }
 }
 
