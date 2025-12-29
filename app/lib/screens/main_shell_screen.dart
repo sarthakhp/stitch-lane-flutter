@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 import '../backend/repositories/order_repository.dart';
 import '../backend/repositories/customer_repository.dart';
 import '../constants/app_constants.dart';
+import '../domain/models/customer_filter_preset.dart';
+import '../domain/services/notification_service.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/customer_service.dart';
 import '../domain/services/permission_service.dart';
 import '../domain/state/order_state.dart';
 import '../domain/state/customer_state.dart';
-import '../main.dart' show processPendingNotification;
+import '../domain/state/main_shell_state.dart';
+import '../main.dart' show consumePendingNotificationPayload;
 import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/customers_tab.dart';
@@ -21,7 +24,8 @@ class MainShellScreen extends StatefulWidget {
 }
 
 class _MainShellScreenState extends State<MainShellScreen> {
-  int _selectedIndex = 0;
+  final _ordersTabKey = GlobalKey<OrdersTabState>();
+  final _customersTabKey = GlobalKey<CustomersTabState>();
 
   @override
   void initState() {
@@ -29,8 +33,17 @@ class _MainShellScreenState extends State<MainShellScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
       _requestPermissions();
-      processPendingNotification();
+      _processPendingNotification();
     });
+  }
+
+  void _processPendingNotification() {
+    final payload = consumePendingNotificationPayload();
+    if (payload == pendingOrdersReminderPayload) {
+      context.read<MainShellState>().switchToCustomersTab(
+        filter: CustomerFilterPreset.pending(),
+      );
+    }
   }
 
   Future<void> _requestPermissions() async {
@@ -52,13 +65,23 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 
   void _onDestinationSelected(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    context.read<MainShellState>().switchToTab(index);
   }
 
-  Widget? _buildFloatingActionButton() {
-    switch (_selectedIndex) {
+  void _applyPendingFilters(MainShellState shellState) {
+    final ordersFilter = shellState.consumeOrdersFilter();
+    if (ordersFilter != null) {
+      _ordersTabKey.currentState?.applyFilter(ordersFilter);
+    }
+
+    final customersFilter = shellState.consumeCustomersFilter();
+    if (customersFilter != null) {
+      _customersTabKey.currentState?.applyFilter(customersFilter);
+    }
+  }
+
+  Widget? _buildFloatingActionButton(int selectedIndex) {
+    switch (selectedIndex) {
       case 1:
         return FloatingActionButton(
           onPressed: () {
@@ -80,15 +103,21 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final shellState = context.watch<MainShellState>();
+    final selectedIndex = shellState.selectedIndex;
     final screenWidth = MediaQuery.of(context).size.width;
     final useNavigationRail = screenWidth >= 600;
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyPendingFilters(shellState);
+    });
+
     final body = IndexedStack(
-      index: _selectedIndex,
-      children: const [
-        HomeTab(),
-        OrdersTab(),
-        CustomersTab(),
+      index: selectedIndex,
+      children: [
+        const HomeTab(),
+        OrdersTab(key: _ordersTabKey),
+        CustomersTab(key: _customersTabKey),
       ],
     );
 
@@ -97,7 +126,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: _selectedIndex,
+              selectedIndex: selectedIndex,
               onDestinationSelected: _onDestinationSelected,
               labelType: NavigationRailLabelType.all,
               destinations: const [
@@ -122,14 +151,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
             Expanded(child: body),
           ],
         ),
-        floatingActionButton: _buildFloatingActionButton(),
+        floatingActionButton: _buildFloatingActionButton(selectedIndex),
       );
     }
 
     return Scaffold(
       body: body,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: selectedIndex,
         onDestinationSelected: _onDestinationSelected,
         destinations: const [
           NavigationDestination(
@@ -149,7 +178,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
           ),
         ],
       ),
-      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButton: _buildFloatingActionButton(selectedIndex),
     );
   }
 }

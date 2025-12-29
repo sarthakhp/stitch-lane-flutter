@@ -25,8 +25,13 @@ class AppRoutes {
         );
 
       case AppConstants.backupRestoreCheckRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => const BackupRestoreCheckScreen(),
+          builder: (_) => BackupRestoreCheckScreen(
+            hasBackup: args?['hasBackup'] as bool?,
+            errorMessage: args?['errorMessage'] as String?,
+            alreadyChecked: args?['alreadyChecked'] as bool? ?? false,
+          ),
         );
 
       case AppConstants.homeRoute:

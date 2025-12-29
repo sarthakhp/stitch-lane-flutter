@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
+import '../../screens/widgets/app_logo.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
@@ -7,6 +8,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leading;
   final PreferredSizeWidget? bottom;
   final bool automaticallyImplyLeading;
+  final bool? centerTitle;
+  final bool showLogo;
 
   const CustomAppBar({
     super.key,
@@ -15,14 +18,29 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leading,
     this.bottom,
     this.automaticallyImplyLeading = true,
+    this.centerTitle,
+    this.showLogo = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget titleWidget = title;
+    if (showLogo) {
+      titleWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppLogo(size: 32, showText: false),
+          const SizedBox(width: AppConfig.spacing8),
+          Flexible(child: title),
+        ],
+      );
+    }
+
     return AppBar(
-      title: title,
+      title: titleWidget,
       leading: leading,
       automaticallyImplyLeading: automaticallyImplyLeading,
+      centerTitle: centerTitle,
       actions: actions != null
           ? [
               Padding(

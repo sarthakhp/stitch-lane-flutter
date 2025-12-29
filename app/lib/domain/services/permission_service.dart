@@ -21,6 +21,7 @@ class PermissionService {
     final permissions = <Permission>[
       Permission.microphone,
       Permission.notification,
+      Permission.contacts,
     ];
 
     final statuses = await permissions.request();

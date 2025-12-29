@@ -10,14 +10,21 @@ class CustomersTab extends StatefulWidget {
   const CustomersTab({super.key});
 
   @override
-  State<CustomersTab> createState() => _CustomersTabState();
+  State<CustomersTab> createState() => CustomersTabState();
 }
 
-class _CustomersTabState extends State<CustomersTab> {
+class CustomersTabState extends State<CustomersTab> {
   String _searchQuery = '';
   CustomerSort _selectedSort = CustomerSort.dueDate;
   CustomerFilterOptions _filterOptions = const CustomerFilterOptions();
   CustomerFilterPreset? _selectedPreset;
+
+  void applyFilter(CustomerFilterPreset preset) {
+    setState(() {
+      _filterOptions = preset.options;
+      _selectedPreset = preset;
+    });
+  }
 
   Future<void> _loadCustomers() async {
     final state = context.read<CustomerState>();

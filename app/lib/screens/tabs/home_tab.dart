@@ -4,6 +4,7 @@ import '../../config/app_config.dart';
 import '../../constants/app_constants.dart';
 import '../../domain/services/order_service.dart';
 import '../../domain/state/order_state.dart';
+import '../../domain/state/main_shell_state.dart';
 import '../../domain/models/filter_preset.dart';
 import '../../domain/models/customer_filter_preset.dart';
 import '../../presentation/presentation.dart';
@@ -79,12 +80,8 @@ class HomeTab extends StatelessWidget {
                       label: 'Pending Orders',
                       color: theme.colorScheme.error,
                       onTap: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppConstants.allOrdersListRoute,
-                          arguments: {
-                            'initialFilterPreset': FilterPreset.allPending(),
-                          },
+                        context.read<MainShellState>().switchToOrdersTab(
+                          filter: FilterPreset.allPending(),
                         );
                       },
                     ),
@@ -97,12 +94,8 @@ class HomeTab extends StatelessWidget {
                       label: 'Customers with Pending Orders',
                       color: theme.colorScheme.tertiary,
                       onTap: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppConstants.customersListRoute,
-                          arguments: {
-                            'initialFilterPreset': CustomerFilterPreset.pending(),
-                          },
+                        context.read<MainShellState>().switchToCustomersTab(
+                          filter: CustomerFilterPreset.pending(),
                         );
                       },
                     ),
@@ -115,12 +108,8 @@ class HomeTab extends StatelessWidget {
                       label: 'Unpaid Amount',
                       color: theme.colorScheme.error,
                       onTap: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppConstants.allOrdersListRoute,
-                          arguments: {
-                            'initialFilterPreset': FilterPreset.unpaid(),
-                          },
+                        context.read<MainShellState>().switchToOrdersTab(
+                          filter: FilterPreset.unpaid(),
                         );
                       },
                     ),

@@ -10,9 +10,7 @@ import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
 import 'screens/login_screen.dart';
-import 'screens/backup_restore_check_screen.dart';
 import 'screens/main_shell_screen.dart';
-import 'constants/app_constants.dart';
 import 'utils/app_logger.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -60,35 +58,13 @@ void main() async {
 
 void _handleNotificationTap(String? payload) {
   if (payload == null) return;
-
-  final navigator = navigatorKey.currentState;
-  if (navigator != null) {
-    _performNotificationNavigation(navigator, payload);
-  } else {
-    _pendingNotificationPayload = payload;
-  }
+  _pendingNotificationPayload = payload;
 }
 
-void _performNotificationNavigation(NavigatorState navigator, String payload) {
-  if (payload == pendingOrdersReminderPayload) {
-    navigator.pushNamed(
-      AppConstants.customersListRoute,
-      arguments: {
-        'initialFilterPreset': CustomerFilterPreset.pending(),
-      },
-    );
-  }
-}
-
-void processPendingNotification() {
+String? consumePendingNotificationPayload() {
   final payload = _pendingNotificationPayload;
-  if (payload != null) {
-    _pendingNotificationPayload = null;
-    final navigator = navigatorKey.currentState;
-    if (navigator != null) {
-      _performNotificationNavigation(navigator, payload);
-    }
-  }
+  _pendingNotificationPayload = null;
+  return payload;
 }
 
 class StitchLaneApp extends StatelessWidget {
@@ -116,6 +92,7 @@ class StitchLaneApp extends StatelessWidget {
         Provider<SettingsRepository>(
           create: (_) => HiveSettingsRepository(),
         ),
+        ChangeNotifierProvider(create: (_) => MainShellState()),
       ],
       child: const AppInitializer(),
     );
@@ -266,43 +243,15 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 }
 
-class AuthGate extends StatefulWidget {
+class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  bool _hasCheckedBackup = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final authState = context.watch<AuthState>();
-
-    if (!authState.isAuthenticated) {
-      _hasCheckedBackup = false;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthState>();
 
     if (authState.isAuthenticated) {
-      if (_hasCheckedBackup) {
-        return const MainShellScreen();
-      } else {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _hasCheckedBackup = true;
-            });
-          }
-        });
-        return const BackupRestoreCheckScreen();
-      }
+      return const MainShellScreen();
     } else {
       return const LoginScreen();
     }

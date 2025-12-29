@@ -13,13 +13,20 @@ class OrdersTab extends StatefulWidget {
   const OrdersTab({super.key});
 
   @override
-  State<OrdersTab> createState() => _OrdersTabState();
+  State<OrdersTab> createState() => OrdersTabState();
 }
 
-class _OrdersTabState extends State<OrdersTab> {
+class OrdersTabState extends State<OrdersTab> {
   String _searchQuery = '';
   OrderFilterOptions _filterOptions = const OrderFilterOptions();
   FilterPreset? _selectedPreset;
+
+  void applyFilter(FilterPreset preset) {
+    setState(() {
+      _filterOptions = preset.options;
+      _selectedPreset = preset;
+    });
+  }
 
   Future<void> _refreshOrders() async {
     final state = context.read<OrderState>();

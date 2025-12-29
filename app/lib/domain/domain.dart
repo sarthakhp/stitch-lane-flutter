@@ -1,6 +1,7 @@
 export 'state/auth_state.dart';
 export 'state/backup_state.dart';
 export 'state/customer_state.dart';
+export 'state/main_shell_state.dart';
 export 'state/order_state.dart';
 export 'state/measurement_state.dart';
 export 'state/settings_state.dart';

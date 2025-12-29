@@ -7,7 +7,16 @@ import '../constants/app_constants.dart';
 import 'widgets/app_logo.dart';
 
 class BackupRestoreCheckScreen extends StatefulWidget {
-  const BackupRestoreCheckScreen({super.key});
+  final bool? hasBackup;
+  final String? errorMessage;
+  final bool alreadyChecked;
+
+  const BackupRestoreCheckScreen({
+    super.key,
+    this.hasBackup,
+    this.errorMessage,
+    this.alreadyChecked = false,
+  });
 
   @override
   State<BackupRestoreCheckScreen> createState() => _BackupRestoreCheckScreenState();
@@ -21,7 +30,13 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   @override
   void initState() {
     super.initState();
-    _checkForBackup();
+    if (widget.alreadyChecked) {
+      _hasBackup = widget.hasBackup ?? false;
+      _errorMessage = widget.errorMessage;
+      _isChecking = false;
+    } else {
+      _checkForBackup();
+    }
   }
 
   Future<void> _checkForBackup() async {

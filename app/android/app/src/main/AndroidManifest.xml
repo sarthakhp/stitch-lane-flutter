@@ -23,7 +23,7 @@
     </queries>
 
     <application
-        android:label="stitch_lane_app"
+        android:label="Stitch Lane"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

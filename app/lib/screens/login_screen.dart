@@ -62,7 +62,27 @@ class LoginScreen extends StatelessWidget {
     await AuthService.signInWithGoogle(authState);
 
     if (context.mounted && authState.isAuthenticated) {
-      Navigator.of(context).pushReplacementNamed(AppConstants.backupRestoreCheckRoute);
+      bool? hasBackup;
+      String? errorMessage;
+
+      try {
+        final backupInfo = await DriveService.getBackupInfo();
+        hasBackup = backupInfo != null;
+      } catch (e) {
+        errorMessage = e.toString();
+        hasBackup = false;
+      }
+
+      if (context.mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          AppConstants.backupRestoreCheckRoute,
+          arguments: {
+            'hasBackup': hasBackup,
+            'errorMessage': errorMessage,
+            'alreadyChecked': true,
+          },
+        );
+      }
     }
   }
 }
