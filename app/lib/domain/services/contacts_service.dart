@@ -1,28 +1,25 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart'
+    as native_picker;
+import '../../utils/app_logger.dart';
 import '../models/contact_data.dart';
 
 class ContactsService {
+  static final native_picker.FlutterNativeContactPicker _nativeContactPicker =
+      native_picker.FlutterNativeContactPicker();
+
   static bool get isContactsAvailable {
     if (kIsWeb) return false;
     return true;
   }
 
-  static Future<bool> checkPermission() async {
+  static Future<bool> requestWritePermission() async {
     if (!isContactsAvailable) return false;
-    
-    try {
-      return await FlutterContacts.requestPermission(readonly: true);
-    } catch (e) {
-      return false;
-    }
-  }
 
-  static Future<bool> requestPermission({bool readonly = true}) async {
-    if (!isContactsAvailable) return false;
-    
     try {
-      return await FlutterContacts.requestPermission(readonly: readonly);
+      final result = await FlutterContacts.requestPermission(readonly: false);
+      return result;
     } catch (e) {
       return false;
     }
@@ -32,28 +29,23 @@ class ContactsService {
     if (!isContactsAvailable) return null;
 
     try {
-      final hasPermission = await requestPermission(readonly: true);
-      if (!hasPermission) return null;
-
-      final contact = await FlutterContacts.openExternalPick();
+      final contact = await _nativeContactPicker.selectContact();
       if (contact == null) return null;
 
-      final fullContact = await FlutterContacts.getContact(contact.id);
-      if (fullContact == null) return null;
-
-      final name = fullContact.displayName.trim();
+      final name = contact.fullName?.trim() ?? '';
       if (name.isEmpty) return null;
 
       String phoneNumber = '';
-      if (fullContact.phones.isNotEmpty) {
-        phoneNumber = fullContact.phones.first.number.trim();
+      if (contact.phoneNumbers != null && contact.phoneNumbers!.isNotEmpty) {
+        phoneNumber = contact.phoneNumbers!.first.trim();
       }
 
       return ContactData(
         name: name,
         phoneNumber: phoneNumber,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error('[ContactsService] pickContact failed', e, stackTrace);
       return null;
     }
   }
@@ -98,7 +90,7 @@ class ContactsService {
     if (name.trim().isEmpty) return false;
 
     try {
-      final hasPermission = await requestPermission(readonly: false);
+      final hasPermission = await requestWritePermission();
       if (!hasPermission) return false;
 
       final exists = await _contactExists(phoneNumber.trim());

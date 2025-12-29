@@ -39,6 +39,7 @@ dependencies:
   workmanager: ^0.9.0+3
   battery_plus: ^7.0.0
   flutter_local_notifications: ^19.5.0
+  flutter_native_contact_picker: ^0.0.11
 
 dev_dependencies:
   flutter_test:
