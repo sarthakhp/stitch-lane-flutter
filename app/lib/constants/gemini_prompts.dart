@@ -33,17 +33,17 @@ RULES:
 - If silent, respond: "No one is speaking"
 
 EXAMPLE:
-1. **Shrug** (950 rps):
-- Length: 31
+1. **Shrug** (**950** rps):
+- મોરી: 31
 - Bust: 39.5
 - Sleeve: 10.5 x 13.5
 - Hook: Back
 
-2. **સાડી** (950 rps):
+2. **સાડી** (**950** rps):
 
-3. **Blouse** (800 rps):
+3. **Blouse** (**800** rps):
 
-*Total: 1700 rps*
+**Total: 1700 rps**
 ''';
 }
 
