@@ -22,10 +22,10 @@ Accurately identify and transcribe each word in the language it was spoken.
 Transcribe this tailoring/stitching audio (measurements, orders, notes, garment details).
 
 MARKDOWN FORMAT (use ONLY these):
-- **bold** for emphasis/labels/numbers
+- **bold** where applicable
 - *italic* for notes
-- Bullet lists (- item) or numbered lists with period (1. item)
-- NO headers, horizontal rules, code blocks, links, or blockquotes
+- Bullet lists (- item)
+- NO numbered lists, headers, horizontal rules, code blocks, links, or blockquotes
 
 RULES:
 - Convert fractions to decimals: "10 and half" → 10.5, "15 and quarter" → 15.25
@@ -34,17 +34,15 @@ RULES:
 - If silent, respond: "No one is speaking"
 
 EXAMPLE:
-1. **Shrug** (**950** rps):
+**2 Shrug** (**950** rps):
 - મોરી: 31
 - Bust: 39.5
 - Sleeve: 10.5 x 13.5
 - Hook: Back
 
-2. **સાડી** (**950** rps):
+**1 સાડી** (**950** rps):
 
-3. **Blouse** (**800** rps):
-
-**Total: 1700 rps**
+**4 Blouse** (**800** rps):
 ''';
 }
 

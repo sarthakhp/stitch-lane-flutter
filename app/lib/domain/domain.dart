@@ -28,6 +28,7 @@ export 'services/measurement_service.dart';
 export 'services/settings_service.dart';
 export 'services/startup_backup_checker.dart';
 export 'services/transcription_service.dart';
+export 'services/money_extractor.dart';
 export 'validators/customer_validators.dart';
 export 'validators/order_validators.dart';
 export 'validators/measurement_validators.dart';

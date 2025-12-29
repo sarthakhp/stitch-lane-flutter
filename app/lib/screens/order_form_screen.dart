@@ -39,6 +39,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   bool _hasUnsavedChanges = false;
   List<String> _imagePaths = [];
   String _descriptionValue = '';
+  List<double> _extractedValues = [];
 
   bool get _isEditing => widget.order != null;
 
@@ -56,6 +57,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _isPaid = widget.order!.isPaid;
       _selectedDueDate = widget.order!.dueDate;
       _imagePaths = List.from(widget.order!.imagePaths);
+      _extractedValues = MoneyExtractor.extractValues(_descriptionValue);
     } else {
       _valueController.text = '';
       _isPaid = false;
@@ -279,14 +281,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       ? TextEditingValue(text: _selectedCustomer!.name)
                       : const TextEditingValue(),
                   optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text.isEmpty) {
+                    final searchText = textEditingValue.text.trim();
+                    if (searchText.isEmpty) {
                       return customerState.customers;
                     }
+                    final searchLower = searchText.toLowerCase();
                     return customerState.customers.where((Customer customer) {
-                      return customer.name
-                          .toLowerCase()
-                          .contains(textEditingValue.text.toLowerCase()) ||
-                          (customer.phoneNumber?.contains(textEditingValue.text) ?? false);
+                      return customer.name.toLowerCase().contains(searchLower) ||
+                          (customer.phoneNumber?.contains(searchText) ?? false);
                     });
                   },
                   displayStringForOption: (Customer customer) => customer.name,
@@ -420,14 +422,25 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               enabled: !_isLoading,
               onChanged: (value) {
                 _descriptionValue = value;
-                if (!_hasUnsavedChanges) {
-                  setState(() {
+                final newExtractedValues = MoneyExtractor.extractValues(value);
+                setState(() {
+                  _extractedValues = newExtractedValues;
+                  if (!_hasUnsavedChanges) {
                     _hasUnsavedChanges = true;
-                  });
-                }
+                  }
+                });
               },
             ),
             const SizedBox(height: AppConfig.spacing16),
+            ExtractedValuesWidget(
+              values: _extractedValues,
+              onApply: () {
+                final total = MoneyExtractor.calculateTotal(_extractedValues);
+                _valueController.text = total.toInt().toString();
+              },
+            ),
+            if (_extractedValues.isNotEmpty)
+              const SizedBox(height: AppConfig.spacing16),
             TextFormField(
               controller: _valueController,
               decoration: const InputDecoration(
