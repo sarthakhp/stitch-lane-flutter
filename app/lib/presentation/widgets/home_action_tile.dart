@@ -5,31 +5,28 @@ class HomeActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback onTap;
-  final Color? iconColor;
-  final Color? backgroundColor;
-  final bool isCreateAction;
+  final Color containerColor;
+  final Color contentColor;
 
   const HomeActionTile({
     super.key,
     required this.icon,
     required this.title,
     required this.onTap,
-    this.iconColor,
-    this.backgroundColor,
-    this.isCreateAction = false,
+    required this.containerColor,
+    required this.contentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveIconColor = iconColor ??
-        (isCreateAction ? theme.colorScheme.primary : theme.colorScheme.onPrimary);
-    final effectiveBackgroundColor = backgroundColor ??
-        (isCreateAction ? null : theme.colorScheme.primary);
 
     return Card(
-      color: effectiveBackgroundColor,
-      elevation: isCreateAction ? 1 : 2,
+      color: containerColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
@@ -45,15 +42,15 @@ class HomeActionTile extends StatelessWidget {
                   Icon(
                     icon,
                     size: iconSize,
-                    color: effectiveIconColor,
+                    color: contentColor,
                   ),
                   const SizedBox(height: AppConfig.spacing8),
                   Text(
                     title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: constraints.maxWidth > 150 ? null : 14.0,
-                      color: isCreateAction ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onPrimary,
-                      fontWeight: isCreateAction ? null : FontWeight.w600,
+                      color: contentColor,
+                      fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 2,

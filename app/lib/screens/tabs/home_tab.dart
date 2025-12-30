@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../constants/app_constants.dart';
 import '../../domain/services/order_service.dart';
+import '../../domain/state/auth_state.dart';
 import '../../domain/state/order_state.dart';
 import '../../domain/state/main_shell_state.dart';
 import '../../domain/models/filter_preset.dart';
@@ -72,6 +73,10 @@ class HomeTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            WelcomeHero(
+              userName: context.watch<AuthState>().userName,
+            ),
+            const SizedBox(height: AppConfig.spacing16),
             Consumer<OrderState>(
               builder: (context, orderState, child) {
                 final orders = orderState.orders;
@@ -79,17 +84,16 @@ class HomeTab extends StatelessWidget {
                 final customersWithPendingCount =
                     OrderService.getCustomersWithPendingOrdersCount(orders);
                 final unpaidAmount = OrderService.getTotalUnpaidAmount(orders);
-                final theme = Theme.of(context);
+                final colorScheme = Theme.of(context).colorScheme;
 
                 return Column(
                   children: [
-                    _buildSummaryCard(
-                      context: context,
-                      theme: theme,
+                    SummaryCard(
                       icon: Icons.pending_actions,
                       value: pendingCount.toString(),
                       label: 'Pending Orders',
-                      color: theme.colorScheme.error,
+                      containerColor: colorScheme.errorContainer,
+                      contentColor: colorScheme.onErrorContainer,
                       onTap: () {
                         context.read<MainShellState>().switchToOrdersTab(
                           filter: FilterPreset.allPending(),
@@ -97,13 +101,12 @@ class HomeTab extends StatelessWidget {
                       },
                     ),
                     const SizedBox(height: AppConfig.spacing8),
-                    _buildSummaryCard(
-                      context: context,
-                      theme: theme,
+                    SummaryCard(
                       icon: Icons.people_outline,
                       value: customersWithPendingCount.toString(),
                       label: 'Customers with Pending Orders',
-                      color: theme.colorScheme.tertiary,
+                      containerColor: colorScheme.tertiaryContainer,
+                      contentColor: colorScheme.onTertiaryContainer,
                       onTap: () {
                         context.read<MainShellState>().switchToCustomersTab(
                           filter: CustomerFilterPreset.pending(),
@@ -111,13 +114,12 @@ class HomeTab extends StatelessWidget {
                       },
                     ),
                     const SizedBox(height: AppConfig.spacing8),
-                    _buildSummaryCard(
-                      context: context,
-                      theme: theme,
+                    SummaryCard(
                       icon: Icons.currency_rupee,
-                      value: unpaidAmount.toString(),
+                      value: '₹$unpaidAmount',
                       label: 'Unpaid Amount',
-                      color: theme.colorScheme.error,
+                      containerColor: colorScheme.secondaryContainer,
+                      contentColor: colorScheme.onSecondaryContainer,
                       onTap: () {
                         context.read<MainShellState>().switchToOrdersTab(
                           filter: FilterPreset.unpaid(),
@@ -129,64 +131,40 @@ class HomeTab extends StatelessWidget {
               },
             ),
             const SizedBox(height: AppConfig.spacing24),
-            GridView.count(
-              crossAxisCount: crossAxisCount,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: AppConfig.spacing16,
-              crossAxisSpacing: AppConfig.spacing16,
-              childAspectRatio: childAspectRatio,
-              children: [
-                HomeActionTile(
-                  icon: Icons.note_add,
-                  title: 'Create Order',
-                  isCreateAction: true,
-                  onTap: () {
-                    Navigator.pushNamed(context, AppConstants.orderFormRoute);
-                  },
-                ),
-                HomeActionTile(
-                  icon: Icons.person_add,
-                  title: 'Create Customer',
-                  isCreateAction: true,
-                  onTap: () {
-                    Navigator.pushNamed(context, AppConstants.customerFormRoute);
-                  },
-                ),
-              ],
+            Builder(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: AppConfig.spacing16,
+                  crossAxisSpacing: AppConfig.spacing16,
+                  childAspectRatio: childAspectRatio,
+                  children: [
+                    HomeActionTile(
+                      icon: Icons.note_add,
+                      title: 'Create Order',
+                      containerColor: colorScheme.primaryContainer,
+                      contentColor: colorScheme.onPrimaryContainer,
+                      onTap: () {
+                        Navigator.pushNamed(context, AppConstants.orderFormRoute);
+                      },
+                    ),
+                    HomeActionTile(
+                      icon: Icons.person_add,
+                      title: 'Create Customer',
+                      containerColor: colorScheme.secondaryContainer,
+                      contentColor: colorScheme.onSecondaryContainer,
+                      onTap: () {
+                        Navigator.pushNamed(context, AppConstants.customerFormRoute);
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard({
-    required BuildContext context,
-    required ThemeData theme,
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 1,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: ListTile(
-          leading: Icon(icon, color: color),
-          title: Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          subtitle: Text(label),
-          trailing: const Icon(Icons.chevron_right, size: 20),
-          dense: true,
         ),
       ),
     );

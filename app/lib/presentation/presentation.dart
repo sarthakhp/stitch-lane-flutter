@@ -13,3 +13,5 @@ export 'widgets/sticky_action_button.dart';
 export 'widgets/custom_app_bar.dart';
 export 'widgets/customer_filter_dialog.dart';
 export 'widgets/extracted_values_widget.dart';
+export 'widgets/summary_card.dart';
+export 'widgets/welcome_hero.dart';
