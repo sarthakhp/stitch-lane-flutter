@@ -11,6 +11,7 @@ import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/order_images_section.dart';
 import '../presentation/widgets/rich_description_input_field.dart';
+import '../utils/date_helper.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -34,6 +35,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   DateTime? _selectedDueDate;
   bool _isLoading = false;
   bool _isPaid = false;
+  DateTime? _paymentDate;
   Customer? _selectedCustomer;
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
@@ -55,12 +57,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _descriptionValue = widget.order!.description ?? '';
       _valueController.text = widget.order!.value.toString();
       _isPaid = widget.order!.isPaid;
+      _paymentDate = widget.order!.paymentDate;
       _selectedDueDate = widget.order!.dueDate;
       _imagePaths = List.from(widget.order!.imagePaths);
       _extractedValues = MoneyExtractor.extractValues(_descriptionValue);
     } else {
       _valueController.text = '';
       _isPaid = false;
+      _paymentDate = null;
       _selectedDueDate = null;
       _imagePaths = [];
     }
@@ -196,6 +200,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         status: _isEditing ? widget.order!.status : OrderStatus.pending,
         value: valueInt,
         isPaid: _isPaid,
+        paymentDate: _paymentDate,
         imagePaths: _imagePaths,
       );
 
@@ -488,11 +493,22 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 title: const Text('Payment Status'),
                 subtitle: Text(_isPaid ? 'Paid' : 'Not Paid'),
                 value: _isPaid,
-                onChanged: _isLoading ? null : (value) {
-                  setState(() {
-                    _isPaid = value;
-                    _hasUnsavedChanges = true;
-                  });
+                onChanged: _isLoading ? null : (value) async {
+                  if (value) {
+                    final selectedDate = await DateHelper.showPaymentDatePicker(context);
+                    if (selectedDate == null || !mounted) return;
+
+                    setState(() {
+                      _isPaid = true;
+                      _paymentDate = selectedDate;
+                      _hasUnsavedChanges = true;
+                    });
+                  } else {
+                    setState(() {
+                      _isPaid = false;
+                      _hasUnsavedChanges = true;
+                    });
+                  }
                 },
                 secondary: Icon(
                   _isPaid ? Icons.check_circle : Icons.pending,

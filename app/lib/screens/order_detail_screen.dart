@@ -11,6 +11,7 @@ import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
 import '../presentation/widgets/order_images_section.dart';
 import '../presentation/widgets/markdown_description_text.dart';
+import '../utils/date_helper.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
@@ -125,12 +126,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final repository = context.read<OrderRepository>();
 
     try {
-      final newValue = !order.isPaid;
-      final updatedOrder = order.copyWith(isPaid: newValue);
-      await OrderService.updateOrder(state, repository, updatedOrder);
+      Order updatedOrder;
 
-      if (context.mounted) {
+      if (!order.isPaid) {
+        final paymentDate = await DateHelper.showPaymentDatePicker(context);
+        if (paymentDate == null || !context.mounted) return;
+
+        updatedOrder = order.copyWith(isPaid: true, paymentDate: paymentDate);
+      } else {
+        updatedOrder = order.copyWith(isPaid: false);
       }
+
+      await OrderService.updateOrder(state, repository, updatedOrder);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -285,6 +292,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       label: 'Created',
                       value: _formatDate(order.created),
                     ),
+                    if (order.isPaid && order.paymentDate != null) ...[
+                      const SizedBox(height: AppConfig.spacing16),
+                      OrderDetailCard(
+                        icon: Icons.payment,
+                        label: 'Payment Date',
+                        value: _formatDate(order.paymentDate!),
+                      ),
+                    ],
                     const SizedBox(height: AppConfig.spacing16),
                     OrderImagesSection(
                       imagePaths: order.imagePaths,

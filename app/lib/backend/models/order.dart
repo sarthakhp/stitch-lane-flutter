@@ -35,6 +35,9 @@ class Order {
   @HiveField(9)
   final List<String> imagePaths;
 
+  @HiveField(10)
+  final DateTime? paymentDate;
+
   Order({
     required this.id,
     required this.customerId,
@@ -46,6 +49,7 @@ class Order {
     this.value = 0,
     this.isPaid = false,
     this.imagePaths = const [],
+    this.paymentDate,
   });
 
   Order copyWith({
@@ -59,6 +63,8 @@ class Order {
     int? value,
     bool? isPaid,
     List<String>? imagePaths,
+    DateTime? paymentDate,
+    bool clearPaymentDate = false,
   }) {
     return Order(
       id: id ?? this.id,
@@ -71,6 +77,7 @@ class Order {
       value: value ?? this.value,
       isPaid: isPaid ?? this.isPaid,
       imagePaths: imagePaths ?? this.imagePaths,
+      paymentDate: clearPaymentDate ? null : (paymentDate ?? this.paymentDate),
     );
   }
 
@@ -86,6 +93,7 @@ class Order {
       'value': value,
       'isPaid': isPaid,
       'imagePaths': imagePaths,
+      'paymentDate': paymentDate?.toIso8601String(),
     };
   }
 
@@ -108,12 +116,15 @@ class Order {
       imagePaths: json['imagePaths'] != null
           ? List<String>.from(json['imagePaths'] as List)
           : [],
+      paymentDate: json['paymentDate'] != null
+          ? DateTime.parse(json['paymentDate'] as String)
+          : null,
     );
   }
 
   @override
   String toString() {
-    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid, imagePaths: $imagePaths)';
+    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid, imagePaths: $imagePaths, paymentDate: $paymentDate)';
   }
 
   @override

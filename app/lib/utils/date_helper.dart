@@ -1,7 +1,20 @@
+import 'package:flutter/material.dart';
 import '../backend/models/order.dart';
 import '../backend/models/order_status.dart';
 
 class DateHelper {
+  static Future<DateTime?> showPaymentDatePicker(BuildContext context) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return showDatePicker(
+      context: context,
+      initialDate: today,
+      firstDate: DateTime(2000),
+      lastDate: today,
+    );
+  }
+
   static bool isDueSoon(
     Order order,
     int dueDateWarningThreshold,
