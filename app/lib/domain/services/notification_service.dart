@@ -1,31 +1,49 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import '../../utils/app_logger.dart';
+import '../models/notification_payload.dart';
 import '../models/pending_orders_data.dart';
 
-const String pendingOrdersReminderPayload = 'pending_orders_reminder';
+enum _NotificationChannel {
+  backup(
+    id: 'stitch_lane_backup',
+    name: 'Backup Notifications',
+    description: 'Notifications for automatic backup status',
+  ),
+  reminder(
+    id: 'stitch_lane_reminders',
+    name: 'Order Reminders',
+    description: 'Daily reminders about pending orders',
+  );
+
+  final String id;
+  final String name;
+  final String description;
+
+  const _NotificationChannel({
+    required this.id,
+    required this.name,
+    required this.description,
+  });
+}
+
+enum _NotificationId {
+  backupFailed(1),
+  backupSuccess(2),
+  backupInProgress(3),
+  pendingOrdersReminder(100);
+
+  final int value;
+  const _NotificationId(this.value);
+}
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  static const String _backupChannelId = 'stitch_lane_backup';
-  static const String _backupChannelName = 'Backup Notifications';
-  static const String _backupChannelDescription = 'Notifications for automatic backup status';
+  static String? _pendingNotificationPayload;
 
-  static const String _reminderChannelId = 'stitch_lane_reminders';
-  static const String _reminderChannelName = 'Order Reminders';
-  static const String _reminderChannelDescription = 'Daily reminders about pending orders';
-
-  static const int _pendingOrdersNotificationId = 100;
-
-  static void Function(String?)? _onNotificationTap;
-
-  static Future<void> initialize({
-    void Function(String?)? onNotificationTap,
-  }) async {
-    _onNotificationTap = onNotificationTap;
-
+  static Future<void> initialize() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -52,47 +70,91 @@ class NotificationService {
   static void _onDidReceiveNotificationResponse(
     NotificationResponse response,
   ) {
-    AppLogger.info('Notification tapped with payload: ${response.payload}');
-    _onNotificationTap?.call(response.payload);
+    if (response.payload != null) {
+      _pendingNotificationPayload = response.payload;
+    }
   }
 
   static Future<void> _checkInitialNotification() async {
     final launchDetails = await _notifications.getNotificationAppLaunchDetails();
     if (launchDetails?.didNotificationLaunchApp ?? false) {
       final payload = launchDetails?.notificationResponse?.payload;
-      AppLogger.info('App launched from notification with payload: $payload');
       if (payload != null) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _onNotificationTap?.call(payload);
-        });
+        _pendingNotificationPayload = payload;
       }
     }
   }
 
+  static NotificationPayload? consumePendingPayload() {
+    final payload = NotificationPayload.fromString(_pendingNotificationPayload);
+    _pendingNotificationPayload = null;
+    return payload;
+  }
+
+  static AndroidNotificationDetails _buildAndroidDetails(
+    _NotificationChannel channel, {
+    required Importance importance,
+    required Priority priority,
+    bool ongoing = false,
+    bool showProgress = false,
+    bool indeterminate = false,
+    StyleInformation? styleInformation,
+  }) {
+    return AndroidNotificationDetails(
+      channel.id,
+      channel.name,
+      channelDescription: channel.description,
+      importance: importance,
+      priority: priority,
+      icon: '@mipmap/ic_launcher',
+      ongoing: ongoing,
+      showProgress: showProgress,
+      indeterminate: indeterminate,
+      styleInformation: styleInformation,
+    );
+  }
+
+  static DarwinNotificationDetails _buildDarwinDetails({
+    required bool presentAlert,
+    required bool presentBadge,
+    required bool presentSound,
+  }) {
+    return DarwinNotificationDetails(
+      presentAlert: presentAlert,
+      presentBadge: presentBadge,
+      presentSound: presentSound,
+    );
+  }
+
+  static NotificationDetails _buildNotificationDetails({
+    required AndroidNotificationDetails android,
+    required DarwinNotificationDetails darwin,
+  }) {
+    return NotificationDetails(
+      android: android,
+      iOS: darwin,
+      macOS: darwin,
+    );
+  }
+
   static Future<void> showBackupFailedNotification(String errorMessage) async {
-    const androidDetails = AndroidNotificationDetails(
-      _backupChannelId,
-      _backupChannelName,
-      channelDescription: _backupChannelDescription,
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.backup,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
     );
-
-    const darwinDetails = DarwinNotificationDetails(
+    final darwinDetails = _buildDarwinDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
-
-    const details = NotificationDetails(
+    final details = _buildNotificationDetails(
       android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
+      darwin: darwinDetails,
     );
 
     await _notifications.show(
-      1,
+      _NotificationId.backupFailed.value,
       'Auto-Backup Failed',
       errorMessage,
       details,
@@ -104,29 +166,23 @@ class NotificationService {
   static Future<void> showBackupSuccessNotification() async {
     await cancelBackupInProgressNotification();
 
-    const androidDetails = AndroidNotificationDetails(
-      _backupChannelId,
-      _backupChannelName,
-      channelDescription: _backupChannelDescription,
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.backup,
       importance: Importance.low,
       priority: Priority.low,
-      icon: '@mipmap/ic_launcher',
     );
-
-    const darwinDetails = DarwinNotificationDetails(
+    final darwinDetails = _buildDarwinDetails(
       presentAlert: true,
       presentBadge: false,
       presentSound: false,
     );
-
-    const details = NotificationDetails(
+    final details = _buildNotificationDetails(
       android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
+      darwin: darwinDetails,
     );
 
     await _notifications.show(
-      2,
+      _NotificationId.backupSuccess.value,
       'Auto-Backup Complete',
       'Your data has been backed up to Google Drive',
       details,
@@ -136,32 +192,26 @@ class NotificationService {
   }
 
   static Future<void> showBackupInProgressNotification() async {
-    const androidDetails = AndroidNotificationDetails(
-      _backupChannelId,
-      _backupChannelName,
-      channelDescription: _backupChannelDescription,
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.backup,
       importance: Importance.low,
       priority: Priority.low,
-      icon: '@mipmap/ic_launcher',
       ongoing: true,
       showProgress: true,
       indeterminate: true,
     );
-
-    const darwinDetails = DarwinNotificationDetails(
+    final darwinDetails = _buildDarwinDetails(
       presentAlert: false,
       presentBadge: false,
       presentSound: false,
     );
-
-    const details = NotificationDetails(
+    final details = _buildNotificationDetails(
       android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
+      darwin: darwinDetails,
     );
 
     await _notifications.show(
-      3,
+      _NotificationId.backupInProgress.value,
       'Auto-Backup in Progress',
       'Backing up your data to Google Drive...',
       details,
@@ -171,7 +221,7 @@ class NotificationService {
   }
 
   static Future<void> cancelBackupInProgressNotification() async {
-    await _notifications.cancel(3);
+    await _notifications.cancel(_NotificationId.backupInProgress.value);
   }
 
   static Future<void> showPendingOrdersReminderNotification(
@@ -180,71 +230,59 @@ class NotificationService {
     final title = '${data.totalPendingOrders} Pending Orders from ${data.customerCount} customers';
     final body = _formatPendingOrdersBody(data);
 
-    final androidDetails = AndroidNotificationDetails(
-      _reminderChannelId,
-      _reminderChannelName,
-      channelDescription: _reminderChannelDescription,
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.reminder,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
       styleInformation: BigTextStyleInformation(
         body,
         contentTitle: title,
         summaryText: 'Tap to view customers',
       ),
     );
-
-    const darwinDetails = DarwinNotificationDetails(
+    final darwinDetails = _buildDarwinDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
-
-    final details = NotificationDetails(
+    final details = _buildNotificationDetails(
       android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
+      darwin: darwinDetails,
     );
 
     await _notifications.show(
-      _pendingOrdersNotificationId,
+      _NotificationId.pendingOrdersReminder.value,
       title,
       body,
       details,
-      payload: pendingOrdersReminderPayload,
+      payload: NotificationPayload.pendingOrdersReminder.value,
     );
 
     AppLogger.info('Pending orders reminder notification shown: ${data.totalPendingOrders} orders');
   }
 
   static Future<void> showNoPendingOrdersNotification() async {
-    const androidDetails = AndroidNotificationDetails(
-      _reminderChannelId,
-      _reminderChannelName,
-      channelDescription: _reminderChannelDescription,
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.reminder,
       importance: Importance.low,
       priority: Priority.low,
-      icon: '@mipmap/ic_launcher',
     );
-
-    const darwinDetails = DarwinNotificationDetails(
+    final darwinDetails = _buildDarwinDetails(
       presentAlert: true,
       presentBadge: false,
       presentSound: false,
     );
-
-    const details = NotificationDetails(
+    final details = _buildNotificationDetails(
       android: androidDetails,
-      iOS: darwinDetails,
-      macOS: darwinDetails,
+      darwin: darwinDetails,
     );
 
     await _notifications.show(
-      _pendingOrdersNotificationId,
+      _NotificationId.pendingOrdersReminder.value,
       'No Pending Orders Due Soon',
       'All caught up! No orders due within the threshold.',
       details,
-      payload: pendingOrdersReminderPayload,
+      payload: NotificationPayload.pendingOrdersReminder.value,
     );
 
     AppLogger.info('No pending orders notification shown');

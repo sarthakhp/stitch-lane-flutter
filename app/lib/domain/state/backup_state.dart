@@ -3,16 +3,23 @@ import '../services/drive_service.dart';
 
 class BackupState extends ChangeNotifier {
   bool _isLoading = false;
+  bool _isCheckingBackup = false;
   String? _errorMessage;
   BackupInfo? _backupInfo;
   double _progress = 0.0;
 
   bool get isLoading => _isLoading;
+  bool get isCheckingBackup => _isCheckingBackup;
   String? get errorMessage => _errorMessage;
   BackupInfo? get backupInfo => _backupInfo;
   double get progress => _progress;
 
   bool get hasBackup => _backupInfo != null;
+
+  void setCheckingBackup(bool checking) {
+    _isCheckingBackup = checking;
+    notifyListeners();
+  }
 
   void setLoading(bool loading) {
     _isLoading = loading;

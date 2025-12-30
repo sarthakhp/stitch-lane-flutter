@@ -3,15 +3,13 @@ import 'package:provider/provider.dart';
 import '../backend/repositories/order_repository.dart';
 import '../backend/repositories/customer_repository.dart';
 import '../constants/app_constants.dart';
-import '../domain/models/customer_filter_preset.dart';
-import '../domain/services/notification_service.dart';
+import '../domain/services/notification_router.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/customer_service.dart';
 import '../domain/services/permission_service.dart';
 import '../domain/state/order_state.dart';
 import '../domain/state/customer_state.dart';
 import '../domain/state/main_shell_state.dart';
-import '../main.dart' show consumePendingNotificationPayload;
 import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/customers_tab.dart';
@@ -23,26 +21,32 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class _MainShellScreenState extends State<MainShellScreen>
+    with WidgetsBindingObserver {
   final _ordersTabKey = GlobalKey<OrdersTabState>();
   final _customersTabKey = GlobalKey<CustomersTabState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
       _requestPermissions();
-      _processPendingNotification();
+      NotificationRouter.processPendingNotification(context);
     });
   }
 
-  void _processPendingNotification() {
-    final payload = consumePendingNotificationPayload();
-    if (payload == pendingOrdersReminderPayload) {
-      context.read<MainShellState>().switchToCustomersTab(
-        filter: CustomerFilterPreset.pending(),
-      );
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      NotificationRouter.processPendingNotification(context);
     }
   }
 
@@ -69,14 +73,20 @@ class _MainShellScreenState extends State<MainShellScreen> {
   }
 
   void _applyPendingFilters(MainShellState shellState) {
-    final ordersFilter = shellState.consumeOrdersFilter();
-    if (ordersFilter != null) {
-      _ordersTabKey.currentState?.applyFilter(ordersFilter);
+    final ordersTabState = _ordersTabKey.currentState;
+    if (ordersTabState != null) {
+      final ordersFilter = shellState.consumeOrdersFilter();
+      if (ordersFilter != null) {
+        ordersTabState.applyFilter(ordersFilter);
+      }
     }
 
-    final customersFilter = shellState.consumeCustomersFilter();
-    if (customersFilter != null) {
-      _customersTabKey.currentState?.applyFilter(customersFilter);
+    final customersTabState = _customersTabKey.currentState;
+    if (customersTabState != null) {
+      final customersFilter = shellState.consumeCustomersFilter();
+      if (customersFilter != null) {
+        customersTabState.applyFilter(customersFilter);
+      }
     }
   }
 

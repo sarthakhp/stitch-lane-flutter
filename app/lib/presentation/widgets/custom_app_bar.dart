@@ -24,14 +24,19 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget titleWidget = title;
+    final boldTitle = DefaultTextStyle.merge(
+      style: const TextStyle(fontWeight: FontWeight.bold),
+      child: title,
+    );
+
+    Widget titleWidget = boldTitle;
     if (showLogo) {
       titleWidget = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           const AppLogo(size: 32, showText: false),
           const SizedBox(width: AppConfig.spacing8),
-          Flexible(child: title),
+          Flexible(child: boldTitle),
         ],
       );
     }

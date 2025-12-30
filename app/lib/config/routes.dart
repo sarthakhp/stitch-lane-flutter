@@ -13,6 +13,7 @@ import '../screens/measurement_detail_screen.dart';
 import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/notification_settings_screen.dart';
+import '../screens/backup_settings_screen.dart';
 import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 
@@ -143,6 +144,11 @@ class AppRoutes {
       case AppConstants.notificationSettingsRoute:
         return MaterialPageRoute(
           builder: (_) => const NotificationSettingsScreen(),
+        );
+
+      case AppConstants.backupSettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const BackupSettingsScreen(),
         );
 
       default:

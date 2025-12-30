@@ -17,8 +17,6 @@ import 'utils/app_logger.dart';
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-String? _pendingNotificationPayload;
-
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
@@ -50,22 +48,9 @@ void main() async {
   );
   await AuthService.initializeAuthPersistence();
   await DatabaseService.initialize();
-  await NotificationService.initialize(
-    onNotificationTap: _handleNotificationTap,
-  );
+  await NotificationService.initialize();
   await BackgroundTaskDispatcher.initialize(callbackDispatcher);
   runApp(const StitchLaneApp());
-}
-
-void _handleNotificationTap(String? payload) {
-  if (payload == null) return;
-  _pendingNotificationPayload = payload;
-}
-
-String? consumePendingNotificationPayload() {
-  final payload = _pendingNotificationPayload;
-  _pendingNotificationPayload = null;
-  return payload;
 }
 
 class StitchLaneApp extends StatelessWidget {

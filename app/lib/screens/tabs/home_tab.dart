@@ -40,6 +40,8 @@ class HomeTab extends StatelessWidget {
             onSelected: (value) {
               if (value == 'settings') {
                 Navigator.pushNamed(context, AppConstants.settingsRoute);
+              } else if (value == 'backup') {
+                Navigator.pushNamed(context, AppConstants.backupSettingsRoute);
               }
             },
             itemBuilder: (context) => [
@@ -48,6 +50,15 @@ class HomeTab extends StatelessWidget {
                 child: ListTile(
                   leading: Icon(Icons.settings),
                   title: Text('Settings'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'backup',
+                child: ListTile(
+                  leading: Icon(Icons.cloud_sync),
+                  title: Text('Backup & Restore'),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
