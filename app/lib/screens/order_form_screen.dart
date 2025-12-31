@@ -11,7 +11,6 @@ import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/order_images_section.dart';
 import '../presentation/widgets/rich_description_input_field.dart';
-import '../utils/date_helper.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -42,6 +41,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   List<String> _imagePaths = [];
   String _descriptionValue = '';
   List<double> _extractedValues = [];
+  List<PaymentEntry> _payments = [];
+  int _totalPaidAmount = 0;
 
   bool get _isEditing => widget.order != null;
 
@@ -61,12 +62,16 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _selectedDueDate = widget.order!.dueDate;
       _imagePaths = List.from(widget.order!.imagePaths);
       _extractedValues = MoneyExtractor.extractValues(_descriptionValue);
+      _payments = List.from(widget.order!.payments);
+      _totalPaidAmount = widget.order!.totalPaidAmount;
     } else {
       _valueController.text = '';
       _isPaid = false;
       _paymentDate = null;
       _selectedDueDate = null;
       _imagePaths = [];
+      _payments = [];
+      _totalPaidAmount = 0;
     }
     _titleController.addListener(_onFieldChanged);
     _valueController.addListener(_onFieldChanged);
@@ -125,6 +130,35 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
   String _formatDate(DateTime date) {
     return DateFormat('MMM d, y').format(date);
+  }
+
+  Order _buildCurrentOrder() {
+    final valueInt = int.tryParse(_valueController.text.trim()) ?? 0;
+    return Order(
+      id: widget.order?.id ?? '',
+      customerId: _selectedCustomer?.id ?? '',
+      title: _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
+      dueDate: _selectedDueDate ?? DateTime.now(),
+      description: _descriptionValue.trim().isEmpty ? null : _descriptionValue.trim(),
+      created: widget.order?.created ?? DateTime.now(),
+      status: widget.order?.status ?? OrderStatus.pending,
+      value: valueInt,
+      isPaid: _isPaid,
+      paymentDate: _paymentDate,
+      imagePaths: _imagePaths,
+      payments: _payments,
+      totalPaidAmount: _totalPaidAmount,
+    );
+  }
+
+  void _handlePaymentsUpdated(Order updatedOrder) {
+    setState(() {
+      _payments = List.from(updatedOrder.payments);
+      _totalPaidAmount = updatedOrder.totalPaidAmount;
+      _isPaid = updatedOrder.isPaid;
+      _paymentDate = updatedOrder.paymentDate;
+      _hasUnsavedChanges = true;
+    });
   }
 
   Future<void> _selectDueDate() async {
@@ -202,6 +236,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         isPaid: _isPaid,
         paymentDate: _paymentDate,
         imagePaths: _imagePaths,
+        payments: _payments,
+        totalPaidAmount: _totalPaidAmount,
       );
 
       if (_isEditing) {
@@ -487,37 +523,13 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: AppConfig.spacing16),
-            Card(
-              child: SwitchListTile(
-                title: const Text('Payment Status'),
-                subtitle: Text(_isPaid ? 'Paid' : 'Not Paid'),
-                value: _isPaid,
-                onChanged: _isLoading ? null : (value) async {
-                  if (value) {
-                    final selectedDate = await DateHelper.showPaymentDatePicker(context);
-                    if (selectedDate == null || !mounted) return;
-
-                    setState(() {
-                      _isPaid = true;
-                      _paymentDate = selectedDate;
-                      _hasUnsavedChanges = true;
-                    });
-                  } else {
-                    setState(() {
-                      _isPaid = false;
-                      _hasUnsavedChanges = true;
-                    });
-                  }
-                },
-                secondary: Icon(
-                  _isPaid ? Icons.check_circle : Icons.pending,
-                  color: _isPaid
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
-                ),
+            if (_isEditing) ...[
+              const SizedBox(height: AppConfig.spacing16),
+              PaymentsSection(
+                order: _buildCurrentOrder(),
+                onOrderUpdated: _handlePaymentsUpdated,
               ),
-            ),
+            ],
             const SizedBox(height: AppConfig.spacing16),
             OrderImagesSection(
               imagePaths: _imagePaths,

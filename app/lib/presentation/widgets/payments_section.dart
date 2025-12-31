@@ -281,14 +281,15 @@ class _PaymentsSectionState extends State<PaymentsSection> {
           children: [
             Text(
               '₹${payment.amount}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
               ),
             ),
             const SizedBox(width: AppConfig.spacing4),
             Icon(
               Icons.edit,
-              size: 14,
+              size: 16,
               color: colorScheme.onSurfaceVariant,
             ),
           ],
@@ -298,24 +299,41 @@ class _PaymentsSectionState extends State<PaymentsSection> {
   }
 
   Widget _buildAmountEditor(PaymentEntry payment) {
-    return SizedBox(
-      width: 100,
-      child: TextField(
-        controller: _amountController,
-        focusNode: _amountFocusNode,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(
-          prefixText: '₹',
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: AppConfig.spacing8,
-            vertical: AppConfig.spacing8,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 100,
+          child: TextField(
+            controller: _amountController,
+            focusNode: _amountFocusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            decoration: const InputDecoration(
+              prefixText: '₹',
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: AppConfig.spacing8,
+                vertical: AppConfig.spacing8,
+              ),
+            ),
+            onSubmitted: (_) => _finishEditingAmount(payment),
           ),
         ),
-        onSubmitted: (_) => _finishEditingAmount(payment),
-        onTapOutside: (_) => _finishEditingAmount(payment),
-      ),
+        const SizedBox(width: AppConfig.spacing4),
+        IconButton(
+          icon: Icon(
+            Icons.check_circle,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          onPressed: () => _finishEditingAmount(payment),
+          tooltip: 'Confirm',
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 

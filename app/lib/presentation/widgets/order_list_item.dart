@@ -71,48 +71,53 @@ class OrderListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppConfig.spacing16),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '₹${order.value}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: order.isPaid
-                          ? colorScheme.primary
-                          : colorScheme.error,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConfig.spacing4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppConfig.spacing8,
-                      vertical: AppConfig.spacing4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: order.isPaid
-                          ? colorScheme.primaryContainer
-                          : colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(AppConfig.spacing12),
-                    ),
-                    child: Text(
-                      order.isPaid ? 'Paid' : 'Not Paid',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: order.isPaid
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onErrorContainer,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              _buildPaymentInfo(context, colorScheme),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPaymentInfo(BuildContext context, ColorScheme colorScheme) {
+    final remainingAmount = order.value - order.totalPaidAmount;
+    final displayAmount = remainingAmount > 0 ? remainingAmount : 0;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '₹$displayAmount',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: order.isPaid ? colorScheme.primary : colorScheme.error,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppConfig.spacing4),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppConfig.spacing8,
+            vertical: AppConfig.spacing4,
+          ),
+          decoration: BoxDecoration(
+            color: order.isPaid
+                ? colorScheme.primaryContainer
+                : colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(AppConfig.spacing12),
+          ),
+          child: Text(
+            order.isPaid ? 'Paid' : 'Not Paid',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: order.isPaid
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onErrorContainer,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
