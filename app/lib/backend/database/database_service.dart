@@ -4,6 +4,7 @@ import '../models/order.dart';
 import '../models/order_status.dart';
 import '../models/app_settings.dart';
 import '../models/measurement.dart';
+import '../models/payment_entry.dart';
 import '../../constants/app_constants.dart';
 
 class DatabaseService {
@@ -19,6 +20,7 @@ class DatabaseService {
       Hive.registerAdapter(OrderStatusAdapter());
       Hive.registerAdapter(AppSettingsAdapter());
       Hive.registerAdapter(MeasurementAdapter());
+      Hive.registerAdapter(PaymentEntryAdapter());
       await Hive.openBox<Customer>(AppConstants.customersBoxName);
       await Hive.openBox<Order>(AppConstants.ordersBoxName);
       await Hive.openBox<AppSettings>(AppConstants.settingsBoxName);

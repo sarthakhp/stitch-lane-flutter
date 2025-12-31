@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'order_status.dart';
+import 'payment_entry.dart';
 
 part 'order.g.dart';
 
@@ -38,6 +39,12 @@ class Order {
   @HiveField(10)
   final DateTime? paymentDate;
 
+  @HiveField(11)
+  final List<PaymentEntry> payments;
+
+  @HiveField(12)
+  final int totalPaidAmount;
+
   Order({
     required this.id,
     required this.customerId,
@@ -50,6 +57,8 @@ class Order {
     this.isPaid = false,
     this.imagePaths = const [],
     this.paymentDate,
+    this.payments = const [],
+    this.totalPaidAmount = 0,
   });
 
   Order copyWith({
@@ -65,6 +74,8 @@ class Order {
     List<String>? imagePaths,
     DateTime? paymentDate,
     bool clearPaymentDate = false,
+    List<PaymentEntry>? payments,
+    int? totalPaidAmount,
   }) {
     return Order(
       id: id ?? this.id,
@@ -78,6 +89,8 @@ class Order {
       isPaid: isPaid ?? this.isPaid,
       imagePaths: imagePaths ?? this.imagePaths,
       paymentDate: clearPaymentDate ? null : (paymentDate ?? this.paymentDate),
+      payments: payments ?? this.payments,
+      totalPaidAmount: totalPaidAmount ?? this.totalPaidAmount,
     );
   }
 
@@ -94,6 +107,8 @@ class Order {
       'isPaid': isPaid,
       'imagePaths': imagePaths,
       'paymentDate': paymentDate?.toIso8601String(),
+      'payments': payments.map((p) => p.toJson()).toList(),
+      'totalPaidAmount': totalPaidAmount,
     };
   }
 
@@ -119,12 +134,18 @@ class Order {
       paymentDate: json['paymentDate'] != null
           ? DateTime.parse(json['paymentDate'] as String)
           : null,
+      payments: json['payments'] != null
+          ? (json['payments'] as List)
+              .map((p) => PaymentEntry.fromJson(p as Map<String, dynamic>))
+              .toList()
+          : [],
+      totalPaidAmount: json['totalPaidAmount'] as int? ?? 0,
     );
   }
 
   @override
   String toString() {
-    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid, imagePaths: $imagePaths, paymentDate: $paymentDate)';
+    return 'Order(id: $id, customerId: $customerId, title: $title, dueDate: $dueDate, description: $description, created: $created, status: $status, value: $value, isPaid: $isPaid, imagePaths: $imagePaths, paymentDate: $paymentDate, payments: $payments, totalPaidAmount: $totalPaidAmount)';
   }
 
   @override

@@ -116,9 +116,19 @@ class OrderService {
   }
 
   static int getTotalUnpaidAmount(List<Order> orders) {
-    return orders
-        .where((order) => !order.isPaid)
-        .fold(0, (sum, order) => sum + order.value);
+    return orders.fold(0, (sum, order) {
+      final unpaid = order.value - order.totalPaidAmount;
+      return sum + (unpaid > 0 ? unpaid : 0);
+    });
+  }
+
+  static int calculateTotalPaidAmount(Order order) {
+    return order.payments.fold(0, (sum, payment) => sum + payment.amount);
+  }
+
+  static int getRemainingAmount(Order order) {
+    final remaining = order.value - order.totalPaidAmount;
+    return remaining > 0 ? remaining : 0;
   }
 
   static Future<Order> toggleOrderStatus(

@@ -1,60 +1,56 @@
 class MoneyExtractor {
   MoneyExtractor._();
 
+  // Regex Explanation:
+  // 1. We allow optional styling characters: ( * _ [
+  // 2. We capture the number: Allows digits, Indian commas (2 or 3 groups), and decimals.
+  // 3. We allow optional closing styling: ) * _ ]
   static final List<RegExp> _patterns = [
-    // ₹500 or ₹ 500 or ₹1,500 or ₹1,500.50 (rupee symbol prefix)
-    RegExp(r'₹\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)'),
+    // ---------------------------------------------------------
+    // PATTERN 1: Prefix Symbols (e.g., ₹500, Rs. 500, INR 500)
+    // ---------------------------------------------------------
+    RegExp(
+      r'(?:₹|Rs\.?|INR)\s*[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d+)?)\s*[*_)*\]]*',
+      caseSensitive: false,
+    ),
 
-    // Rs. 500 or Rs 500 or Rs.500 (with optional comma/decimal)
-    RegExp(r'Rs\.?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)', caseSensitive: false),
-
-    // 500 ₹ or 500₹ (rupee symbol suffix)
-    RegExp(r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*₹'),
-
-    // (950 rps) or (**950** rps) - number with rps in parentheses
-    RegExp(r'\(\s*\*{0,2}(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\*{0,2}\s*rps\s*\)', caseSensitive: false),
-
-    // 500 rps or **500** rps (without parentheses)
-    RegExp(r'\*{0,2}(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\*{0,2}\s*rps(?!\w)', caseSensitive: false),
-
-    // 500 ruppees or 500 rupees or 500rupees
-    RegExp(r'(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*rup+ees?', caseSensitive: false),
+    // ---------------------------------------------------------
+    // PATTERN 2: Suffix Words (e.g., 500 rps, **500** rupees, 500/-)
+    // ---------------------------------------------------------
+    // Looks for:
+    // 1. Optional Prefix Noise: (, [, *, **
+    // 2. The Number (Capturing Group 1)
+    // 3. Optional Suffix Noise: ), ], *, **
+    // 4. The Unit: rupees, rupee, rps, rp, /-, or just the symbol ₹ at the end
+    RegExp(
+      r'[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d+)?)\s*[*_)*\]]*\s*(?:rupees?|rps?|rp|INR|₹|\/-)(?!\w)',
+      caseSensitive: false,
+    ),
   ];
 
+  /// Extracts all rupee amounts found in the text and returns them as a List of Doubles.
   static List<double> extractValues(String text) {
-    if (text.isEmpty) return [];
+    List<double> foundAmounts = [];
 
-    final Set<double> uniqueValues = {};
-    final List<_MatchInfo> allMatches = [];
+    for (var regex in _patterns) {
+      Iterable<RegExpMatch> matches = regex.allMatches(text);
 
-    for (final pattern in _patterns) {
-      for (final match in pattern.allMatches(text)) {
-        final valueStr = match.group(1);
-        if (valueStr != null) {
-          final cleanValue = valueStr.replaceAll(',', '');
-          final value = double.tryParse(cleanValue);
-          if (value != null && value > 0) {
-            allMatches.add(_MatchInfo(
-              value: value,
-              start: match.start,
-              end: match.end,
-            ));
+      for (var match in matches) {
+        // Group 1 is always the number part in our regexes
+        String? numberStr = match.group(1);
+
+        if (numberStr != null) {
+          // Clean the number (remove commas) and parse
+          String cleanNumber = numberStr.replaceAll(',', '');
+          double? amount = double.tryParse(cleanNumber);
+          if (amount != null) {
+            foundAmounts.add(amount);
           }
         }
       }
     }
 
-    allMatches.sort((a, b) => a.start.compareTo(b.start));
-
-    int lastEnd = -1;
-    for (final matchInfo in allMatches) {
-      if (matchInfo.start >= lastEnd) {
-        uniqueValues.add(matchInfo.value);
-        lastEnd = matchInfo.end;
-      }
-    }
-
-    return uniqueValues.toList();
+    return foundAmounts;
   }
 
   static double calculateTotal(List<double> values) {
@@ -76,16 +72,3 @@ class MoneyExtractor {
     return '$formattedValues = ${formatValue(total)}';
   }
 }
-
-class _MatchInfo {
-  final double value;
-  final int start;
-  final int end;
-
-  _MatchInfo({
-    required this.value,
-    required this.start,
-    required this.end,
-  });
-}
-

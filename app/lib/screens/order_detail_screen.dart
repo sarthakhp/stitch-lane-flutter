@@ -11,7 +11,6 @@ import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/measurement_card.dart';
 import '../presentation/widgets/order_images_section.dart';
 import '../presentation/widgets/markdown_description_text.dart';
-import '../utils/date_helper.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Order order;
@@ -121,27 +120,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Future<void> _togglePaymentStatus(BuildContext context, Order order) async {
+  Future<void> _updateOrder(Order updatedOrder) async {
     final state = context.read<OrderState>();
     final repository = context.read<OrderRepository>();
 
     try {
-      Order updatedOrder;
-
-      if (!order.isPaid) {
-        final paymentDate = await DateHelper.showPaymentDatePicker(context);
-        if (paymentDate == null || !context.mounted) return;
-
-        updatedOrder = order.copyWith(isPaid: true, paymentDate: paymentDate);
-      } else {
-        updatedOrder = order.copyWith(isPaid: false);
-      }
-
       await OrderService.updateOrder(state, repository, updatedOrder);
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update payment status: $e')),
+          SnackBar(content: Text('Failed to update order: $e')),
         );
       }
     }
@@ -292,14 +280,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       label: 'Created',
                       value: _formatDate(order.created),
                     ),
-                    if (order.isPaid && order.paymentDate != null) ...[
-                      const SizedBox(height: AppConfig.spacing16),
-                      OrderDetailCard(
-                        icon: Icons.payment,
-                        label: 'Payment Date',
-                        value: _formatDate(order.paymentDate!),
-                      ),
-                    ],
+                    const SizedBox(height: AppConfig.spacing16),
+                    PaymentsSection(
+                      order: order,
+                      onOrderUpdated: _updateOrder,
+                    ),
                     const SizedBox(height: AppConfig.spacing16),
                     OrderImagesSection(
                       imagePaths: order.imagePaths,
@@ -355,7 +340,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               const SizedBox(width: AppConfig.spacing8),
                               Expanded(
                                 child: FilledButton.tonalIcon(
-                                  onPressed: () => _togglePaymentStatus(context, order),
+                                  onPressed: null,
                                   icon: Icon(order.isPaid ? Icons.check_circle : Icons.pending),
                                   label: Text(order.isPaid ? 'Paid' : 'Not Paid'),
                                   style: FilledButton.styleFrom(
@@ -363,6 +348,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                         ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
                                         : Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
                                     foregroundColor: order.isPaid
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.error,
+                                    disabledBackgroundColor: order.isPaid
+                                        ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+                                        : Theme.of(context).colorScheme.error.withValues(alpha: 0.2),
+                                    disabledForegroundColor: order.isPaid
                                         ? Theme.of(context).colorScheme.primary
                                         : Theme.of(context).colorScheme.error,
                                   ),

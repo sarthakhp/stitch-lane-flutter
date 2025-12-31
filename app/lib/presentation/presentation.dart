@@ -8,6 +8,7 @@ export 'widgets/order_list_item.dart';
 export 'widgets/empty_orders_state.dart';
 export 'widgets/loading_widget.dart';
 export 'widgets/error_widget.dart';
+export 'widgets/payments_section.dart';
 export 'widgets/search_bar_widget.dart';
 export 'widgets/sticky_action_button.dart';
 export 'widgets/custom_app_bar.dart';
