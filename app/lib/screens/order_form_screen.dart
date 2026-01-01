@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
-import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
-import '../presentation/widgets/sticky_bottom_action_bar.dart';
-import '../presentation/widgets/order_images_section.dart';
 import '../presentation/widgets/rich_description_input_field.dart';
+import '../presentation/widgets/sticky_bottom_action_bar.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -29,60 +24,34 @@ class OrderFormScreen extends StatefulWidget {
 class _OrderFormScreenState extends State<OrderFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _descriptionKey = GlobalKey<RichDescriptionInputFieldState>();
   final _valueController = TextEditingController();
-  DateTime? _selectedDueDate;
-  bool _isLoading = false;
-  bool _isPaid = false;
-  DateTime? _paymentDate;
-  Customer? _selectedCustomer;
-  bool _hasAttemptedSubmit = false;
-  bool _hasUnsavedChanges = false;
-  List<String> _imagePaths = [];
-  String _descriptionValue = '';
-  List<double> _extractedValues = [];
-  List<PaymentEntry> _payments = [];
-  int _totalPaidAmount = 0;
-
-  bool get _isEditing => widget.order != null;
+  final _descriptionKey = GlobalKey<RichDescriptionInputFieldState>();
+  late final OrderFormController _controller;
 
   @override
   void initState() {
     super.initState();
-    _selectedCustomer = widget.customer;
+    _controller = OrderFormController(
+      existingOrder: widget.order,
+      initialCustomer: widget.customer,
+    );
+    _initializeTextControllers();
+    _controller.addListener(_onControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCustomersIfNeeded();
     });
-    if (_isEditing) {
-      _titleController.text = widget.order!.title ?? '';
-      _descriptionValue = widget.order!.description ?? '';
-      _valueController.text = widget.order!.value.toString();
-      _isPaid = widget.order!.isPaid;
-      _paymentDate = widget.order!.paymentDate;
-      _selectedDueDate = widget.order!.dueDate;
-      _imagePaths = List.from(widget.order!.imagePaths);
-      _extractedValues = MoneyExtractor.extractValues(_descriptionValue);
-      _payments = List.from(widget.order!.payments);
-      _totalPaidAmount = widget.order!.totalPaidAmount;
-    } else {
-      _valueController.text = '';
-      _isPaid = false;
-      _paymentDate = null;
-      _selectedDueDate = null;
-      _imagePaths = [];
-      _payments = [];
-      _totalPaidAmount = 0;
-    }
-    _titleController.addListener(_onFieldChanged);
-    _valueController.addListener(_onFieldChanged);
   }
 
-  void _onFieldChanged() {
-    if (!_hasUnsavedChanges) {
-      setState(() {
-        _hasUnsavedChanges = true;
-      });
+  void _initializeTextControllers() {
+    _titleController.text = _controller.title;
+    _valueController.text = _controller.valueText;
+  }
+
+  void _onControllerChanged() {
+    if (_valueController.text != _controller.valueText) {
+      _valueController.text = _controller.valueText;
     }
+    setState(() {});
   }
 
   Future<void> _loadCustomersIfNeeded() async {
@@ -95,15 +64,15 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
   @override
   void dispose() {
-    _titleController.removeListener(_onFieldChanged);
-    _valueController.removeListener(_onFieldChanged);
+    _controller.removeListener(_onControllerChanged);
+    _controller.dispose();
     _titleController.dispose();
     _valueController.dispose();
     super.dispose();
   }
 
   Future<bool> _onWillPop() async {
-    if (!_hasUnsavedChanges || _isLoading) {
+    if (!_controller.hasUnsavedChanges || _controller.isLoading) {
       return true;
     }
 
@@ -128,136 +97,44 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return shouldPop ?? false;
   }
 
-  String _formatDate(DateTime date) {
-    return DateFormat('MMM d, y').format(date);
-  }
-
-  Order _buildCurrentOrder() {
-    final valueInt = int.tryParse(_valueController.text.trim()) ?? 0;
-    return Order(
-      id: widget.order?.id ?? '',
-      customerId: _selectedCustomer?.id ?? '',
-      title: _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
-      dueDate: _selectedDueDate ?? DateTime.now(),
-      description: _descriptionValue.trim().isEmpty ? null : _descriptionValue.trim(),
-      created: widget.order?.created ?? DateTime.now(),
-      status: widget.order?.status ?? OrderStatus.pending,
-      value: valueInt,
-      isPaid: _isPaid,
-      paymentDate: _paymentDate,
-      imagePaths: _imagePaths,
-      payments: _payments,
-      totalPaidAmount: _totalPaidAmount,
-    );
-  }
-
-  void _handlePaymentsUpdated(Order updatedOrder) {
-    setState(() {
-      _payments = List.from(updatedOrder.payments);
-      _totalPaidAmount = updatedOrder.totalPaidAmount;
-      _isPaid = updatedOrder.isPaid;
-      _paymentDate = updatedOrder.paymentDate;
-      _hasUnsavedChanges = true;
-    });
-  }
-
-  Future<void> _selectDueDate() async {
-    final now = DateTime.now();
-    final initialDate = _selectedDueDate ?? now;
-    final firstDate = _isEditing ? DateTime(2000) : now;
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: DateTime(2100),
-    );
-
-    if (picked != null && mounted) {
-      setState(() {
-        _selectedDueDate = picked;
-        _hasUnsavedChanges = true;
-      });
-    }
-  }
-
   Future<void> _saveOrder() async {
-    setState(() {
-      _hasAttemptedSubmit = true;
-    });
+    _controller.setHasAttemptedSubmit(true);
 
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    if (_selectedCustomer == null) {
+    final validationError = _controller.validateForSave();
+    if (validationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a customer')),
+        SnackBar(content: Text(validationError)),
       );
       return;
     }
 
-    if (_selectedDueDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a due date')),
-      );
-      return;
-    }
-
-    final valueText = _valueController.text.trim();
-    if (valueText.isEmpty || int.tryParse(valueText) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter order value')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
+    _controller.setLoading(true);
 
     try {
       final state = context.read<OrderState>();
       final repository = context.read<OrderRepository>();
+      final order = _controller.buildOrder();
 
-      final titleText = _titleController.text.trim();
-      final descriptionText = _descriptionValue.trim();
-      final valueInt = int.parse(_valueController.text.trim());
-
-      final order = Order(
-        id: _isEditing ? widget.order!.id : const Uuid().v4(),
-        customerId: _selectedCustomer!.id,
-        title: titleText.isEmpty ? null : titleText,
-        dueDate: _selectedDueDate!,
-        description: descriptionText.isEmpty ? null : descriptionText,
-        created: _isEditing ? widget.order!.created : DateTime.now(),
-        status: _isEditing ? widget.order!.status : OrderStatus.pending,
-        value: valueInt,
-        isPaid: _isPaid,
-        paymentDate: _paymentDate,
-        imagePaths: _imagePaths,
-        payments: _payments,
-        totalPaidAmount: _totalPaidAmount,
-      );
-
-      if (_isEditing) {
+      if (_controller.isEditing) {
         await OrderService.updateOrder(state, repository, order);
       } else {
         await OrderService.addOrder(state, repository, order);
       }
 
       if (mounted) {
-        setState(() {
-          _hasUnsavedChanges = false;
-        });
+        _controller.clearUnsavedChanges();
 
-        if (_isEditing) {
+        if (_controller.isEditing) {
           Navigator.pop(context);
         } else {
           Navigator.pushReplacementNamed(
             context,
             AppConstants.orderDetailRoute,
-            arguments: {'order': order, 'customer': _selectedCustomer},
+            arguments: {'order': order, 'customer': _controller.selectedCustomer},
           );
         }
 
@@ -265,7 +142,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           SnackBar(
             duration: const Duration(milliseconds: 800),
             content: Text(
-              _isEditing
+              _controller.isEditing
                   ? 'Order updated successfully'
                   : 'Order added successfully',
             ),
@@ -280,10 +157,18 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        _controller.setLoading(false);
       }
+    }
+  }
+
+  Future<void> _handleCreateNewCustomer(CustomerState customerState) async {
+    FocusScope.of(context).unfocus();
+    final previousCount = customerState.customers.length;
+    await Navigator.pushNamed(context, AppConstants.customerFormRoute);
+    if (mounted && customerState.customers.length > previousCount) {
+      final newCustomer = customerState.customers.last;
+      _controller.setSelectedCustomer(newCustomer);
     }
   }
 
@@ -301,247 +186,23 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       },
       child: Scaffold(
         appBar: CustomAppBar(
-          title: Text(_isEditing ? 'Edit Order' : 'Add Order'),
+          title: Text(_controller.isEditing ? 'Edit Order' : 'Add Order'),
         ),
         body: GestureDetector(
-          onTap: () {
-            FocusScope.of(context).unfocus();
-          },
+          onTap: () => FocusScope.of(context).unfocus(),
           child: Consumer<CustomerState>(
             builder: (context, customerState, child) {
               return Column(
                 children: [
                   Expanded(
-                    child: Form(
-                      key: _formKey,
-                      child: ListView(
-                        padding: const EdgeInsets.all(AppConfig.spacing16),
-                        children: [
-                Autocomplete<Customer>(
-                  initialValue: _selectedCustomer != null
-                      ? TextEditingValue(text: _selectedCustomer!.name)
-                      : const TextEditingValue(),
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    final searchText = textEditingValue.text.trim();
-                    if (searchText.isEmpty) {
-                      return customerState.customers;
-                    }
-                    final searchLower = searchText.toLowerCase();
-                    return customerState.customers.where((Customer customer) {
-                      return customer.name.toLowerCase().contains(searchLower) ||
-                          (customer.phoneNumber?.contains(searchText) ?? false);
-                    });
-                  },
-                  displayStringForOption: (Customer customer) => customer.name,
-                  fieldViewBuilder: (
-                    BuildContext context,
-                    TextEditingController textEditingController,
-                    FocusNode focusNode,
-                    VoidCallback onFieldSubmitted,
-                  ) {
-                    return TextFormField(
-                      controller: textEditingController,
-                      focusNode: focusNode,
-                      enabled: !_isEditing && !_isLoading,
-                      decoration: InputDecoration(
-                        labelText: 'Customer',
-                        hintText: 'Search customer by name or phone...',
-                        prefixIcon: const Icon(Icons.person),
-                        border: const OutlineInputBorder(),
-                        errorText: _hasAttemptedSubmit && _selectedCustomer == null
-                            ? 'Please select a customer'
-                            : null,
-                        suffixIcon: _selectedCustomer != null
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedCustomer = null;
-                                    _hasUnsavedChanges = true;
-                                  });
-                                  textEditingController.clear();
-                                  focusNode.requestFocus();
-                                },
-                              )
-                            : null,
-                      ),
-                      onFieldSubmitted: (String value) {
-                        onFieldSubmitted();
-                      },
-                    );
-                  },
-                  optionsViewBuilder: (
-                    BuildContext context,
-                    AutocompleteOnSelected<Customer> onSelected,
-                    Iterable<Customer> options,
-                  ) {
-                    return Align(
-                      alignment: Alignment.topLeft,
-                      child: Material(
-                        elevation: 4.0,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxHeight: 250,
-                            maxWidth: 400,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListTile(
-                                leading: const Icon(Icons.person_add),
-                                title: const Text('Create new customer'),
-                                onTap: () async {
-                                  FocusScope.of(context).unfocus();
-                                  final customerState = context.read<CustomerState>();
-                                  final previousCount = customerState.customers.length;
-                                  await Navigator.pushNamed(
-                                    context,
-                                    AppConstants.customerFormRoute,
-                                  );
-                                  if (mounted && customerState.customers.length > previousCount) {
-                                    final newCustomer = customerState.customers.last;
-                                    setState(() {
-                                      _selectedCustomer = newCustomer;
-                                      _hasUnsavedChanges = true;
-                                    });
-                                  }
-                                },
-                              ),
-                              const Divider(height: 1),
-                              Flexible(
-                                child: ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  itemCount: options.length,
-                                  itemBuilder: (BuildContext context, int index) {
-                                    final Customer customer = options.elementAt(index);
-                                    return ListTile(
-                                      title: Text(customer.name),
-                                      subtitle: customer.phoneNumber != null
-                                          ? Text(customer.phoneNumber!)
-                                          : null,
-                                      onTap: () {
-                                        onSelected(customer);
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  onSelected: (Customer customer) {
-                    setState(() {
-                      _selectedCustomer = customer;
-                      _hasUnsavedChanges = true;
-                    });
-                    FocusScope.of(context).unfocus();
-                  },
-                ),
-                const SizedBox(height: AppConfig.spacing16),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Title (Optional)',
-                    hintText: 'Enter order title',
-                    prefixIcon: Icon(Icons.assignment),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: OrderValidators.validateTitle,
-                  textInputAction: TextInputAction.next,
-                  enabled: !_isLoading,
-                ),
-            const SizedBox(height: AppConfig.spacing16),
-            RichDescriptionInputField(
-              key: _descriptionKey,
-              initialValue: _descriptionValue,
-              labelText: 'Description (Optional)',
-              hintText: 'Enter order description',
-              enabled: !_isLoading,
-              onChanged: (value) {
-                _descriptionValue = value;
-                final newExtractedValues = MoneyExtractor.extractValues(value);
-                setState(() {
-                  _extractedValues = newExtractedValues;
-                  if (!_hasUnsavedChanges) {
-                    _hasUnsavedChanges = true;
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: AppConfig.spacing16),
-            ExtractedValuesWidget(
-              values: _extractedValues,
-              onApply: () {
-                final total = MoneyExtractor.calculateTotal(_extractedValues);
-                _valueController.text = total.toInt().toString();
-              },
-            ),
-            if (_extractedValues.isNotEmpty)
-              const SizedBox(height: AppConfig.spacing16),
-            TextFormField(
-              controller: _valueController,
-              decoration: const InputDecoration(
-                labelText: 'Order Value',
-                hintText: 'Enter order value',
-                prefixIcon: Icon(Icons.currency_rupee),
-                border: OutlineInputBorder(),
-                helperText: 'Enter positive, negative, or zero value',
-              ),
-              keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: false),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
-              ],
-              textInputAction: TextInputAction.next,
-              enabled: !_isLoading,
-            ),
-            const SizedBox(height: AppConfig.spacing16),
-            InkWell(
-              onTap: _isLoading ? null : _selectDueDate,
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: 'Due Date',
-                  hintText: 'Select due date',
-                  prefixIcon: const Icon(Icons.calendar_today),
-                  border: const OutlineInputBorder(),
-                  errorText: _selectedDueDate == null && _formKey.currentState?.validate() == false
-                      ? 'Due date is required'
-                      : null,
-                ),
-                child: Text(
-                  _selectedDueDate != null
-                      ? _formatDate(_selectedDueDate!)
-                      : 'Tap to select date',
-                  style: _selectedDueDate != null
-                      ? Theme.of(context).textTheme.bodyLarge
-                      : Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).hintColor,
-                          ),
-                ),
-              ),
-            ),
-            if (_isEditing) ...[
-              const SizedBox(height: AppConfig.spacing16),
-              PaymentsSection(
-                order: _buildCurrentOrder(),
-                onOrderUpdated: _handlePaymentsUpdated,
-              ),
-            ],
-            const SizedBox(height: AppConfig.spacing16),
-            OrderImagesSection(
-              imagePaths: _imagePaths,
-              onImagesChanged: (updatedPaths) {
-                setState(() {
-                  _imagePaths = updatedPaths;
-                  _hasUnsavedChanges = true;
-                });
-              },
-            ),
-          ],
-                      ),
+                    child: OrderFormBody(
+                      controller: _controller,
+                      formKey: _formKey,
+                      titleController: _titleController,
+                      valueController: _valueController,
+                      descriptionKey: _descriptionKey,
+                      customers: customerState.customers,
+                      onCreateNewCustomer: () => _handleCreateNewCustomer(customerState),
                     ),
                   ),
                   StickyBottomActionBar(
@@ -552,8 +213,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       }
                     },
                     onSave: _saveOrder,
-                    saveLabel: _isEditing ? 'Update' : 'Save',
-                    isLoading: _isLoading,
+                    saveLabel: _controller.isEditing ? 'Update' : 'Save',
+                    isLoading: _controller.isLoading,
                   ),
                 ],
               );
@@ -564,4 +225,3 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     );
   }
 }
-
