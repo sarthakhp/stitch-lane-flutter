@@ -10,7 +10,7 @@ class MoneyExtractor {
     // PATTERN 1: Prefix Symbols (e.g., ₹500, Rs. 500, INR 500)
     // ---------------------------------------------------------
     RegExp(
-      r'(?:₹|Rs\.?|INR)\s*[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d+)?)\s*[*_)*\]]*',
+      r'(?:₹|Rs\.?|INR)\s*[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*[*_)*\]]*',
       caseSensitive: false,
     ),
 
@@ -23,7 +23,7 @@ class MoneyExtractor {
     // 3. Optional Suffix Noise: ), ], *, **
     // 4. The Unit: rupees, rupee, rps, rp, /-, or just the symbol ₹ at the end
     RegExp(
-      r'[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})*(?:\.\d+)?)\s*[*_)*\]]*\s*(?:rupees?|rps?|rp|INR|₹|\/-)(?!\w)',
+      r'[*_(\[]*\s*(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*[*_)*\]]*\s*(?:rupees?|rps?|rp|INR|₹|\/-)(?!\w)',
       caseSensitive: false,
     ),
   ];

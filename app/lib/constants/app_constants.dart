@@ -21,5 +21,6 @@ class AppConstants {
   static const String settingsRoute = '/settings';
   static const String notificationSettingsRoute = '/settings/notifications';
   static const String backupSettingsRoute = '/backup-settings';
+	  static const String businessAnalysisRoute = '/business-analysis';
 }
 

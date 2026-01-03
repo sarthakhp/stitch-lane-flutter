@@ -160,6 +160,18 @@ class HomeTab extends StatelessWidget {
                         Navigator.pushNamed(context, AppConstants.customerFormRoute);
                       },
                     ),
+	                      HomeActionTile(
+	                        icon: Icons.analytics_outlined,
+	                        title: 'Business Analysis',
+	                        containerColor: colorScheme.tertiaryContainer,
+	                        contentColor: colorScheme.onTertiaryContainer,
+	                        onTap: () {
+	                          Navigator.pushNamed(
+	                            context,
+	                            AppConstants.businessAnalysisRoute,
+	                          );
+	                        },
+	                      ),
                   ],
                 );
               },

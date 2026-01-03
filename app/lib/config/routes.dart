@@ -14,6 +14,7 @@ import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/backup_settings_screen.dart';
+	import '../screens/business_analysis_screen.dart';
 import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 
@@ -150,6 +151,11 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => const BackupSettingsScreen(),
         );
+
+	      case AppConstants.businessAnalysisRoute:
+	        return MaterialPageRoute(
+	          builder: (_) => const BusinessAnalysisScreen(),
+	        );
 
       default:
         return _errorRoute('Route not found: ${settings.name}');
