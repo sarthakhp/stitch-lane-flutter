@@ -40,6 +40,8 @@ dependencies:
   battery_plus: ^7.0.0
   flutter_local_notifications: ^19.5.0
   flutter_native_contact_picker: ^0.0.11
+  photo_view: ^0.15.0
+  share_plus: ^12.0.1
 
 dev_dependencies:
   flutter_test:

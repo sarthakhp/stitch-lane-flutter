@@ -18,8 +18,8 @@ class OrdersTab extends StatefulWidget {
 
 class OrdersTabState extends State<OrdersTab> {
   String _searchQuery = '';
-  OrderFilterOptions _filterOptions = const OrderFilterOptions();
-  FilterPreset? _selectedPreset;
+  OrderFilterOptions _filterOptions = const OrderFilterOptions.recent();
+  FilterPreset? _selectedPreset = FilterPreset.recent();
 
   void applyFilter(FilterPreset preset) {
     setState(() {

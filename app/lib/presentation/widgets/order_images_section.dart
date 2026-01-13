@@ -2,6 +2,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../config/app_config.dart';
 import '../../domain/domain.dart';
 
@@ -334,6 +337,19 @@ class _FullImageViewerState extends State<_FullImageViewer> {
     super.dispose();
   }
 
+  ImageProvider _getImageProvider(String imagePath) {
+    if (kIsWeb) {
+      return NetworkImage(imagePath);
+    }
+    return FileImage(File(imagePath));
+  }
+
+  Future<void> _shareImage() async {
+    if (kIsWeb) return;
+    final imagePath = widget.imagePaths[_currentIndex];
+    await SharePlus.instance.share(ShareParams(files: [XFile(imagePath)]));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -343,30 +359,29 @@ class _FullImageViewerState extends State<_FullImageViewer> {
         foregroundColor: Colors.white,
         title: Text('${_currentIndex + 1} / ${widget.imagePaths.length}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () => widget.onDelete(_currentIndex),
-          ),
+          if (!kIsWeb)
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _shareImage,
+            ),
         ],
       ),
-      body: PageView.builder(
-        controller: _pageController,
+      body: PhotoViewGallery.builder(
+        pageController: _pageController,
         itemCount: widget.imagePaths.length,
         onPageChanged: (index) {
           setState(() {
             _currentIndex = index;
           });
         },
-        itemBuilder: (context, index) {
-          final imagePath = widget.imagePaths[index];
-          return InteractiveViewer(
-            child: Center(
-              child: kIsWeb
-                  ? Image.network(imagePath)
-                  : Image.file(File(imagePath)),
-            ),
+        builder: (context, index) {
+          return PhotoViewGalleryPageOptions(
+            imageProvider: _getImageProvider(widget.imagePaths[index]),
+            minScale: PhotoViewComputedScale.contained,
+            maxScale: PhotoViewComputedScale.covered * 4,
           );
         },
+        backgroundDecoration: const BoxDecoration(color: Colors.black),
       ),
     );
   }

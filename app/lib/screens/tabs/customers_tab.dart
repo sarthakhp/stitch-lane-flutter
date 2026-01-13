@@ -16,8 +16,8 @@ class CustomersTab extends StatefulWidget {
 class CustomersTabState extends State<CustomersTab> {
   String _searchQuery = '';
   CustomerSort _selectedSort = CustomerSort.dueDate;
-  CustomerFilterOptions _filterOptions = const CustomerFilterOptions();
-  CustomerFilterPreset? _selectedPreset;
+  CustomerFilterOptions _filterOptions = const CustomerFilterOptions.recent();
+  CustomerFilterPreset? _selectedPreset = CustomerFilterPreset.recent();
 
   void applyFilter(CustomerFilterPreset preset) {
     setState(() {
