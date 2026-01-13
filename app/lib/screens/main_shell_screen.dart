@@ -131,8 +131,9 @@ class _MainShellScreenState extends State<MainShellScreen>
       ],
     );
 
+    Widget scaffold;
     if (useNavigationRail) {
-      return Scaffold(
+      scaffold = Scaffold(
         body: Row(
           children: [
             NavigationRail(
@@ -163,32 +164,42 @@ class _MainShellScreenState extends State<MainShellScreen>
         ),
         floatingActionButton: _buildFloatingActionButton(selectedIndex),
       );
+    } else {
+      scaffold = Scaffold(
+        body: body,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: _onDestinationSelected,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment),
+              label: 'Orders',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outlined),
+              selectedIcon: Icon(Icons.people),
+              label: 'Customers',
+            ),
+          ],
+        ),
+        floatingActionButton: _buildFloatingActionButton(selectedIndex),
+      );
     }
 
-    return Scaffold(
-      body: body,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: _onDestinationSelected,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment),
-            label: 'Orders',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outlined),
-            selectedIcon: Icon(Icons.people),
-            label: 'Customers',
-          ),
-        ],
-      ),
-      floatingActionButton: _buildFloatingActionButton(selectedIndex),
+    return PopScope(
+      canPop: selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && selectedIndex != 0) {
+          shellState.switchToHomeTab();
+        }
+      },
+      child: scaffold,
     );
   }
 }
