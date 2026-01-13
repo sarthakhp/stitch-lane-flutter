@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../domain/models/customer_filter_options.dart';
-import '../../domain/models/customer_filter_preset.dart';
 import '../../config/app_config.dart';
-import 'styled_filter_chip.dart';
 
 class CustomerFilterDialog extends StatefulWidget {
   final CustomerFilterOptions initialOptions;
@@ -18,28 +16,16 @@ class CustomerFilterDialog extends StatefulWidget {
 
 class _CustomerFilterDialogState extends State<CustomerFilterDialog> {
   late CustomerFilterOptions _options;
-  CustomerFilterPreset? _selectedPreset;
 
   @override
   void initState() {
     super.initState();
     _options = widget.initialOptions;
-    _selectedPreset = _findMatchingPreset(_options);
-  }
-
-  CustomerFilterPreset? _findMatchingPreset(CustomerFilterOptions options) {
-    for (final preset in CustomerFilterPreset.allPresets) {
-      if (preset.options == options) {
-        return preset;
-      }
-    }
-    return null;
   }
 
   void _reset() {
     setState(() {
       _options = const CustomerFilterOptions();
-      _selectedPreset = null;
     });
   }
 
@@ -47,22 +33,9 @@ class _CustomerFilterDialogState extends State<CustomerFilterDialog> {
     Navigator.of(context).pop(_options);
   }
 
-  void _applyPreset(CustomerFilterPreset preset) {
-    setState(() {
-      if (_selectedPreset == preset) {
-        _options = const CustomerFilterOptions();
-        _selectedPreset = null;
-      } else {
-        _options = preset.options;
-        _selectedPreset = preset;
-      }
-    });
-  }
-
   void _updateOption(CustomerFilterOptions newOptions) {
     setState(() {
       _options = newOptions;
-      _selectedPreset = _findMatchingPreset(newOptions);
     });
   }
 
@@ -89,26 +62,6 @@ class _CustomerFilterDialogState extends State<CustomerFilterDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Quick Filters:',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppConfig.spacing8),
-              Wrap(
-                spacing: AppConfig.spacing8,
-                runSpacing: AppConfig.spacing8,
-                children: CustomerFilterPreset.allPresets.map((preset) {
-                  return StyledFilterChip(
-                    icon: preset.icon,
-                    label: preset.name,
-                    isSelected: _selectedPreset == preset,
-                    onSelected: () => _applyPreset(preset),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: AppConfig.spacing16),
               Text(
                 'Status',
                 style: theme.textTheme.titleSmall?.copyWith(

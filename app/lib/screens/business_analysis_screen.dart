@@ -70,73 +70,55 @@ class BusinessAnalysisScreen extends StatelessWidget {
             }
 
             final now = DateTime.now();
-            final firstDayThisMonth = DateTime(now.year, now.month, 1);
-            final firstDayNextMonth = DateTime(now.year, now.month + 1, 1);
-            final firstDayLastMonth = DateTime(now.year, now.month - 1, 1);
-
-            final totalPaidThisMonth = _getPaidTotalInRange(
-              orderState.orders,
-              firstDayThisMonth,
-              firstDayNextMonth,
-            );
-
-            final totalPaidLastMonth = _getPaidTotalInRange(
-              orderState.orders,
-              firstDayLastMonth,
-              firstDayThisMonth,
-            );
-
-            final thisMonthLabel = _getMonthYearLabel(
-              firstDayThisMonth.year,
-              firstDayThisMonth.month,
-            );
-
-            final lastMonthLabel = _getMonthYearLabel(
-              firstDayLastMonth.year,
-              firstDayLastMonth.month,
-            );
-
             final colorScheme = Theme.of(context).colorScheme;
             final textTheme = Theme.of(context).textTheme;
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppConfig.spacing24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'This month ($thisMonthLabel)',
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: AppConfig.spacing8),
-                        Text(
-                          '\u20b9$totalPaidThisMonth',
-                          style: textTheme.displaySmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: AppConfig.spacing24),
-                        const Divider(),
-                        const SizedBox(height: AppConfig.spacing24),
-                        Text(
-                          'Last month ($lastMonthLabel)',
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: AppConfig.spacing8),
-                        Text(
-                          '\u20b9$totalPaidLastMonth',
-                          style: textTheme.displaySmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+            final monthsData = List.generate(6, (index) {
+              final monthDate = DateTime(now.year, now.month - index, 1);
+              final nextMonthDate = DateTime(now.year, now.month - index + 1, 1);
+              final totalPaid = _getPaidTotalInRange(
+                orderState.orders,
+                monthDate,
+                nextMonthDate,
+              );
+              final label = index == 0
+                  ? 'This month (${_getMonthYearLabel(monthDate.year, monthDate.month)})'
+                  : _getMonthYearLabel(monthDate.year, monthDate.month);
+              return (label: label, amount: totalPaid);
+            });
+
+            return SingleChildScrollView(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppConfig.spacing24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (int i = 0; i < monthsData.length; i++) ...[
+                            if (i > 0) ...[
+                              const SizedBox(height: AppConfig.spacing16),
+                              const Divider(),
+                              const SizedBox(height: AppConfig.spacing16),
+                            ],
+                            Text(
+                              monthsData[i].label,
+                              style: textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: AppConfig.spacing8),
+                            Text(
+                              '\u20b9${monthsData[i].amount}',
+                              style: textTheme.displaySmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

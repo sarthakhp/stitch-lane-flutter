@@ -51,12 +51,22 @@ class ContactsService {
   }
 
   static String _normalizePhoneNumber(String phoneNumber) {
-    return phoneNumber.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+    return phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  static String _getLocalNumber(String normalizedNumber) {
+    if (normalizedNumber.length > 10) {
+      return normalizedNumber.substring(normalizedNumber.length - 10);
+    }
+    return normalizedNumber;
   }
 
   static Future<bool> _contactExists(String phoneNumber) async {
     try {
       final normalizedInput = _normalizePhoneNumber(phoneNumber);
+      if (normalizedInput.isEmpty) return false;
+
+      final localInput = _getLocalNumber(normalizedInput);
 
       final contacts = await FlutterContacts.getContacts(
         withProperties: true,
@@ -65,16 +75,15 @@ class ContactsService {
       for (final contact in contacts) {
         for (final phone in contact.phones) {
           final normalizedContactPhone = _normalizePhoneNumber(phone.number);
+          if (normalizedContactPhone.isEmpty) continue;
 
           if (normalizedContactPhone == normalizedInput) {
             return true;
           }
 
-          if (normalizedContactPhone.endsWith(normalizedInput) ||
-              normalizedInput.endsWith(normalizedContactPhone)) {
-            if ((normalizedContactPhone.length - normalizedInput.length).abs() <= 3) {
-              return true;
-            }
+          final localContactPhone = _getLocalNumber(normalizedContactPhone);
+          if (localInput.length >= 10 && localContactPhone == localInput) {
+            return true;
           }
         }
       }

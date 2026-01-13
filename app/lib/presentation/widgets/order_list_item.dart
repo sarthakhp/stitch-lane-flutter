@@ -81,7 +81,8 @@ class OrderListItem extends StatelessWidget {
 
   Widget _buildPaymentInfo(BuildContext context, ColorScheme colorScheme) {
     final remainingAmount = order.value - order.totalPaidAmount;
-    final displayAmount = remainingAmount > 0 ? remainingAmount : 0;
+    final displayAmount =
+        order.isPaid ? order.totalPaidAmount : (remainingAmount > 0 ? remainingAmount : 0);
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
