@@ -94,13 +94,12 @@ class AccountCard extends StatelessWidget {
         ),
       );
 
-      final authState = context.read<AuthState>();
       final customerState = context.read<CustomerState>();
       final orderState = context.read<OrderState>();
       final settingsState = context.read<SettingsState>();
       final backupState = context.read<BackupState>();
 
-      await AuthService.signOut(authState);
+      await AuthService.signOut();
 
       customerState.clearCustomers();
       orderState.clearOrders();

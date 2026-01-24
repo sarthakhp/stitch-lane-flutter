@@ -51,7 +51,11 @@ class BackupService {
     return jsonEncode(backup);
   }
 
-  static Future<void> restoreBackup(String backupJson) async {
+  static Future<void> restoreBackup(
+    String backupJson, {
+    void Function(int current, int total)? onImageProgress,
+    void Function(int current, int total)? onAudioProgress,
+  }) async {
     final backupData = jsonDecode(backupJson) as Map<String, dynamic>;
     _validateBackup(backupData);
 
@@ -75,7 +79,7 @@ class BackupService {
 
     try {
       AppLogger.info('Starting image download from Drive after restore');
-      await ImageSyncService.downloadImagesFromDrive();
+      await ImageSyncService.downloadImagesFromDrive(onProgress: onImageProgress);
       AppLogger.info('Images restored successfully');
     } catch (e) {
       AppLogger.error('Failed to restore images from Drive', e);
@@ -83,7 +87,7 @@ class BackupService {
 
     try {
       AppLogger.info('Starting audio download from Drive after restore');
-      await AudioSyncService.downloadAudiosFromDrive();
+      await AudioSyncService.downloadAudiosFromDrive(onProgress: onAudioProgress);
       AppLogger.info('Audio files restored successfully');
     } catch (e) {
       AppLogger.error('Failed to restore audio files from Drive', e);

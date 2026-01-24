@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -9,9 +10,9 @@ import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
-import 'screens/backup_restore_check_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell_screen.dart';
+import 'screens/backup_restore_check_screen.dart';
 import 'utils/app_logger.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
@@ -100,7 +101,6 @@ class _AppInitializerState extends State<AppInitializer> {
   void initState() {
     super.initState();
     _initializeApp();
-    _setupAuthListener();
   }
 
   @override
@@ -109,21 +109,7 @@ class _AppInitializerState extends State<AppInitializer> {
     super.dispose();
   }
 
-  void _setupAuthListener() {
-    AuthService.authStateChanges().listen((user) {
-      if (mounted) {
-        final authState = context.read<AuthState>();
-        if (user != null) {
-          authState.setUser(user);
-        } else {
-          authState.signOut();
-        }
-      }
-    });
-  }
-
   Future<void> _initializeApp() async {
-    final authState = context.read<AuthState>();
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
 
@@ -132,7 +118,6 @@ class _AppInitializerState extends State<AppInitializer> {
     final currentUser = AuthService.getCurrentUser();
 
     if (currentUser != null) {
-      authState.setUser(currentUser);
       await AuthService.silentSignIn();
     }
 
@@ -229,20 +214,61 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authState = context.watch<AuthState>();
+  State<AuthGate> createState() => _AuthGateState();
+}
 
-    if (authState.isAuthenticated) {
-      if (authState.pendingBackupCheck) {
-        return const BackupRestoreCheckScreen();
-      }
-      return const MainShellScreen();
-    }
-    return const LoginScreen();
+class _AuthGateState extends State<AuthGate> {
+  int _refreshKey = 0;
+
+  void _onBackupChoiceCompleted() {
+    setState(() {
+      _refreshKey++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        final user = snapshot.data ?? FirebaseAuth.instance.currentUser;
+
+        if (user != null) {
+          return FutureBuilder<bool>(
+            key: ValueKey(_refreshKey),
+            future: OnboardingService.hasCompletedBackupChoice(user.uid),
+            builder: (context, choiceSnapshot) {
+              if (choiceSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              final hasCompleted = choiceSnapshot.data ?? false;
+
+              if (!hasCompleted) {
+                return BackupRestoreCheckScreen(
+                  onComplete: () async {
+                    await OnboardingService.setBackupChoiceCompleted(user.uid);
+                    _onBackupChoiceCompleted();
+                  },
+                );
+              }
+
+              return const MainShellScreen();
+            },
+          );
+        }
+
+        return const LoginScreen();
+      },
+    );
   }
 }
+
+
 

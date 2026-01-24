@@ -7,12 +7,14 @@ class BackupState extends ChangeNotifier {
   String? _errorMessage;
   BackupInfo? _backupInfo;
   double _progress = 0.0;
+  String? _progressMessage;
 
   bool get isLoading => _isLoading;
   bool get isCheckingBackup => _isCheckingBackup;
   String? get errorMessage => _errorMessage;
   BackupInfo? get backupInfo => _backupInfo;
   double get progress => _progress;
+  String? get progressMessage => _progressMessage;
 
   bool get hasBackup => _backupInfo != null;
 
@@ -26,12 +28,19 @@ class BackupState extends ChangeNotifier {
     if (loading) {
       _errorMessage = null;
       _progress = 0.0;
+      _progressMessage = null;
     }
     notifyListeners();
   }
 
   void setProgress(double progress) {
     _progress = progress;
+    notifyListeners();
+  }
+
+  void setDetailedProgress(double progress, String message) {
+    _progress = progress;
+    _progressMessage = message;
     notifyListeners();
   }
 
@@ -56,6 +65,7 @@ class BackupState extends ChangeNotifier {
     _isLoading = false;
     _errorMessage = null;
     _progress = 0.0;
+    _progressMessage = null;
     notifyListeners();
   }
 }

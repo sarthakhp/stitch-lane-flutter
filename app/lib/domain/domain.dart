@@ -24,6 +24,7 @@ export 'services/image_storage_service.dart';
 export 'services/image_sync_service.dart';
 export 'services/notification_router.dart';
 export 'services/notification_service.dart';
+export 'services/onboarding_service.dart';
 export 'services/order_service.dart';
 export 'services/pending_orders_reminder_service.dart';
 export 'services/permission_service.dart';

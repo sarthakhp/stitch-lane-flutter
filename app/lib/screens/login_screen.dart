@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
+import 'backup_restore_check_screen.dart';
+import 'main_shell_screen.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/error_message_card.dart';
 
@@ -58,11 +60,30 @@ class LoginScreen extends StatelessWidget {
 
   Future<void> _handleGoogleSignIn(BuildContext context) async {
     final authState = context.read<AuthState>();
-    authState.setPendingBackupCheck(pending: true);
-    await AuthService.signInWithGoogle(authState);
+    authState.setLoading(true);
 
-    if (!authState.isAuthenticated) {
-      authState.clearBackupCheck();
+    final result = await AuthService.signInWithGoogle();
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (result) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (builderContext) => BackupRestoreCheckScreen(
+            onComplete: () {
+              Navigator.of(builderContext).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MainShellScreen()),
+                (route) => false,
+              );
+            },
+          ),
+        ),
+        (route) => false,
+      );
+    } else {
+      authState.setLoading(false);
     }
   }
 }

@@ -53,7 +53,9 @@ class ImageSyncService {
     }
   }
 
-  static Future<void> downloadImagesFromDrive() async {
+  static Future<void> downloadImagesFromDrive({
+    void Function(int current, int total)? onProgress,
+  }) async {
     try {
       AppLogger.info('Starting image download from Drive');
 
@@ -61,7 +63,9 @@ class ImageSyncService {
       final driveImages = await DriveServiceImageOperations.listImagesInFolder(driveApi);
       AppLogger.info('Found ${driveImages.length} images in Drive');
 
-      for (final imageFile in driveImages) {
+      final total = driveImages.length;
+      for (int i = 0; i < total; i++) {
+        final imageFile = driveImages[i];
         final imageName = imageFile['name'] as String;
         final imageId = imageFile['id'] as String;
 
@@ -78,6 +82,7 @@ class ImageSyncService {
           );
           AppLogger.info('Downloaded and saved image: $imageName');
         }
+        onProgress?.call(i + 1, total);
       }
 
       AppLogger.info('Image download completed successfully');

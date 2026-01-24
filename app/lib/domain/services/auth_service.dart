@@ -5,8 +5,8 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:hive/hive.dart';
 import '../../config/auth_config.dart';
 import '../../backend/backend.dart';
-import '../state/auth_state.dart';
 import '../../utils/app_logger.dart';
+import 'onboarding_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -35,40 +35,34 @@ class AuthService {
     }
   }
 
-  static Future<void> signInWithGoogle(AuthState authState) async {
+  static Future<bool> signInWithGoogle() async {
     try {
-      authState.setLoading(true);
-      authState.clearError();
-
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
-        authState.setLoading(false);
-        return;
+        return false;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      
-      authState.setUser(userCredential.user);
-      authState.setLoading(false);
+      await _auth.signInWithCredential(credential);
+
+      return true;
     } catch (e) {
-      authState.setError('Failed to sign in with Google: ${e.toString()}');
+      AppLogger.error('signInWithGoogle failed', e);
+      rethrow;
     }
   }
 
-  static Future<void> signOut(AuthState authState) async {
+  static Future<void> signOut() async {
     try {
-      authState.setLoading(true);
-      authState.clearError();
-
-      AppLogger.info('Signing out and clearing local data...');
+      final userId = _auth.currentUser?.uid;
 
       await Future.wait([
         _auth.signOut(),
@@ -77,17 +71,17 @@ class AuthService {
 
       await _clearLocalDatabases();
 
-      authState.signOut();
-      AppLogger.info('Sign out complete');
+      if (userId != null) {
+        await OnboardingService.clearBackupChoice(userId);
+      }
     } catch (e) {
-      authState.setError('Failed to sign out: ${e.toString()}');
+      AppLogger.error('signOut failed', e);
+      rethrow;
     }
   }
 
   static Future<void> _clearLocalDatabases() async {
     try {
-      AppLogger.info('Clearing Hive databases...');
-
       final customersBox = Hive.box<Customer>('customers_box');
       final ordersBox = Hive.box<Order>('orders_box');
       final settingsBox = Hive.box<AppSettings>('settings_box');
@@ -95,8 +89,6 @@ class AuthService {
       await customersBox.clear();
       await ordersBox.clear();
       await settingsBox.clear();
-
-      AppLogger.info('Local databases cleared');
     } catch (e) {
       AppLogger.error('Error clearing databases', e);
       rethrow;

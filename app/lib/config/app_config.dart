@@ -16,7 +16,7 @@ class AppConfig {
   static const int minNameLength = 2;
   static const int maxNameLength = 100;
   static const int minPhoneLength = 10;
-  static const int maxDescriptionLength = 500;
+  static const int maxDescriptionLength = 5000;
 
   static const int minTitleLength = 2;
   static const int maxTitleLength = 100;

@@ -53,7 +53,9 @@ class AudioSyncService {
     }
   }
 
-  static Future<void> downloadAudiosFromDrive() async {
+  static Future<void> downloadAudiosFromDrive({
+    void Function(int current, int total)? onProgress,
+  }) async {
     try {
       AppLogger.info('Starting audio download from Drive');
 
@@ -63,7 +65,9 @@ class AudioSyncService {
 
       final directory = await getApplicationDocumentsDirectory();
 
-      for (final audioFile in driveAudios) {
+      final total = driveAudios.length;
+      for (int i = 0; i < total; i++) {
+        final audioFile = driveAudios[i];
         final audioName = audioFile['name'] as String;
         final audioId = audioFile['id'] as String;
 
@@ -74,6 +78,7 @@ class AudioSyncService {
           await file.writeAsBytes(audioBytes);
           AppLogger.info('Downloaded and saved audio: $audioName');
         }
+        onProgress?.call(i + 1, total);
       }
 
       AppLogger.info('Audio download completed successfully');

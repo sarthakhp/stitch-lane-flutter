@@ -1,20 +1,24 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
 import 'widgets/app_logo.dart';
+import 'widgets/confirmation_dialog.dart';
 
 class BackupRestoreCheckScreen extends StatefulWidget {
   final bool? hasBackup;
   final String? errorMessage;
   final bool alreadyChecked;
+  final VoidCallback? onComplete;
 
   const BackupRestoreCheckScreen({
     super.key,
     this.hasBackup,
     this.errorMessage,
     this.alreadyChecked = false,
+    this.onComplete,
   });
 
   @override
@@ -90,12 +94,25 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         return;
       }
 
-      backupState.setProgress(0.4);
-      backupState.setProgress(0.6);
+      backupState.setDetailedProgress(0.4, 'Restoring data...');
 
-      await BackupService.restoreBackup(backupJson);
+      await BackupService.restoreBackup(
+        backupJson,
+        onImageProgress: (current, total) {
+          backupState.setDetailedProgress(
+            0.5 + (current / total) * 0.2,
+            'Restoring images $current / $total',
+          );
+        },
+        onAudioProgress: (current, total) {
+          backupState.setDetailedProgress(
+            0.7 + (current / total) * 0.2,
+            'Restoring audio $current / $total',
+          );
+        },
+      );
 
-      backupState.setProgress(0.9);
+      backupState.setDetailedProgress(0.95, 'Loading data...');
 
       await CustomerService.loadCustomers(customerState, customerRepository);
       await OrderService.loadOrders(orderState, orderRepository);
@@ -112,7 +129,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
             backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
-        context.read<AuthState>().clearBackupCheck();
+        widget.onComplete?.call();
       }
     } catch (e) {
       backupState.setError(e.toString());
@@ -127,8 +144,19 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
     }
   }
 
-  void _handleSkip() {
-    context.read<AuthState>().clearBackupCheck();
+  Future<void> _handleSkip() async {
+    final confirmed = await ConfirmationDialog.show(
+      context: context,
+      title: 'Start Fresh?',
+      content:
+          'Your previous backup data will not be restored and may be permanently lost if you continue.\n\nAre you sure you want to start fresh?',
+      confirmText: 'Start Fresh',
+      cancelText: 'Go Back',
+    );
+
+    if (confirmed && mounted) {
+      widget.onComplete?.call();
+    }
   }
 
   @override
@@ -153,7 +181,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
                 }
 
                 if (backupState.isLoading) {
-                  return _buildRestoringView(backupState.progress);
+                  return _buildRestoringView(backupState);
                 }
 
                 return _buildBackupFoundView();
@@ -250,6 +278,10 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   Widget _buildBackupFoundView() {
+    final user = FirebaseAuth.instance.currentUser;
+    final displayName = user?.displayName;
+    final email = user?.email;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -268,6 +300,21 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
               ),
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: AppConfig.spacing8),
+        if (displayName != null)
+          Text(
+            displayName,
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+        if (email != null)
+          Text(
+            email,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+            textAlign: TextAlign.center,
+          ),
         const SizedBox(height: AppConfig.spacing16),
         Text(
           'We found a backup for your account.\nWould you like to restore it?',
@@ -277,20 +324,49 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppConfig.spacing32),
-        FilledButton(
-          onPressed: _handleRestore,
-          child: const Text('Restore Backup'),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _handleRestore,
+            icon: const Icon(Icons.cloud_download),
+            label: const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppConfig.spacing8),
+              child: Text(
+                'Restore Backup',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
         ),
-        const SizedBox(height: AppConfig.spacing16),
-        OutlinedButton(
+        const SizedBox(height: AppConfig.spacing24),
+        TextButton(
           onPressed: _handleSkip,
-          child: const Text('Start Fresh'),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          child: const Text('Skip and start fresh'),
+        ),
+        const SizedBox(height: AppConfig.spacing8),
+        TextButton.icon(
+          onPressed: _handleSignOut,
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          icon: const Icon(Icons.logout, size: 18),
+          label: const Text('Sign out'),
         ),
       ],
     );
   }
 
-  Widget _buildRestoringView(double progress) {
+  Future<void> _handleSignOut() async {
+    await AuthService.signOut();
+  }
+
+  Widget _buildRestoringView(BackupState backupState) {
+    final progress = backupState.progress;
+    final message = backupState.progressMessage;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -304,7 +380,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         ),
         const SizedBox(height: AppConfig.spacing16),
         Text(
-          '${(progress * 100).toInt()}%',
+          message ?? '${(progress * 100).toInt()}%',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
