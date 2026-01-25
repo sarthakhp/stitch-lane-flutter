@@ -42,17 +42,13 @@ class AutoBackupService {
       await _initializeForBackground();
 
       if (!await _checkBatteryLevel()) {
-        const message = 'Battery level too low (below 15%)';
-        AppLogger.warning(message);
-        await NotificationService.showBackupFailedNotification(message);
+        AppLogger.warning('Battery level too low (below 15%)');
         await _scheduleNextIfEnabled();
         return;
       }
 
       if (!await _checkDriveAccess()) {
-        const message = 'Google Drive not accessible. Please sign in manually.';
-        AppLogger.warning(message);
-        await NotificationService.showBackupFailedNotification(message);
+        AppLogger.warning('Google Drive not accessible. Please sign in manually.');
         await _scheduleNextIfEnabled();
         return;
       }
@@ -74,9 +70,6 @@ class AutoBackupService {
     } catch (e) {
       AppLogger.error('Auto-backup failed', e);
       await NotificationService.cancelBackupInProgressNotification();
-      await NotificationService.showBackupFailedNotification(
-        'Backup failed: ${e.toString().substring(0, e.toString().length.clamp(0, 100))}',
-      );
       await _scheduleNextIfEnabled();
       rethrow;
     }
