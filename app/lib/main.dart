@@ -123,6 +123,7 @@ class _AppInitializerState extends State<AppInitializer> {
 
     await SettingsService.loadSettings(settingsState, settingsRepository);
 
+    await _initializeDebugLogs(settingsState);
     await _initializeAutoBackup(settingsState, settingsRepository);
     await _initializePendingOrdersReminder(settingsState);
 
@@ -130,6 +131,30 @@ class _AppInitializerState extends State<AppInitializer> {
       setState(() {
         _isInitializing = false;
       });
+    }
+  }
+
+  Future<void> _initializeDebugLogs(SettingsState settingsState) async {
+    try {
+      if (settingsState.debugLogsEnabled) {
+        await AppLogger.enableFileLogging().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            try {
+              AppLogger.warning('Debug logs initialization timed out');
+            } catch (_) {
+              // Silently fail
+            }
+          },
+        );
+      }
+    } catch (e) {
+      // Silently fail - don't let debug logs initialization block app startup
+      try {
+        AppLogger.warning('Failed to initialize debug logs: $e');
+      } catch (_) {
+        // Even if logging the warning fails, continue app startup
+      }
     }
   }
 

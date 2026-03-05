@@ -23,13 +23,14 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       autoBackupEnabledRaw: fields[3] as bool?,
       autoBackupTimeRaw: fields[4] as String?,
       lastBackupTime: fields[5] as DateTime?,
+      debugLogsEnabledRaw: fields[6] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.dueDateWarningThreshold)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(4)
       ..write(obj.autoBackupTimeRaw)
       ..writeByte(5)
-      ..write(obj.lastBackupTime);
+      ..write(obj.lastBackupTime)
+      ..writeByte(6)
+      ..write(obj.debugLogsEnabledRaw);
   }
 
   @override

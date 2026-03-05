@@ -22,6 +22,7 @@ export 'services/drive_service.dart';
 export 'services/gemini_service.dart';
 export 'services/image_storage_service.dart';
 export 'services/image_sync_service.dart';
+export 'services/log_manager_service.dart';
 export 'services/notification_router.dart';
 export 'services/notification_service.dart';
 export 'services/onboarding_service.dart';

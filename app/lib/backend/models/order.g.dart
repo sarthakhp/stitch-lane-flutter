@@ -26,10 +26,10 @@ class OrderAdapter extends TypeAdapter<Order> {
       status: fields[6] as OrderStatus,
       value: fields[7] as int,
       isPaid: fields[8] as bool,
-      imagePaths: (fields[9] as List?)?.cast<String>() ?? [],
+      imagePaths: (fields[9] as List).cast<String>(),
       paymentDate: fields[10] as DateTime?,
-      payments: (fields[11] as List?)?.cast<PaymentEntry>() ?? [],
-      totalPaidAmount: fields[12] as int? ?? 0,
+      payments: (fields[11] as List).cast<PaymentEntry>(),
+      totalPaidAmount: fields[12] as int,
     );
   }
 

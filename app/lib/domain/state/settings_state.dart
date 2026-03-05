@@ -15,6 +15,7 @@ class SettingsState extends ChangeNotifier {
   bool get autoBackupEnabled => _settings.autoBackupEnabled;
   String get autoBackupTime => _settings.autoBackupTime;
   DateTime? get lastBackupTime => _settings.lastBackupTime;
+  bool get debugLogsEnabled => _settings.debugLogsEnabled;
 
   void setSettings(AppSettings settings) {
     _settings = settings;

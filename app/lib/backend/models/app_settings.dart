@@ -22,10 +22,14 @@ class AppSettings {
   @HiveField(5)
   final DateTime? lastBackupTime;
 
+  @HiveField(6)
+  final bool? debugLogsEnabledRaw;
+
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
   String get autoBackupTime => autoBackupTimeRaw ?? '03:00';
+  bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
 
   AppSettings({
     this.dueDateWarningThreshold = 3,
@@ -34,6 +38,7 @@ class AppSettings {
     this.autoBackupEnabledRaw,
     this.autoBackupTimeRaw,
     this.lastBackupTime,
+    this.debugLogsEnabledRaw,
   });
 
   AppSettings copyWith({
@@ -43,6 +48,7 @@ class AppSettings {
     bool? autoBackupEnabled,
     String? autoBackupTime,
     DateTime? lastBackupTime,
+    bool? debugLogsEnabled,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -51,6 +57,7 @@ class AppSettings {
       autoBackupEnabledRaw: autoBackupEnabled ?? this.autoBackupEnabled,
       autoBackupTimeRaw: autoBackupTime ?? this.autoBackupTime,
       lastBackupTime: lastBackupTime ?? this.lastBackupTime,
+      debugLogsEnabledRaw: debugLogsEnabled ?? this.debugLogsEnabled,
     );
   }
 
@@ -62,6 +69,7 @@ class AppSettings {
       'autoBackupEnabled': autoBackupEnabled,
       'autoBackupTime': autoBackupTime,
       'lastBackupTime': lastBackupTime?.toIso8601String(),
+      'debugLogsEnabled': debugLogsEnabled,
     };
   }
 
@@ -80,12 +88,13 @@ class AppSettings {
       autoBackupEnabledRaw: json['autoBackupEnabled'] as bool?,
       autoBackupTimeRaw: json['autoBackupTime'] as String?,
       lastBackupTime: backupTime,
+      debugLogsEnabledRaw: json['debugLogsEnabled'] as bool?,
     );
   }
 
   @override
   String toString() {
-    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime)';
+    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime, debugLogsEnabled: $debugLogsEnabled)';
   }
 
   @override
@@ -97,7 +106,8 @@ class AppSettings {
            other.pendingOrdersReminderTime == pendingOrdersReminderTime &&
            other.autoBackupEnabled == autoBackupEnabled &&
            other.autoBackupTime == autoBackupTime &&
-           other.lastBackupTime == lastBackupTime;
+           other.lastBackupTime == lastBackupTime &&
+           other.debugLogsEnabled == debugLogsEnabled;
   }
 
   @override
@@ -108,6 +118,7 @@ class AppSettings {
     autoBackupEnabled,
     autoBackupTime,
     lastBackupTime,
+    debugLogsEnabled,
   );
 }
 
