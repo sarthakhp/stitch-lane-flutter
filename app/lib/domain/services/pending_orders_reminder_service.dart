@@ -166,6 +166,9 @@ class PendingOrdersReminderService {
     if (!Hive.isAdapterRegistered(4)) {
       Hive.registerAdapter(MeasurementAdapter());
     }
+    if (!Hive.isAdapterRegistered(5)) {
+      Hive.registerAdapter(PaymentEntryAdapter());
+    }
   }
 }
 

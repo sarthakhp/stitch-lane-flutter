@@ -15,11 +15,8 @@ class AppLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDarkMode
-        ?
-        'assets/images/icon_for_white_background.png'
-        :
-        'assets/images/icon_for_dark_background.png'
-        ;
+        ? 'assets/images/icon_for_dark_background.png'
+        : 'assets/images/icon_for_white_background.png';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
