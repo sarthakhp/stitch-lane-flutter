@@ -1,11 +1,11 @@
 {
-    "name": "Stitch Lane",
-    "short_name": "Stitch Lane",
+    "name": "Stitch Genie",
+    "short_name": "Stitch Genie",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
     "theme_color": "#2196F3",
-    "description": "Stitch Lane App",
+    "description": "Stitch Genie App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

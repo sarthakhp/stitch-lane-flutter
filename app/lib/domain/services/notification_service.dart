@@ -6,12 +6,12 @@ import '../models/pending_orders_data.dart';
 
 enum _NotificationChannel {
   backup(
-    id: 'stitch_lane_backup',
+    id: 'stitch_genie_backup',
     name: 'Backup Notifications',
     description: 'Notifications for automatic backup status',
   ),
   reminder(
-    id: 'stitch_lane_reminders',
+    id: 'stitch_genie_reminders',
     name: 'Order Reminders',
     description: 'Daily reminders about pending orders',
   );

@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
 import 'config/routes.dart';
+import 'constants/app_constants.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell_screen.dart';
 import 'screens/backup_restore_check_screen.dart';
@@ -51,11 +52,11 @@ void main() async {
   await DatabaseService.initialize();
   await NotificationService.initialize();
   await BackgroundTaskDispatcher.initialize(callbackDispatcher);
-  runApp(const StitchLaneApp());
+  runApp(const StitchGenieApp());
 }
 
-class StitchLaneApp extends StatelessWidget {
-  const StitchLaneApp({super.key});
+class StitchGenieApp extends StatelessWidget {
+  const StitchGenieApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +198,7 @@ class _AppInitializerState extends State<AppInitializer> {
     }
 
     return MaterialApp(
-      title: 'Stitch Lane',
+      title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       navigatorObservers: [routeObserver],

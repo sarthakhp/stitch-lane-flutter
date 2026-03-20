@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../utils/app_logger.dart';
+import '../../constants/app_constants.dart';
 
 class LogManagerService {
   static Future<String?> getLogsFromLastMinutes(int minutes) async {
@@ -100,7 +101,7 @@ class LogManagerService {
 
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
-      final logFileName = 'stitch_lane_logs_$timestamp.txt';
+      final logFileName = 'stitch_genie_logs_$timestamp.txt';
       final logFile = File('${tempDir.path}/$logFileName');
 
       await logFile.writeAsString(logsContent);
@@ -108,7 +109,7 @@ class LogManagerService {
       final result = await SharePlus.instance.share(
         ShareParams(
           files: [XFile(logFile.path)],
-          subject: 'Stitch Lane App Logs (Last $minutes minutes)',
+          subject: '${AppConstants.appName} App Logs (Last $minutes minutes)',
           text: 'App logs from the last $minutes minutes',
         ),
       );

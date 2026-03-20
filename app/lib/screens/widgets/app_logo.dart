@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
+import '../../constants/app_constants.dart';
 
 class AppLogo extends StatelessWidget {
   final double size;
@@ -16,7 +17,7 @@ class AppLogo extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDarkMode
         ? 'assets/images/icon_for_dark_background.png'
-        : 'assets/images/icon_for_white_background.png';
+        : 'assets/images/icon_for_light_background.png';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -30,7 +31,7 @@ class AppLogo extends StatelessWidget {
         if (showText) ...[
           const SizedBox(height: AppConfig.spacing24),
           Text(
-            'Stitch Lane',
+            AppConstants.appName,
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,

@@ -1,5 +1,5 @@
 name: stitch_lane_app
-description: Stitch Lane Flutter Application
+description: StitchGenie Flutter Application
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -64,7 +64,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: false
-  image_path: "assets/images/icon_for_dark_background.png"
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/images/icon_for_dark_background.png"
+  image_path: "assets/images/icon_for_light_background.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/icon_for_light_background.png"
 

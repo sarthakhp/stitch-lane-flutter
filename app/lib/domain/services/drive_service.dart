@@ -4,10 +4,12 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'auth_service.dart';
 import '../../utils/app_logger.dart';
+import '../../constants/app_constants.dart';
 
 class DriveService {
-  static const String appFolderName = 'Stitch Lane';
-  static const String backupFileName = 'stitch_lane_backup.json';
+  static const String appFolderName = AppConstants.appName;
+  static const String backupFileName = 'stitch_genie_backup.json';
+  static const String _legacyBackupFileName = 'stitch_lane_backup.json';
   static const String imagesFolderName = 'images';
   static const String audiosFolderName = 'audios';
 
@@ -66,14 +68,19 @@ class DriveService {
   }
 
   static Future<String?> _findBackupFile(drive.DriveApi driveApi, String folderId) async {
-    final fileList = await driveApi.files.list(
-      q: "name='$backupFileName' and '$folderId' in parents and trashed=false",
-      spaces: 'appDataFolder',
-      $fields: 'files(id, name)',
-    );
+    for (final fileName in [backupFileName, _legacyBackupFileName]) {
+      final fileList = await driveApi.files.list(
+        q: "name='$fileName' and '$folderId' in parents and trashed=false",
+        spaces: 'appDataFolder',
+        $fields: 'files(id, name)',
+      );
 
-    if (fileList.files != null && fileList.files!.isNotEmpty) {
-      return fileList.files!.first.id;
+      if (fileList.files != null && fileList.files!.isNotEmpty) {
+        if (fileName == _legacyBackupFileName) {
+          AppLogger.info('Found legacy backup file, will migrate to new name on next backup');
+        }
+        return fileList.files!.first.id;
+      }
     }
 
     return null;
@@ -155,17 +162,22 @@ class DriveService {
         return null;
       }
 
-      final fileList = await driveApi.files.list(
-        q: "name='$backupFileName' and '$folderId' in parents and trashed=false",
-        spaces: 'appDataFolder',
-        $fields: 'files(id, name, size, modifiedTime)',
-      );
-
-      if (fileList.files == null || fileList.files!.isEmpty) {
-        return null;
+      drive.File? file;
+      for (final fileName in [backupFileName, _legacyBackupFileName]) {
+        final fileList = await driveApi.files.list(
+          q: "name='$fileName' and '$folderId' in parents and trashed=false",
+          spaces: 'appDataFolder',
+          $fields: 'files(id, name, size, modifiedTime)',
+        );
+        if (fileList.files != null && fileList.files!.isNotEmpty) {
+          file = fileList.files!.first;
+          break;
+        }
       }
 
-      final file = fileList.files!.first;
+      if (file == null) {
+        return null;
+      }
       final backupSize = int.tryParse(file.size ?? '0') ?? 0;
 
       final images = await DriveServiceImageOperations.listImagesInFolder(driveApi);

@@ -34,7 +34,7 @@ class HomeTab extends StatelessWidget {
 
     return Scaffold(
       appBar: CustomAppBar(
-        title: const Text('Stitch Lane'),
+        title: const Text(AppConstants.appName),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
