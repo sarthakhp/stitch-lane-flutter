@@ -16,6 +16,11 @@
 .env.local
 .env.*.local
 
+# Android signing
+app/android/key.properties
+*.jks
+*.keystore
+
 # Documentation (project-specific)
 *.md.backup
 
