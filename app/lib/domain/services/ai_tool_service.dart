@@ -5,7 +5,7 @@ import '../../backend/database/sqlite_database.dart';
 const int _defaultMaxRows = 50;
 
 /// Max response size in characters (~tokens). 8000 chars ≈ 2000 tokens.
-const int _maxResponseSize = 8000;
+const int _maxResponseSize = 6000;
 
 class AiToolResult {
   final bool success;
@@ -41,16 +41,10 @@ class AiToolResult {
 class AiToolService {
   static const String schemaDescription = '''
 Tables:
-- customers: id (TEXT PK), name (TEXT), phone_number (TEXT), description (TEXT), created (TEXT ISO8601)
-- orders: id (TEXT PK), customer_id (TEXT FK→customers), title (TEXT), due_date (TEXT ISO8601), description (TEXT), created (TEXT ISO8601), status (TEXT: pending/ready/done), value (INTEGER, in smallest currency unit), is_paid (INTEGER 0/1), total_paid_amount (INTEGER), payments (TEXT JSON array), image_paths (TEXT JSON array), payment_date (TEXT ISO8601)
-- measurements: id (TEXT PK), customer_id (TEXT FK→customers), description (TEXT), created (TEXT ISO8601), modified (TEXT ISO8601), audio_file_path (TEXT)
-- settings: key (TEXT PK), due_date_warning_threshold (INTEGER), pending_orders_reminder_enabled (INTEGER 0/1), pending_orders_reminder_time (TEXT HH:mm), auto_backup_enabled (INTEGER 0/1), auto_backup_time (TEXT HH:mm), last_backup_time (TEXT ISO8601), debug_logs_enabled (INTEGER 0/1)
-
-Notes:
-- Dates are ISO 8601 strings (e.g. 2025-12-25T00:00:00.000). Use string comparison for date filtering.
-- Boolean fields are INTEGER 0 or 1.
-- payments and image_paths are JSON-encoded arrays stored as TEXT.
-- value and total_paid_amount are in smallest currency unit (e.g. paise for INR).''';
+- customers(id TEXT PK, name TEXT, phone_number TEXT, description TEXT, created TEXT)
+- orders(id TEXT PK, customer_id TEXT FK→customers, title TEXT, due_date TEXT, description TEXT, created TEXT, status TEXT[pending/ready/done], value INT rupees, is_paid INT 0/1, total_paid_amount INT rupees, payments TEXT JSON, image_paths TEXT JSON, payment_date TEXT)
+- measurements(id TEXT PK, customer_id TEXT FK→customers, description TEXT, created TEXT, modified TEXT, audio_file_path TEXT)
+All dates are ISO8601 strings. Booleans are 0/1. payments is a JSON array: [{"id","date","amount"}]. Use json_each(payments) to query by payment date.''';
 
   /// Execute a read-only SQL query. Only SELECT statements are allowed.
   static Future<AiToolResult> queryDatabase(String sql, {int? maxRows}) async {

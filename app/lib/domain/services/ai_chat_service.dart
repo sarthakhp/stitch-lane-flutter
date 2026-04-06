@@ -1,13 +1,11 @@
-import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
-import 'package:toonx/toonx.dart' as toonx;
 import '../../utils/app_logger.dart';
 import 'ai_chat_config.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
-import 'ai_tool_service.dart';
+import 'ai_executor.dart';
 
 class AiChatService {
   ChatGoogleGenerativeAI? _model;
@@ -29,6 +27,8 @@ class AiChatService {
       defaultOptions: const ChatGoogleGenerativeAIOptions(
         model: aiModelName,
         tools: aiTools,
+        responseMimeType: 'application/json',
+        responseSchema: aiResponseSchema,
       ),
     );
   }
@@ -49,7 +49,11 @@ class AiChatService {
     return _exchanges
         .expand((e) => [
               AiChatMessage(text: e.userText, isUser: true),
-              AiChatMessage(text: e.assistantText, isUser: false),
+              AiChatMessage(
+                text: e.assistantText,
+                isUser: false,
+                uiComponents: e.uiComponents,
+              ),
             ])
         .toList();
   }
@@ -72,147 +76,40 @@ class AiChatService {
   Future<AiChatResponse> sendMessage(String userMessage) async {
     _ensureModel();
 
-    final history = AiChatHistory.buildLangchainHistory(buildAiSystemPrompt(), _exchanges);
-    history.add(ChatMessage.humanText(userMessage));
-
-    final toolCallRecords = <ToolCallRecord>[];
-    var exchangeUsage = AiTokenUsage.zero;
-    int invokeCount = 0;
-    final log = StringBuffer();
-
-    _logHistory(log, history);
+    var systemPrompt = buildAiSystemPrompt();
+    final historyText = AiChatHistory.buildHistoryText(_exchanges);
+    if (historyText != null) {
+      systemPrompt += '\n\nConversation history:\n$historyText';
+    }
+    final history = <ChatMessage>[
+      ChatMessage.system(systemPrompt),
+      ChatMessage.humanText(userMessage),
+    ];
 
     try {
-      var result = await _model!.invoke(PromptValue.chat(history));
-      var stepUsage = _usageFrom(result);
-      exchangeUsage = exchangeUsage + stepUsage;
-      invokeCount++;
-      var aiMessage = result.output;
-
-      _logInvoke(log, invokeCount, 'initial', stepUsage, aiMessage);
-      history.add(aiMessage);
-
-      while (aiMessage.toolCalls.isNotEmpty) {
-        final toolCall = aiMessage.toolCalls.first;
-        final resultJson = await _executeTool(toolCall, toolCallRecords, log);
-
-        history.add(ChatMessage.tool(toolCallId: toolCall.id, content: resultJson));
-
-        result = await _model!.invoke(PromptValue.chat(history));
-        stepUsage = _usageFrom(result);
-        exchangeUsage = exchangeUsage + stepUsage;
-        invokeCount++;
-        aiMessage = result.output;
-
-        _logInvoke(log, invokeCount, 'after tool', stepUsage, aiMessage, historyLength: history.length);
-        history.add(aiMessage);
-      }
-
-      final responseText = aiMessage.content;
-
-      _logSummary(log, userMessage, responseText, toolCallRecords.length, invokeCount, exchangeUsage);
-      AppLogger.info('AI Exchange:\n$log');
+      final result = await AiExecutor.run(_model!, history, systemPrompt: systemPrompt);
 
       _exchanges.add(ChatExchange(
         userText: userMessage,
-        assistantText: responseText,
-        toolCalls: toolCallRecords,
+        assistantText: result.responseText,
+        toolCalls: result.toolCalls,
+        uiComponents: result.uiComponents,
       ));
-      _sessionUsage = _sessionUsage + exchangeUsage;
+      _sessionUsage = _sessionUsage + result.usage;
 
-      return AiChatResponse(text: responseText, usage: exchangeUsage);
+      return AiChatResponse(
+        text: result.responseText,
+        usage: result.usage,
+        uiComponents: result.uiComponents,
+      );
     } catch (e) {
       AppLogger.error('AI chat error', e);
-      AppLogger.info('AI Exchange (failed):\n$log');
-      return AiChatResponse(text: 'Something went wrong. Please try again.', usage: exchangeUsage);
-    }
-  }
-
-  Future<String> _executeTool(
-    AIChatMessageToolCall toolCall,
-    List<ToolCallRecord> records,
-    StringBuffer log,
-  ) async {
-    if (toolCall.name == 'queryDatabase') {
-      final sql = toolCall.arguments['sql'] as String;
-      log.writeln('  tool sql: $sql');
-
-      final toolResult = await AiToolService.queryDatabase(sql);
-      final resultToon = toonx.encode(toolResult.toJson());
-
-      if (toolResult.success) {
-        log.writeln('  tool result: ${toolResult.totalRows} rows\n  $resultToon');
-      } else {
-        log.writeln('  tool result ERROR: ${toolResult.error}');
-      }
-
-      records.add(ToolCallRecord(
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-        response: resultToon,
-      ));
-      return resultToon;
-    }
-
-    final errorJson = jsonEncode({'error': 'Unknown tool: ${toolCall.name}'});
-    records.add(ToolCallRecord(
-      id: toolCall.id,
-      name: toolCall.name,
-      arguments: toolCall.arguments,
-      response: errorJson,
-    ));
-    return errorJson;
-  }
-
-  // --- Logging helpers ---
-
-  AiTokenUsage _usageFrom(ChatResult result) => AiTokenUsage(
-        promptTokens: result.usage.promptTokens ?? 0,
-        responseTokens: result.usage.responseTokens ?? 0,
-        totalTokens: result.usage.totalTokens ?? 0,
+      clearThoughtSignatureCache();
+      return AiChatResponse(
+        text: 'Something went wrong. Please try again.',
+        usage: AiTokenUsage.zero,
       );
-
-  void _logHistory(StringBuffer log, List<ChatMessage> history) {
-    log.writeln('--- history sent (${history.length} messages) ---');
-    for (final msg in history) {
-      switch (msg) {
-        case SystemChatMessage():
-          log.writeln('  [system] ${msg.content.length} chars');
-        case HumanChatMessage():
-          log.writeln('  [user] ${msg.contentAsString.length} chars');
-        case AIChatMessage():
-          if (msg.toolCalls.isNotEmpty) {
-            log.writeln('  [ai-tool-call] ${msg.toolCalls.map((t) => t.name).join(", ")}');
-          } else {
-            log.writeln('  [ai] ${msg.content.length} chars');
-          }
-        case ToolChatMessage():
-          log.writeln('  [tool-response] ${msg.content.length} chars');
-        default:
-          log.writeln('  [${msg.runtimeType}] ${msg.contentAsString.length} chars');
-      }
     }
-  }
-
-  void _logInvoke(StringBuffer log, int count, String label, AiTokenUsage usage, AIChatMessage ai, {int? historyLength}) {
-    log.writeln('--- invoke #$count ($label) ---');
-    log.writeln('  tokens — in: ${usage.promptTokens}, out: ${usage.responseTokens}, total: ${usage.totalTokens}');
-    if (historyLength != null) log.writeln('  history messages sent: $historyLength');
-    if (ai.toolCalls.isNotEmpty) {
-      log.writeln('  model requested tool call: ${ai.toolCalls.first.name}');
-    } else {
-      log.writeln('  model responded with text (${ai.content.length} chars)');
-    }
-  }
-
-  void _logSummary(StringBuffer log, String user, String response, int toolCalls, int invokes, AiTokenUsage usage) {
-    log.writeln('--- exchange summary ---');
-    log.writeln('  user: $user');
-    log.writeln('  response: ${response.length} chars');
-    log.writeln('  tool calls: $toolCalls');
-    log.writeln('  invoke count: $invokes');
-    log.writeln('  total tokens — in: ${usage.promptTokens}, out: ${usage.responseTokens}, total: ${usage.totalTokens}');
   }
 
   void dispose() {

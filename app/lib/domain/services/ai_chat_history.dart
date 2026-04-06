@@ -1,10 +1,12 @@
 import 'dart:convert';
-import 'package:langchain/langchain.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'ai_chat_models.dart';
 
-/// Number of recent exchanges that include full tool call details in history.
-/// Older exchanges only include user text + assistant response text.
+/// Number of recent exchanges that include full tool call + response details.
 const int _recentFullDetailCount = 2;
+
+/// Max chars to show from front/back when truncating.
+const int _truncateEdge = 100;
 
 const String _storageKey = 'ai_chat_history';
 const String _usageStorageKey = 'ai_chat_token_usage';
@@ -43,17 +45,20 @@ class ChatExchange {
   final String userText;
   final String assistantText;
   final List<ToolCallRecord> toolCalls;
+  final List<UiComponent> uiComponents;
 
   ChatExchange({
     required this.userText,
     required this.assistantText,
     this.toolCalls = const [],
+    this.uiComponents = const [],
   });
 
   Map<String, dynamic> toJson() => {
         'userText': userText,
         'assistantText': assistantText,
         'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
+        'uiComponents': uiComponents.map((c) => c.toJson()).toList(),
       };
 
   factory ChatExchange.fromJson(Map<String, dynamic> json) => ChatExchange(
@@ -61,6 +66,10 @@ class ChatExchange {
         assistantText: json['assistantText'] as String,
         toolCalls: (json['toolCalls'] as List?)
                 ?.map((t) => ToolCallRecord.fromJson(t as Map<String, dynamic>))
+                .toList() ??
+            [],
+        uiComponents: (json['uiComponents'] as List?)
+                ?.map((c) => UiComponent.fromJson(c as Map<String, dynamic>))
                 .toList() ??
             [],
       );
@@ -106,61 +115,46 @@ class AiChatHistory {
     return map.map((k, v) => MapEntry(k, v as int));
   }
 
-  /// Build langchain ChatMessage list from saved exchanges.
+  /// Build conversation history as a plain text string.
   ///
   /// Strategy:
-  /// - Last [_recentFullDetailCount] exchanges: include full tool call details
-  ///   (AI tool call message → tool response → AI final response)
-  /// - Older exchanges: only user text + assistant response text
+  /// - Last [_recentFullDetailCount] exchanges: full user message + full
+  ///   assistant response + tool call details (tool output truncated)
+  /// - Older exchanges: full user message + truncated assistant response
   ///
-  /// This keeps recent context rich for the model while avoiding history bloat.
-  static List<ChatMessage> buildLangchainHistory(
-    String systemPrompt,
-    List<ChatExchange> exchanges,
-  ) {
-    final messages = <ChatMessage>[ChatMessage.system(systemPrompt)];
-    if (exchanges.isEmpty) return messages;
+  /// Returns null if there's no history.
+  static String? buildHistoryText(List<ChatExchange> exchanges) {
+    if (exchanges.isEmpty) return null;
 
+    final buf = StringBuffer();
     final cutoff = exchanges.length - _recentFullDetailCount;
 
     for (int i = 0; i < exchanges.length; i++) {
-      final exchange = exchanges[i];
+      final e = exchanges[i];
       final isRecent = i >= cutoff;
 
-      // Always add the user message
-      messages.add(ChatMessage.humanText(exchange.userText));
+      buf.writeln('User: ${e.userText}');
 
-      if (isRecent && exchange.toolCalls.isNotEmpty) {
-        // Recent exchange: include full tool call flow
-        // 1. AI message with tool calls
-        messages.add(AIChatMessage(
-          content: '',
-          toolCalls: exchange.toolCalls
-              .map((tc) => AIChatMessageToolCall(
-                    id: tc.id,
-                    name: tc.name,
-                    argumentsRaw: jsonEncode(tc.arguments),
-                    arguments: tc.arguments,
-                  ))
-              .toList(),
-        ));
-
-        // 2. Tool responses
-        for (final tc in exchange.toolCalls) {
-          messages.add(ChatMessage.tool(
-            toolCallId: tc.id,
-            content: tc.response,
-          ));
+      if (isRecent && e.toolCalls.isNotEmpty) {
+        // Recent: include tool call details
+        for (final tc in e.toolCalls) {
+          buf.writeln('Tool call: ${tc.name}(${jsonEncode(tc.arguments)})');
+          buf.writeln('Tool result: ${_truncate(tc.response)}');
         }
-
-        // 3. Final AI text response
-        messages.add(AIChatMessage(content: exchange.assistantText));
+        buf.writeln('Assistant: ${e.assistantText}');
       } else {
-        // Older exchange: just the assistant's text response
-        messages.add(AIChatMessage(content: exchange.assistantText));
+        // Older: truncate assistant response
+        buf.writeln('Assistant: ${_truncate(e.assistantText)}');
       }
+
+      buf.writeln();
     }
 
-    return messages;
+    return buf.toString().trimRight();
+  }
+
+  static String _truncate(String text) {
+    if (text.length <= _truncateEdge * 2 + 3) return text;
+    return '${text.substring(0, _truncateEdge)}...${text.substring(text.length - _truncateEdge)}';
   }
 }

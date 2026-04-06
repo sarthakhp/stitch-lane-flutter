@@ -44,5 +44,22 @@ EXAMPLE:
 
 **4 Blouse** (**800** rps):
 ''';
+  // --- Chat voice input prompts ---
+
+  static const String chatSystemInstruction = '''
+You are a speech-to-text assistant for a tailoring business app.
+The audio may contain mixed English and Gujarati words (code-switching).
+
+Transcribe EACH word in its ORIGINAL language:
+- English words → English
+- Gujarati words → Gujarati script (ગુજરાતી)
+Preserve the exact mix of languages as spoken.
+''';
+
+  static const String chatTranscriptionPrompt = '''
+Transcribe this audio as a plain text query or message.
+Output ONLY the transcribed text — no formatting, no markdown, no bullet points.
+If silent, respond: "No one is speaking"
+''';
 }
 

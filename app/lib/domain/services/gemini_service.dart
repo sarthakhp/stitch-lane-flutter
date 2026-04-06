@@ -30,7 +30,11 @@ class GeminiService {
     return _model!;
   }
 
-  static Future<String?> transcribeAudio(String audioFilePath) async {
+  static Future<String?> transcribeAudio(
+    String audioFilePath, {
+    String? systemInstruction,
+    String? transcriptionPrompt,
+  }) async {
     try {
       AppLogger.info('Starting audio transcription for: $audioFilePath');
 
@@ -46,12 +50,15 @@ class GeminiService {
       final model = _getModel();
       final audioBase64 = base64Encode(audioBytes);
 
+      final system = systemInstruction ?? GeminiPrompts.systemInstruction;
+      final prompt = transcriptionPrompt ?? GeminiPrompts.transcriptionPrompt;
+
       final response = await model.invoke(
         PromptValue.chat([
-          ChatMessage.system(GeminiPrompts.systemInstruction),
+          ChatMessage.system(system),
           ChatMessage.human(
             ChatMessageContent.multiModal([
-              ChatMessageContent.text(GeminiPrompts.transcriptionPrompt),
+              ChatMessageContent.text(prompt),
               ChatMessageContent.image(
                 data: audioBase64,
                 mimeType: 'audio/m4a',

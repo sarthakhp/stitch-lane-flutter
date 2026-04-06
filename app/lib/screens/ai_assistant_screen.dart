@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../config/app_config.dart';
+import '../constants/gemini_prompts.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
+import '../domain/services/audio_recording_service.dart';
+import '../domain/services/transcription_service.dart';
 import '../presentation/presentation.dart';
+import '../presentation/widgets/recording_dialog.dart';
+import '../presentation/widgets/transcription_error_dialog.dart';
+import 'widgets/ai/ai_message_bubble.dart';
+import 'widgets/ai/ai_typing_indicator.dart';
 
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
@@ -60,7 +66,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
     if (mounted) {
       setState(() {
-        _messages.add(AiChatMessage(text: response.text, isUser: false));
+        _messages.add(AiChatMessage(
+          text: response.text,
+          isUser: false,
+          uiComponents: response.uiComponents,
+        ));
         _isLoading = false;
       });
       await _chatService.saveChat();
@@ -75,6 +85,43 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _messages.clear();
       });
     }
+  }
+
+  Future<void> _handleVoiceInput() async {
+    final audioPath = await RecordingDialog.show(context);
+    if (audioPath == null || !mounted) return;
+
+    // Transcribe loop with retry support
+    var shouldRetry = true;
+    while (shouldRetry && mounted) {
+      shouldRetry = false;
+
+      final result = await TranscriptionService.transcribe(
+        // ignore: use_build_context_synchronously
+        context: context,
+        audioFilePath: audioPath,
+        systemInstruction: GeminiPrompts.chatSystemInstruction,
+        transcriptionPrompt: GeminiPrompts.chatTranscriptionPrompt,
+      );
+
+      if (result.type == TranscriptionResultType.success && result.text != null) {
+        _inputController.text = result.text!;
+        break;
+      }
+
+      if (result.type == TranscriptionResultType.cancelled || !mounted) break;
+
+      final action = await TranscriptionErrorDialog.show(
+        // ignore: use_build_context_synchronously
+        context,
+        errorMessage: result.errorMessage ?? 'Transcription failed',
+        audioFilePath: audioPath,
+      );
+
+      shouldRetry = action == TranscriptionErrorAction.retry;
+    }
+
+    await AudioRecordingService.deleteTemporaryAudio();
   }
 
   void _scrollToBottom() {
@@ -177,113 +224,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       itemCount: _messages.length + (_isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _messages.length) {
-          return _buildTypingIndicator(context);
+          return const AiTypingIndicator();
         }
-        return _buildMessageBubble(context, _messages[index]);
+        return AiMessageBubble(message: _messages[index]);
       },
-    );
-  }
-
-  Widget _buildMessageBubble(BuildContext context, AiChatMessage message) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isUser = message.isUser;
-
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppConfig.spacing12,
-          vertical: AppConfig.spacing8,
-        ),
-        decoration: BoxDecoration(
-          color: isUser ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
-            bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
-          ),
-        ),
-        child: isUser
-            ? SelectableText(
-                message.text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              )
-            : MarkdownBody(
-                data: message.text,
-                styleSheet: MarkdownStyleSheet(
-                  p: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                  strong: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  tableHead: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                  tableBody: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                  tableBorder: TableBorder.all(
-                    color: colorScheme.outlineVariant,
-                    width: 0.5,
-                  ),
-                  tableCellsPadding: const EdgeInsets.symmetric(
-                    horizontal: AppConfig.spacing8,
-                    vertical: AppConfig.spacing4,
-                  ),
-                  listBullet: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                  ),
-                  code: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.primary,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                  ),
-                ),
-                selectable: true,
-              ),
-      ),
-    );
-  }
-
-  Widget _buildTypingIndicator(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppConfig.spacing16,
-          vertical: AppConfig.spacing12,
-        ),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomRight: Radius.circular(16),
-            bottomLeft: Radius.circular(4),
-          ),
-        ),
-        child: SizedBox(
-          width: 40,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(3, (i) {
-              return _TypingDot(delay: i * 200);
-            }),
-          ),
-        ),
-      ),
     );
   }
 
@@ -359,66 +303,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             ),
           ),
           const SizedBox(width: AppConfig.spacing4),
+          IconButton(
+            onPressed: _isLoading ? null : _handleVoiceInput,
+            icon: const Icon(Icons.mic),
+          ),
           IconButton.filled(
             onPressed: _isLoading ? null : () => _sendMessage(_inputController.text),
             icon: const Icon(Icons.send),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TypingDot extends StatefulWidget {
-  final int delay;
-  const _TypingDot({required this.delay});
-
-  @override
-  State<_TypingDot> createState() => _TypingDotState();
-}
-
-class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _animation = Tween(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _controller.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, -4 * _animation.value),
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
     );
   }
 }

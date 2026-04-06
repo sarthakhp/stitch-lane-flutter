@@ -8,6 +8,10 @@ import 'package:langchain_core/tools.dart';
 
 import 'types.dart';
 
+/// Clear cached raw g.Content entries used for thought_signature preservation.
+/// Call this after each completed exchange to avoid stale entries.
+void clearThoughtSignatureCache() => _RawContentCache.clear();
+
 /// Cache to preserve raw g.Content (including ThoughtSignaturePart) between
 /// response mapping and request history mapping, since AIChatMessage cannot
 /// carry the thought signature data.
@@ -23,7 +27,11 @@ class _RawContentCache {
   }
 
   static g.Content? retrieve(List<AIChatMessageToolCall> calls) {
-    return _cache.remove(_key(calls));
+    return _cache[_key(calls)];
+  }
+
+  static void clear() {
+    _cache.clear();
   }
 }
 

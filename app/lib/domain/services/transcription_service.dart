@@ -28,6 +28,8 @@ class TranscriptionService {
   static Future<TranscriptionResult> transcribe({
     required BuildContext context,
     required String audioFilePath,
+    String? systemInstruction,
+    String? transcriptionPrompt,
   }) async {
     bool isCancelled = false;
 
@@ -43,7 +45,11 @@ class TranscriptionService {
 
     String? transcription;
     try {
-      transcription = await GeminiService.transcribeAudio(audioFilePath);
+      transcription = await GeminiService.transcribeAudio(
+        audioFilePath,
+        systemInstruction: systemInstruction,
+        transcriptionPrompt: transcriptionPrompt,
+      );
     } catch (e) {
       if (context.mounted && !isCancelled) {
         Navigator.of(context).pop();
