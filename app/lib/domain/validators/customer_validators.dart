@@ -28,6 +28,10 @@ class CustomerValidators {
       return 'Phone number must be at least ${AppConfig.minPhoneLength} digits';
     }
 
+    if (digitsOnly.length > AppConfig.maxPhoneLength) {
+      return 'Phone number must not exceed ${AppConfig.maxPhoneLength} digits';
+    }
+
     return null;
   }
 

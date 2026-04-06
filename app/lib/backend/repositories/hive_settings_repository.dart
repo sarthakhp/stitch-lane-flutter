@@ -25,5 +25,14 @@ class HiveSettingsRepository implements SettingsRepository {
       throw Exception('Failed to save settings: $e');
     }
   }
+
+  @override
+  Future<void> clearAll() async {
+    try {
+      await _box.clear();
+    } catch (e) {
+      throw Exception('Failed to clear settings: $e');
+    }
+  }
 }
 

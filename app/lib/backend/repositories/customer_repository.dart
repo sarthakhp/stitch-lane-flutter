@@ -10,5 +10,7 @@ abstract class CustomerRepository {
   Future<void> updateCustomer(Customer customer);
   
   Future<void> deleteCustomer(String id);
+
+  Future<void> clearAll();
 }
 

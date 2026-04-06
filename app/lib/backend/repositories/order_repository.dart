@@ -8,5 +8,7 @@ abstract class OrderRepository {
   Future<void> updateOrder(Order order);
   Future<void> deleteOrder(String id);
   Future<void> deleteOrdersByCustomerId(String customerId);
+
+  Future<void> clearAll();
 }
 

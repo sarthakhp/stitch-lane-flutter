@@ -8,5 +8,7 @@ abstract class MeasurementRepository {
   Future<void> updateMeasurement(Measurement measurement);
   Future<void> deleteMeasurement(String id);
   Future<void> deleteMeasurementsByCustomerId(String customerId);
+
+  Future<void> clearAll();
 }
 

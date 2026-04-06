@@ -15,6 +15,7 @@ import '../screens/settings_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/backup_settings_screen.dart';
 	import '../screens/business_analysis_screen.dart';
+import '../screens/ai_assistant_screen.dart';
 import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 
@@ -156,6 +157,11 @@ class AppRoutes {
 	        return MaterialPageRoute(
 	          builder: (_) => const BusinessAnalysisScreen(),
 	        );
+
+      case AppConstants.aiAssistantRoute:
+        return MaterialPageRoute(
+          builder: (_) => const AiAssistantScreen(),
+        );
 
       default:
         return _errorRoute('Route not found: ${settings.name}');

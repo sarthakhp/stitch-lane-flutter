@@ -69,6 +69,7 @@ class LoginScreen extends StatelessWidget {
     }
 
     if (result) {
+      authState.setLoading(false);
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (builderContext) => BackupRestoreCheckScreen(

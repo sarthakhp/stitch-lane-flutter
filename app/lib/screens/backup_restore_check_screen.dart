@@ -98,6 +98,10 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
 
       await BackupService.restoreBackup(
         backupJson,
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
         onImageProgress: (current, total) {
           backupState.setDetailedProgress(
             0.5 + (current / total) * 0.2,
@@ -360,7 +364,17 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   Future<void> _handleSignOut() async {
-    await AuthService.signOut();
+    final customerRepository = context.read<CustomerRepository>();
+    final orderRepository = context.read<OrderRepository>();
+    final measurementRepository = context.read<MeasurementRepository>();
+    final settingsRepository = context.read<SettingsRepository>();
+
+    await AuthService.signOut(
+      customerRepository: customerRepository,
+      orderRepository: orderRepository,
+      measurementRepository: measurementRepository,
+      settingsRepository: settingsRepository,
+    );
   }
 
   Widget _buildRestoringView(BackupState backupState) {

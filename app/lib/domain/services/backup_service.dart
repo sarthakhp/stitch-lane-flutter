@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'package:hive/hive.dart';
 import '../../backend/backend.dart';
-import '../../constants/app_constants.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
 import '../../utils/app_logger.dart';
@@ -23,28 +21,31 @@ class BackupService {
   static const String _orderCountKey = 'orderCount';
   static const String _measurementCountKey = 'measurementCount';
 
-  static Future<String> createBackup() async {
-    final customersBox = DatabaseService.getCustomersBox();
-    final ordersBox = DatabaseService.getOrdersBox();
-    final measurementsBox = DatabaseService.getMeasurementsBox();
-    final settingsBox = DatabaseService.getSettingsBox();
-
-    final settings = settingsBox.get(AppConstants.settingsKey);
+  static Future<String> createBackup({
+    required CustomerRepository customerRepository,
+    required OrderRepository orderRepository,
+    required MeasurementRepository measurementRepository,
+    required SettingsRepository settingsRepository,
+  }) async {
+    final customers = await customerRepository.getAllCustomers();
+    final orders = await orderRepository.getAllOrders();
+    final measurements = await measurementRepository.getAllMeasurements();
+    final settings = await settingsRepository.getSettings();
 
     final backup = {
       _versionKey: _backupVersion,
       _timestampKey: DateTime.now().toIso8601String(),
       _appVersionKey: _appVersion,
       _boxesKey: {
-        _customersKey: customersBox.values.map((c) => c.toJson()).toList(),
-        _ordersKey: ordersBox.values.map((o) => o.toJson()).toList(),
-        _measurementsKey: measurementsBox.values.map((m) => m.toJson()).toList(),
-        _settingsKey: settings?.toJson(),
+        _customersKey: customers.map((c) => c.toJson()).toList(),
+        _ordersKey: orders.map((o) => o.toJson()).toList(),
+        _measurementsKey: measurements.map((m) => m.toJson()).toList(),
+        _settingsKey: settings.toJson(),
       },
       _metadataKey: {
-        _customerCountKey: customersBox.length,
-        _orderCountKey: ordersBox.length,
-        _measurementCountKey: measurementsBox.length,
+        _customerCountKey: customers.length,
+        _orderCountKey: orders.length,
+        _measurementCountKey: measurements.length,
       },
     };
 
@@ -53,29 +54,34 @@ class BackupService {
 
   static Future<void> restoreBackup(
     String backupJson, {
+    required CustomerRepository customerRepository,
+    required OrderRepository orderRepository,
+    required MeasurementRepository measurementRepository,
+    required SettingsRepository settingsRepository,
     void Function(int current, int total)? onImageProgress,
     void Function(int current, int total)? onAudioProgress,
   }) async {
     final backupData = jsonDecode(backupJson) as Map<String, dynamic>;
     _validateBackup(backupData);
 
-    final customersBox = DatabaseService.getCustomersBox();
-    final ordersBox = DatabaseService.getOrdersBox();
-    final measurementsBox = DatabaseService.getMeasurementsBox();
-    final settingsBox = DatabaseService.getSettingsBox();
+    Future<void> doRestore() async {
+      await orderRepository.clearAll();
+      await measurementRepository.clearAll();
+      await customerRepository.clearAll();
 
-    await Future.wait([
-      customersBox.clear(),
-      ordersBox.clear(),
-      measurementsBox.clear(),
-    ]);
+      final boxes = backupData[_boxesKey] as Map<String, dynamic>;
 
-    final boxes = backupData[_boxesKey] as Map<String, dynamic>;
+      await _restoreCustomers(boxes, customerRepository);
+      await _restoreOrders(boxes, orderRepository);
+      await _restoreMeasurements(boxes, measurementRepository);
+      await _restoreSettings(boxes, settingsRepository);
+    }
 
-    await _restoreCustomers(boxes, customersBox);
-    await _restoreOrders(boxes, ordersBox);
-    await _restoreMeasurements(boxes, measurementsBox);
-    await _restoreSettings(boxes, settingsBox);
+    if (DatabaseService.isUsingSqlite) {
+      await SqliteDatabase.withForeignKeysDisabled(doRestore);
+    } else {
+      await doRestore();
+    }
 
     try {
       AppLogger.info('Starting image download from Drive after restore');
@@ -96,52 +102,52 @@ class BackupService {
 
   static Future<void> _restoreCustomers(
     Map<String, dynamic> boxes,
-    Box<Customer> customersBox,
+    CustomerRepository customerRepository,
   ) async {
     final customersList = boxes[_customersKey] as List?;
     if (customersList == null) return;
 
     for (var json in customersList) {
       final customer = Customer.fromJson(json as Map<String, dynamic>);
-      await customersBox.put(customer.id, customer);
+      await customerRepository.addCustomer(customer);
     }
   }
 
   static Future<void> _restoreOrders(
     Map<String, dynamic> boxes,
-    Box<Order> ordersBox,
+    OrderRepository orderRepository,
   ) async {
     final ordersList = boxes[_ordersKey] as List?;
     if (ordersList == null) return;
 
     for (var json in ordersList) {
       final order = Order.fromJson(json as Map<String, dynamic>);
-      await ordersBox.put(order.id, order);
+      await orderRepository.addOrder(order);
     }
   }
 
   static Future<void> _restoreMeasurements(
     Map<String, dynamic> boxes,
-    Box<Measurement> measurementsBox,
+    MeasurementRepository measurementRepository,
   ) async {
     final measurementsList = boxes[_measurementsKey] as List?;
     if (measurementsList == null) return;
 
     for (var json in measurementsList) {
       final measurement = Measurement.fromJson(json as Map<String, dynamic>);
-      await measurementsBox.put(measurement.id, measurement);
+      await measurementRepository.addMeasurement(measurement);
     }
   }
 
   static Future<void> _restoreSettings(
     Map<String, dynamic> boxes,
-    Box<AppSettings> settingsBox,
+    SettingsRepository settingsRepository,
   ) async {
     final settingsJson = boxes[_settingsKey] as Map<String, dynamic>?;
     if (settingsJson == null) return;
 
     final settings = AppSettings.fromJson(settingsJson);
-    await settingsBox.put(AppConstants.settingsKey, settings);
+    await settingsRepository.saveSettings(settings);
   }
 
   static void _validateBackup(Map<String, dynamic> backupData) {
@@ -173,4 +179,3 @@ class BackupService {
     };
   }
 }
-

@@ -5,6 +5,9 @@ class AppConstants {
   static const String settingsBoxName = 'settings_box';
   static const String measurementsBoxName = 'measurements_box';
   static const String settingsKey = 'app_settings';
+  static const String backupFileName = 'stitch_genie_backup.json';
+  static const String backupZipPrefix = 'stitch_genie_backup';
+  static const String imagesFolderName = 'order_images';
 
   static const String loginRoute = '/login';
   static const String backupRestoreCheckRoute = '/backup-restore-check';
@@ -23,5 +26,6 @@ class AppConstants {
   static const String notificationSettingsRoute = '/settings/notifications';
   static const String backupSettingsRoute = '/backup-settings';
 	  static const String businessAnalysisRoute = '/business-analysis';
+  static const String aiAssistantRoute = '/ai-assistant';
 }
 

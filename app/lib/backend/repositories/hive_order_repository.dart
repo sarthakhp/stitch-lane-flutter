@@ -84,5 +84,14 @@ class HiveOrderRepository implements OrderRepository {
       throw Exception('Failed to delete orders for customer: $e');
     }
   }
+
+  @override
+  Future<void> clearAll() async {
+    try {
+      await _box.clear();
+    } catch (e) {
+      throw Exception('Failed to clear orders: $e');
+    }
+  }
 }
 

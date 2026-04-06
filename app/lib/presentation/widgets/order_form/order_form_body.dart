@@ -37,7 +37,14 @@ class OrderFormBody extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(AppConfig.spacing16),
         children: [
-          _buildCustomerField(),
+          CustomerAutocompleteField(
+            customers: customers,
+            selectedCustomer: controller.selectedCustomer,
+            enabled: !controller.isEditing && !controller.isLoading,
+            onCustomerSelected: controller.setSelectedCustomer,
+            onCustomerCleared: () => controller.setSelectedCustomer(null),
+            onCreateNewCustomer: onCreateNewCustomer,
+          ),
           const SizedBox(height: AppConfig.spacing16),
           OrderTitleField(
             controller: titleController,
@@ -58,25 +65,12 @@ class OrderFormBody extends StatelessWidget {
             selectedDate: controller.dueDate,
             enabled: !controller.isLoading,
             isEditing: controller.isEditing,
-            showError: controller.hasAttemptedSubmit && controller.dueDate == null,
             onDateSelected: controller.setDueDate,
           ),
           const SizedBox(height: AppConfig.spacing16),
           _buildImagesSection(),
         ],
       ),
-    );
-  }
-
-  Widget _buildCustomerField() {
-    return CustomerAutocompleteField(
-      customers: customers,
-      selectedCustomer: controller.selectedCustomer,
-      enabled: !controller.isEditing && !controller.isLoading,
-      hasError: controller.hasAttemptedSubmit && controller.selectedCustomer == null,
-      onCustomerSelected: controller.setSelectedCustomer,
-      onCustomerCleared: () => controller.setSelectedCustomer(null),
-      onCreateNewCustomer: onCreateNewCustomer,
     );
   }
 
@@ -113,4 +107,3 @@ class OrderFormBody extends StatelessWidget {
     );
   }
 }
-

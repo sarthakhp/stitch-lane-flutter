@@ -60,6 +60,8 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                       onSignIn: () => _handleDriveSignIn(context),
                       onBackup: () => _handleBackup(context),
                       onRestore: () => _handleRestore(context),
+                      onExport: () => _handleExport(context),
+                      onImport: () => _handleImport(context),
                     ),
                     const SizedBox(height: AppConfig.spacing24),
                     _AutoBackupSection(
@@ -121,9 +123,19 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
 
     final backupState = context.read<BackupState>();
     try {
+      final customerRepository = context.read<CustomerRepository>();
+      final orderRepository = context.read<OrderRepository>();
+      final measurementRepository = context.read<MeasurementRepository>();
+      final settingsRepository = context.read<SettingsRepository>();
+
       backupState.setLoading(true);
       backupState.setProgress(0.2);
-      final backupJson = await BackupService.createBackup();
+      final backupJson = await BackupService.createBackup(
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
       backupState.setProgress(0.4);
       await DriveService.uploadBackup(backupJson);
       backupState.setProgress(0.5);
@@ -131,7 +143,9 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       backupState.setProgress(0.7);
       await AudioSyncService.syncAudiosToDrive();
       backupState.setProgress(0.9);
-      await BackupTimeService.updateLastBackupTime();
+      await BackupTimeService.updateLastBackupTime(
+        settingsRepository: settingsRepository,
+      );
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
       backupState.setProgress(1.0);
@@ -211,7 +225,13 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       final settingsRepository = context.read<SettingsRepository>();
 
       backupState.setProgress(0.6);
-      await BackupService.restoreBackup(backupJson);
+      await BackupService.restoreBackup(
+        backupJson,
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
       backupState.setProgress(0.9);
       await CustomerService.loadCustomers(customerState, customerRepository);
       await OrderService.loadOrders(orderState, orderRepository);
@@ -240,6 +260,157 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _handleExport(BuildContext context) async {
+    final backupState = context.read<BackupState>();
+    try {
+      backupState.setLoading(true);
+      await BackupExportService.exportDriveBackupAsZip(
+        onProgress: (status) {
+          if (context.mounted) {
+            backupState.setDetailedProgress(0.5, status);
+          }
+        },
+      );
+      backupState.setLoading(false);
+    } catch (e) {
+      backupState.setError('Export failed: ${e.toString()}');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleImport(BuildContext context) async {
+    final backupState = context.read<BackupState>();
+
+    try {
+      // 1. Pick a zip file
+      final zipPath = await BackupImportService.pickZipFile();
+      if (zipPath == null || !context.mounted) return; // user cancelled
+
+      // 2. Validate the zip (no data touched yet)
+      backupState.setLoading(true);
+      backupState.setDetailedProgress(0.1, 'Validating backup file...');
+
+      final validation = await BackupImportService.validateZip(zipPath);
+      if (!validation.success) {
+        backupState.setError('Invalid backup: ${validation.error}');
+        return;
+      }
+
+      backupState.setLoading(false);
+      if (!context.mounted) return;
+
+      // 3. Show confirmation dialog
+      final metadata = validation.metadata!;
+      final confirmed = await ConfirmationDialog.show(
+        context: context,
+        title: 'Import from Zip',
+        content: 'This will replace all current data.\n\n'
+            'Backup contains:\n'
+            '• ${metadata['customerCount']} customers\n'
+            '• ${metadata['orderCount']} orders\n'
+            '• ${metadata['measurementCount']} measurements\n'
+            '• ${metadata['imageCount']} images\n'
+            '• ${metadata['audioCount']} audio files\n\n'
+            'Your current data will be backed up in memory. If the import fails, it will be restored automatically.',
+        confirmText: 'Import',
+        cancelText: 'Cancel',
+      );
+
+      if (!confirmed || !context.mounted) {
+        backupState.reset();
+        return;
+      }
+
+      // 4. Perform the import
+      backupState.setLoading(true);
+
+      final customerRepository = context.read<CustomerRepository>();
+      final orderRepository = context.read<OrderRepository>();
+      final measurementRepository = context.read<MeasurementRepository>();
+      final settingsRepository = context.read<SettingsRepository>();
+
+      final result = await BackupImportService.importFromZip(
+        zipPath,
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+        onProgress: (status) {
+          if (context.mounted) {
+            backupState.setDetailedProgress(0.5, status);
+          }
+        },
+      );
+
+      if (!result.success) {
+        backupState.setError(result.error ?? 'Import failed');
+        if (context.mounted) {
+          // Reload states since rollback happened
+          await _reloadAllStates(context);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'Import failed'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 5. Reload all states
+      if (context.mounted) {
+        await _reloadAllStates(context);
+      }
+
+      backupState.setProgress(1.0);
+      backupState.setLoading(false);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Backup imported successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      backupState.setError('Import failed: ${e.toString()}');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import failed: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _reloadAllStates(BuildContext context) async {
+    final customerState = context.read<CustomerState>();
+    final orderState = context.read<OrderState>();
+    final measurementState = context.read<MeasurementState>();
+    final settingsState = context.read<SettingsState>();
+    final customerRepository = context.read<CustomerRepository>();
+    final orderRepository = context.read<OrderRepository>();
+    final measurementRepository = context.read<MeasurementRepository>();
+    final settingsRepository = context.read<SettingsRepository>();
+
+    await CustomerService.loadCustomers(customerState, customerRepository);
+    await OrderService.loadOrders(orderState, orderRepository);
+    await MeasurementService.loadMeasurements(measurementState, measurementRepository);
+    await SettingsService.loadSettings(settingsState, settingsRepository);
   }
 
   String _formatDate(DateTime date) =>
@@ -453,12 +624,16 @@ class _BackupActionsSection extends StatelessWidget {
   final VoidCallback onSignIn;
   final VoidCallback onBackup;
   final VoidCallback onRestore;
+  final VoidCallback onExport;
+  final VoidCallback onImport;
 
   const _BackupActionsSection({
     required this.backupState,
     required this.onSignIn,
     required this.onBackup,
     required this.onRestore,
+    required this.onExport,
+    required this.onImport,
   });
 
   @override
@@ -517,6 +692,26 @@ class _BackupActionsSection extends StatelessWidget {
                   ],
                 );
               },
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: backupState.isLoading ? null : onExport,
+                    icon: const Icon(Icons.download),
+                    label: const Text('Export Zip'),
+                  ),
+                ),
+                const SizedBox(width: AppConfig.spacing16),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: backupState.isLoading ? null : onImport,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Import Zip'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

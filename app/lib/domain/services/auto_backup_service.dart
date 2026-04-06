@@ -2,7 +2,6 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import '../../backend/backend.dart';
-import '../../constants/app_constants.dart';
 import '../../firebase_options.dart';
 import '../../utils/app_logger.dart';
 import 'backup_service.dart';
@@ -41,43 +40,60 @@ class AutoBackupService {
 
       await _initializeForBackground();
 
+      final customerRepository = RepositoryFactory.createCustomerRepository();
+      final orderRepository = RepositoryFactory.createOrderRepository();
+      final measurementRepository = RepositoryFactory.createMeasurementRepository();
+      final settingsRepository = RepositoryFactory.createSettingsRepository();
+
       if (!await _checkBatteryLevel()) {
         AppLogger.warning('Battery level too low (below 15%)');
-        await _scheduleNextIfEnabled();
+        await _scheduleNextIfEnabled(settingsRepository);
         return;
       }
 
       if (!await _checkDriveAccess()) {
         AppLogger.warning('Google Drive not accessible. Please sign in manually.');
-        await _scheduleNextIfEnabled();
+        await _scheduleNextIfEnabled(settingsRepository);
         return;
       }
 
       await NotificationService.showBackupInProgressNotification();
 
-      final backupJson = await BackupService.createBackup();
+      final backupJson = await BackupService.createBackup(
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
       await DriveService.uploadBackup(backupJson);
       await ImageSyncService.syncImagesToDrive();
       await AudioSyncService.syncAudiosToDrive();
 
-      await _updateLastBackupTime();
+      await BackupTimeService.updateLastBackupTime(
+        settingsRepository: settingsRepository,
+      );
 
       await NotificationService.showBackupSuccessNotification();
 
       AppLogger.info('Auto-backup completed successfully');
 
-      await _scheduleNextIfEnabled();
+      await _scheduleNextIfEnabled(settingsRepository);
     } catch (e) {
       AppLogger.error('Auto-backup failed', e);
       await NotificationService.cancelBackupInProgressNotification();
-      await _scheduleNextIfEnabled();
+      try {
+        final settingsRepository = RepositoryFactory.createSettingsRepository();
+        await _scheduleNextIfEnabled(settingsRepository);
+      } catch (scheduleError) {
+        AppLogger.error('Failed to schedule next backup after failure', scheduleError);
+      }
       rethrow;
     }
   }
 
-  static Future<void> _scheduleNextIfEnabled() async {
+  static Future<void> _scheduleNextIfEnabled(SettingsRepository settingsRepository) async {
     try {
-      final settings = await _getSettings();
+      final settings = await settingsRepository.getSettings();
       if (settings.autoBackupEnabled) {
         await _scheduler.scheduleNextDay(settings.autoBackupTime);
         AppLogger.info('Next auto-backup scheduled for tomorrow');
@@ -85,11 +101,6 @@ class AutoBackupService {
     } catch (e) {
       AppLogger.error('Failed to schedule next backup', e);
     }
-  }
-
-  static Future<AppSettings> _getSettings() async {
-    final settingsBox = DatabaseService.getSettingsBox();
-    return settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
   }
 
   static Future<void> _initializeForBackground() async {
@@ -125,13 +136,10 @@ class AutoBackupService {
     }
   }
 
-  static Future<void> _updateLastBackupTime() async {
-    await BackupTimeService.updateLastBackupTime();
-  }
-
   static Future<bool> isAutoBackupEnabled() async {
     try {
-      final settings = await _getSettings();
+      final settingsRepository = RepositoryFactory.createSettingsRepository();
+      final settings = await settingsRepository.getSettings();
       return settings.autoBackupEnabled;
     } catch (e) {
       return false;
@@ -140,7 +148,8 @@ class AutoBackupService {
 
   static Future<String> getAutoBackupTime() async {
     try {
-      final settings = await _getSettings();
+      final settingsRepository = RepositoryFactory.createSettingsRepository();
+      final settings = await settingsRepository.getSettings();
       return settings.autoBackupTime;
     } catch (e) {
       return '03:00';

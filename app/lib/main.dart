@@ -13,6 +13,7 @@ import 'config/routes.dart';
 import 'constants/app_constants.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell_screen.dart';
+import 'screens/widgets/app_logo.dart';
 import 'screens/backup_restore_check_screen.dart';
 import 'utils/app_logger.dart';
 
@@ -66,19 +67,19 @@ class StitchGenieApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BackupState()),
         ChangeNotifierProvider(create: (_) => CustomerState()),
         Provider<CustomerRepository>(
-          create: (_) => HiveCustomerRepository(),
+          create: (_) => RepositoryFactory.createCustomerRepository(),
         ),
         ChangeNotifierProvider(create: (_) => OrderState()),
         Provider<OrderRepository>(
-          create: (_) => HiveOrderRepository(),
+          create: (_) => RepositoryFactory.createOrderRepository(),
         ),
         ChangeNotifierProvider(create: (_) => MeasurementState()),
         Provider<MeasurementRepository>(
-          create: (_) => HiveMeasurementRepository(),
+          create: (_) => RepositoryFactory.createMeasurementRepository(),
         ),
         ChangeNotifierProvider(create: (_) => SettingsState()),
         Provider<SettingsRepository>(
-          create: (_) => HiveSettingsRepository(),
+          create: (_) => RepositoryFactory.createSettingsRepository(),
         ),
         ChangeNotifierProvider(create: (_) => MainShellState()),
       ],
@@ -168,6 +169,7 @@ class _AppInitializerState extends State<AppInitializer> {
     }
 
     _lifecycleBackupService.initialize(
+      settingsRepository: settingsRepository,
       onBackupComplete: () {
         SettingsService.loadSettings(settingsState, settingsRepository);
       },
@@ -187,11 +189,26 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   Widget build(BuildContext context) {
     if (_isInitializing) {
-      return const MaterialApp(
+      return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.blue,
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+        ),
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.blue,
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+        ),
+        themeMode: ThemeMode.system,
+        home: const Scaffold(
           body: Center(
-            child: CircularProgressIndicator(),
+            child: AppLogo(size: 120),
           ),
         ),
       );

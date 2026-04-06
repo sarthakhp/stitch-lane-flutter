@@ -1,20 +1,19 @@
 import '../../backend/backend.dart';
-import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
 
 class BackupTimeService {
-  static Future<void> updateLastBackupTime() async {
+  static Future<void> updateLastBackupTime({
+    required SettingsRepository settingsRepository,
+  }) async {
     try {
-      final settingsBox = DatabaseService.getSettingsBox();
-      final currentSettings = settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
+      final currentSettings = await settingsRepository.getSettings();
       final updatedSettings = currentSettings.copyWith(
         lastBackupTime: DateTime.now(),
       );
-      await settingsBox.put(AppConstants.settingsKey, updatedSettings);
+      await settingsRepository.saveSettings(updatedSettings);
       AppLogger.info('Last backup time updated');
     } catch (e) {
       AppLogger.error('Failed to update last backup time', e);
     }
   }
 }
-

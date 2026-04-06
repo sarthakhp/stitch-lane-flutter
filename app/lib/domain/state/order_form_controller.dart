@@ -21,7 +21,6 @@ class OrderFormController extends ChangeNotifier {
   bool _isPaid = false;
   DateTime? _paymentDate;
   bool _isLoading = false;
-  bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
   List<double> _extractedValues = [];
 
@@ -41,7 +40,6 @@ class OrderFormController extends ChangeNotifier {
   bool get isPaid => _isPaid;
   DateTime? get paymentDate => _paymentDate;
   bool get isLoading => _isLoading;
-  bool get hasAttemptedSubmit => _hasAttemptedSubmit;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   List<double> get extractedValues => List.unmodifiable(_extractedValues);
 
@@ -122,11 +120,6 @@ class OrderFormController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setHasAttemptedSubmit(bool value) {
-    _hasAttemptedSubmit = value;
-    notifyListeners();
-  }
-
   void clearUnsavedChanges() {
     _hasUnsavedChanges = false;
   }
@@ -139,17 +132,6 @@ class OrderFormController extends ChangeNotifier {
   }
 
   int? get parsedValue => int.tryParse(_valueText.trim());
-
-  bool get isCustomerValid => _selectedCustomer != null;
-  bool get isDueDateValid => _dueDate != null;
-  bool get isValueValid => _valueText.trim().isNotEmpty && parsedValue != null;
-
-  String? validateForSave() {
-    if (!isCustomerValid) return 'Please select a customer';
-    if (!isDueDateValid) return 'Please select a due date';
-    if (!isValueValid) return 'Please enter order value';
-    return null;
-  }
 
   Order buildOrder() {
     final titleText = _title.trim();

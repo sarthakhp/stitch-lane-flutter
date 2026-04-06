@@ -172,6 +172,18 @@ class HomeTab extends StatelessWidget {
 	                          );
 	                        },
 	                      ),
+                    HomeActionTile(
+                      icon: Icons.auto_awesome,
+                      title: 'AI Assistant',
+                      containerColor: colorScheme.primaryContainer,
+                      contentColor: colorScheme.onPrimaryContainer,
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          AppConstants.aiAssistantRoute,
+                        );
+                      },
+                    ),
                   ],
                 );
               },

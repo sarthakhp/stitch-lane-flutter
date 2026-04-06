@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../backend/backend.dart';
@@ -284,6 +285,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d+\-\s()]')),
+              ],
               validator: CustomerValidators.validatePhoneNumber,
               textInputAction: TextInputAction.next,
               enabled: !_isLoading,

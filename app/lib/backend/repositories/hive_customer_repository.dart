@@ -57,5 +57,14 @@ class HiveCustomerRepository implements CustomerRepository {
       throw Exception('Failed to delete customer: $e');
     }
   }
+
+  @override
+  Future<void> clearAll() async {
+    try {
+      await _box.clear();
+    } catch (e) {
+      throw Exception('Failed to clear customers: $e');
+    }
+  }
 }
 

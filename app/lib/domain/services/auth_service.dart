@@ -1,10 +1,12 @@
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../config/auth_config.dart';
 import '../../backend/backend.dart';
+import '../../backend/database/sqlite_database.dart';
 import '../../utils/app_logger.dart';
 import 'onboarding_service.dart';
 
@@ -60,7 +62,12 @@ class AuthService {
     }
   }
 
-  static Future<void> signOut() async {
+  static Future<void> signOut({
+    required CustomerRepository customerRepository,
+    required OrderRepository orderRepository,
+    required MeasurementRepository measurementRepository,
+    required SettingsRepository settingsRepository,
+  }) async {
     try {
       final userId = _auth.currentUser?.uid;
 
@@ -69,7 +76,15 @@ class AuthService {
         _googleSignIn.signOut(),
       ]);
 
-      await _clearLocalDatabases();
+      await Future.wait([
+        _clearLocalDatabases(
+          customerRepository: customerRepository,
+          orderRepository: orderRepository,
+          measurementRepository: measurementRepository,
+          settingsRepository: settingsRepository,
+        ),
+        _clearLocalFiles(),
+      ]);
 
       if (userId != null) {
         await OnboardingService.clearBackupChoice(userId);
@@ -80,18 +95,49 @@ class AuthService {
     }
   }
 
-  static Future<void> _clearLocalDatabases() async {
+  static Future<void> _clearLocalDatabases({
+    required CustomerRepository customerRepository,
+    required OrderRepository orderRepository,
+    required MeasurementRepository measurementRepository,
+    required SettingsRepository settingsRepository,
+  }) async {
     try {
-      final customersBox = Hive.box<Customer>('customers_box');
-      final ordersBox = Hive.box<Order>('orders_box');
-      final settingsBox = Hive.box<AppSettings>('settings_box');
-
-      await customersBox.clear();
-      await ordersBox.clear();
-      await settingsBox.clear();
+      await SqliteDatabase.withForeignKeysDisabled(() async {
+        // Clear children first, then parents
+        await Future.wait([
+          orderRepository.clearAll(),
+          measurementRepository.clearAll(),
+          settingsRepository.clearAll(),
+        ]);
+        await customerRepository.clearAll();
+      });
     } catch (e) {
       AppLogger.error('Error clearing databases', e);
       rethrow;
+    }
+  }
+
+  static Future<void> _clearLocalFiles() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+
+      // Delete order images folder
+      final imagesDir = Directory('${appDir.path}/order_images');
+      if (await imagesDir.exists()) {
+        await imagesDir.delete(recursive: true);
+        AppLogger.info('Deleted order_images directory');
+      }
+
+      // Delete measurement audio files
+      final files = appDir.listSync();
+      for (final file in files) {
+        if (file is File && file.path.endsWith('.m4a')) {
+          await file.delete();
+          AppLogger.info('Deleted audio file: ${file.path}');
+        }
+      }
+    } catch (e) {
+      AppLogger.error('Error clearing local files', e);
     }
   }
 
@@ -103,4 +149,3 @@ class AuthService {
     return _auth.authStateChanges();
   }
 }
-

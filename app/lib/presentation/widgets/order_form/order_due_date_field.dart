@@ -1,20 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../domain/validators/order_validators.dart';
 
-class OrderDueDateField extends StatelessWidget {
+class OrderDueDateField extends FormField<DateTime> {
+  OrderDueDateField({
+    super.key,
+    DateTime? selectedDate,
+    required ValueChanged<DateTime> onDateSelected,
+    bool enabled = true,
+    bool isEditing = false,
+  }) : super(
+          initialValue: selectedDate,
+          validator: (value) => OrderValidators.validateDueDate(value, isEdit: isEditing),
+          builder: (FormFieldState<DateTime> state) {
+            return _DueDateFieldContent(
+              selectedDate: state.value,
+              errorText: state.errorText,
+              enabled: enabled,
+              isEditing: isEditing,
+              onDateSelected: (date) {
+                state.didChange(date);
+                onDateSelected(date);
+              },
+            );
+          },
+        );
+}
+
+class _DueDateFieldContent extends StatelessWidget {
   final DateTime? selectedDate;
+  final String? errorText;
   final bool enabled;
-  final bool showError;
   final bool isEditing;
   final ValueChanged<DateTime> onDateSelected;
 
-  const OrderDueDateField({
-    super.key,
+  const _DueDateFieldContent({
     required this.selectedDate,
+    required this.errorText,
+    required this.enabled,
+    required this.isEditing,
     required this.onDateSelected,
-    this.enabled = true,
-    this.showError = false,
-    this.isEditing = false,
   });
 
   String _formatDate(DateTime date) {
@@ -50,7 +75,7 @@ class OrderDueDateField extends StatelessWidget {
           hintText: 'Select due date',
           prefixIcon: const Icon(Icons.calendar_today),
           border: const OutlineInputBorder(),
-          errorText: showError ? 'Due date is required' : null,
+          errorText: errorText,
         ),
         child: Text(
           selectedDate != null
@@ -66,4 +91,3 @@ class OrderDueDateField extends StatelessWidget {
     );
   }
 }
-

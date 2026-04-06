@@ -231,9 +231,6 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
       showListBullets: true,
       showListNumbers: true,
       showListCheck: false,
-      showClipboardCopy: false,
-      showClipboardCut: false,
-      showClipboardPaste: false,
       showRedo: false,
       showUndo: false,
       buttonOptions: QuillSimpleToolbarButtonOptions(

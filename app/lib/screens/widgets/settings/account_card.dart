@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../backend/backend.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
@@ -98,8 +99,21 @@ class AccountCard extends StatelessWidget {
       final orderState = context.read<OrderState>();
       final settingsState = context.read<SettingsState>();
       final backupState = context.read<BackupState>();
+      final customerRepository = context.read<CustomerRepository>();
+      final orderRepository = context.read<OrderRepository>();
+      final measurementRepository = context.read<MeasurementRepository>();
+      final settingsRepository = context.read<SettingsRepository>();
 
-      await AuthService.signOut();
+      try {
+        await AuthService.signOut(
+          customerRepository: customerRepository,
+          orderRepository: orderRepository,
+          measurementRepository: measurementRepository,
+          settingsRepository: settingsRepository,
+        );
+      } catch (_) {
+        // Auth already signed out; local cleanup failed but we still proceed to login
+      }
 
       customerState.clearCustomers();
       orderState.clearOrders();
@@ -107,7 +121,7 @@ class AccountCard extends StatelessWidget {
       backupState.reset();
 
       if (context.mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // dismiss loading dialog
         Navigator.of(context).pushNamedAndRemoveUntil(
           AppConstants.loginRoute,
           (route) => false,

@@ -171,7 +171,17 @@ class BackupRestoreCard extends StatelessWidget {
       backupState.setLoading(true);
       backupState.setProgress(0.2);
 
-      final backupJson = await BackupService.createBackup();
+      final customerRepository = context.read<CustomerRepository>();
+      final orderRepository = context.read<OrderRepository>();
+      final measurementRepository = context.read<MeasurementRepository>();
+      final settingsRepository = context.read<SettingsRepository>();
+
+      final backupJson = await BackupService.createBackup(
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
       backupState.setProgress(0.4);
 
       await DriveService.uploadBackup(backupJson);
@@ -183,7 +193,9 @@ class BackupRestoreCard extends StatelessWidget {
       await AudioSyncService.syncAudiosToDrive();
       backupState.setProgress(0.9);
 
-      await BackupTimeService.updateLastBackupTime();
+      await BackupTimeService.updateLastBackupTime(
+        settingsRepository: settingsRepository,
+      );
 
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
@@ -274,7 +286,13 @@ class BackupRestoreCard extends StatelessWidget {
 
       backupState.setProgress(0.6);
 
-      await BackupService.restoreBackup(backupJson);
+      await BackupService.restoreBackup(
+        backupJson,
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
 
       backupState.setProgress(0.9);
 

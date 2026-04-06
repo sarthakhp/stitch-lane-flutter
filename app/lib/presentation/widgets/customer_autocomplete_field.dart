@@ -1,24 +1,55 @@
 import 'package:flutter/material.dart';
 import '../../backend/models/customer.dart';
 
-class CustomerAutocompleteField extends StatelessWidget {
+class CustomerAutocompleteField extends FormField<Customer> {
+  CustomerAutocompleteField({
+    super.key,
+    required List<Customer> customers,
+    Customer? selectedCustomer,
+    required ValueChanged<Customer> onCustomerSelected,
+    required VoidCallback onCustomerCleared,
+    required VoidCallback onCreateNewCustomer,
+    bool enabled = true,
+  }) : super(
+          initialValue: selectedCustomer,
+          validator: (value) => value == null ? 'Please select a customer' : null,
+          builder: (FormFieldState<Customer> state) {
+            return _CustomerAutocompleteContent(
+              customers: customers,
+              selectedCustomer: state.value,
+              errorText: state.errorText,
+              enabled: enabled,
+              onCustomerSelected: (customer) {
+                state.didChange(customer);
+                onCustomerSelected(customer);
+              },
+              onCustomerCleared: () {
+                state.didChange(null);
+                onCustomerCleared();
+              },
+              onCreateNewCustomer: onCreateNewCustomer,
+            );
+          },
+        );
+}
+
+class _CustomerAutocompleteContent extends StatelessWidget {
   final List<Customer> customers;
   final Customer? selectedCustomer;
+  final String? errorText;
+  final bool enabled;
   final ValueChanged<Customer> onCustomerSelected;
   final VoidCallback onCustomerCleared;
   final VoidCallback onCreateNewCustomer;
-  final bool enabled;
-  final bool hasError;
 
-  const CustomerAutocompleteField({
-    super.key,
+  const _CustomerAutocompleteContent({
     required this.customers,
     required this.selectedCustomer,
+    required this.errorText,
+    required this.enabled,
     required this.onCustomerSelected,
     required this.onCustomerCleared,
     required this.onCreateNewCustomer,
-    this.enabled = true,
-    this.hasError = false,
   });
 
   List<Customer> _getSortedCustomers() {
@@ -51,7 +82,7 @@ class CustomerAutocompleteField extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           enabled: enabled,
-          hasError: hasError,
+          errorText: errorText,
           selectedCustomer: selectedCustomer,
           onFieldSubmitted: onFieldSubmitted,
           onClear: () {
@@ -80,7 +111,7 @@ class _CustomerTextField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
-  final bool hasError;
+  final String? errorText;
   final Customer? selectedCustomer;
   final VoidCallback onFieldSubmitted;
   final VoidCallback onClear;
@@ -89,7 +120,7 @@ class _CustomerTextField extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.enabled,
-    required this.hasError,
+    required this.errorText,
     required this.selectedCustomer,
     required this.onFieldSubmitted,
     required this.onClear,
@@ -106,7 +137,7 @@ class _CustomerTextField extends StatelessWidget {
         hintText: 'Search customer by name or phone...',
         prefixIcon: const Icon(Icons.person),
         border: const OutlineInputBorder(),
-        errorText: hasError ? 'Please select a customer' : null,
+        errorText: errorText,
         suffixIcon: selectedCustomer != null
             ? IconButton(
                 icon: const Icon(Icons.clear),
@@ -174,4 +205,3 @@ class _CustomerOptionsView extends StatelessWidget {
     );
   }
 }
-

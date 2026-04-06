@@ -1,13 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:langchain/langchain.dart';
+import 'package:langchain_google/langchain_google.dart';
 import '../../constants/gemini_prompts.dart';
 import '../../utils/app_logger.dart';
 
 class GeminiService {
-  static GenerativeModel? _model;
+  static ChatGoogleGenerativeAI? _model;
 
-  static GenerativeModel _getModel() {
+  static ChatGoogleGenerativeAI _getModel() {
     if (_model != null) return _model!;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
@@ -18,10 +20,11 @@ class GeminiService {
       );
     }
 
-    _model = GenerativeModel(
-      model: 'gemini-3-flash-preview',
+    _model = ChatGoogleGenerativeAI(
       apiKey: apiKey,
-      systemInstruction: Content.system(GeminiPrompts.systemInstruction),
+      defaultOptions: const ChatGoogleGenerativeAIOptions(
+        model: 'gemini-2.5-flash',
+      ),
     );
 
     return _model!;
@@ -41,36 +44,33 @@ class GeminiService {
       AppLogger.info('Audio file size: ${audioBytes.length} bytes');
 
       final model = _getModel();
+      final audioBase64 = base64Encode(audioBytes);
 
-      final promptPart = TextPart(GeminiPrompts.transcriptionPrompt);
+      final response = await model.invoke(
+        PromptValue.chat([
+          ChatMessage.system(GeminiPrompts.systemInstruction),
+          ChatMessage.human(
+            ChatMessageContent.multiModal([
+              ChatMessageContent.text(GeminiPrompts.transcriptionPrompt),
+              ChatMessageContent.image(
+                data: audioBase64,
+                mimeType: 'audio/m4a',
+              ),
+            ]),
+          ),
+        ]),
+      );
 
-      final audioPart = DataPart('audio/m4a', audioBytes);
+      final transcription = response.output.content;
+      AppLogger.info('Response: $transcription');
 
-      final response = await model.generateContent([
-        Content.multi([promptPart, audioPart])
-      ]);
-
-      AppLogger.info('Response: ${response.text}');
-
-      if (response.text == null || response.text!.isEmpty) {
+      if (transcription.isEmpty) {
         AppLogger.warning('Gemini returned empty transcription');
         return null;
       }
 
-      final transcription = response.text!;
       AppLogger.info('Transcription successful: ${transcription.length} characters');
-
       return transcription;
-    } on GenerativeAIException catch (e) {
-      AppLogger.error('Gemini API error during transcription', e);
-      if (e.message.contains('API key')) {
-        throw Exception('Invalid API key. Please check your GEMINI_API_KEY in .env file');
-      } else if (e.message.contains('quota') || e.message.contains('limit')) {
-        throw Exception('API quota exceeded. Please try again later');
-      } else if (e.message.contains('network') || e.message.contains('connection')) {
-        throw Exception('Network error. Please check your internet connection');
-      }
-      throw Exception('Transcription failed: ${e.message}');
     } on SocketException catch (e) {
       AppLogger.error('Network error during transcription', e);
       throw Exception('No internet connection. Please check your network');
@@ -80,4 +80,3 @@ class GeminiService {
     }
   }
 }
-

@@ -1,6 +1,4 @@
-import 'package:hive_flutter/hive_flutter.dart';
 import '../../backend/backend.dart';
-import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
 import '../models/pending_orders_data.dart';
 import 'daily_task_scheduler.dart';
@@ -33,7 +31,15 @@ class PendingOrdersReminderService {
 
       await _initializeForBackground();
 
-      final data = await _aggregatePendingOrdersData();
+      final orderRepository = RepositoryFactory.createOrderRepository();
+      final customerRepository = RepositoryFactory.createCustomerRepository();
+      final settingsRepository = RepositoryFactory.createSettingsRepository();
+
+      final data = await _aggregatePendingOrdersData(
+        orderRepository: orderRepository,
+        customerRepository: customerRepository,
+        settingsRepository: settingsRepository,
+      );
 
       if (data.hasOrders) {
         await NotificationService.showPendingOrdersReminderNotification(data);
@@ -43,19 +49,24 @@ class PendingOrdersReminderService {
         AppLogger.info('No pending orders notification shown');
       }
 
-      await _scheduleNextIfEnabled();
+      await _scheduleNextIfEnabled(settingsRepository);
 
       AppLogger.info('Pending orders reminder completed');
     } catch (e) {
       AppLogger.error('Pending orders reminder failed', e);
-      await _scheduleNextIfEnabled();
+      try {
+        final settingsRepository = RepositoryFactory.createSettingsRepository();
+        await _scheduleNextIfEnabled(settingsRepository);
+      } catch (scheduleError) {
+        AppLogger.error('Failed to schedule next reminder after failure', scheduleError);
+      }
       rethrow;
     }
   }
 
-  static Future<void> _scheduleNextIfEnabled() async {
+  static Future<void> _scheduleNextIfEnabled(SettingsRepository settingsRepository) async {
     try {
-      final settings = await _getSettings();
+      final settings = await settingsRepository.getSettings();
       if (settings.pendingOrdersReminderEnabled) {
         await _scheduler.scheduleNextDay(settings.pendingOrdersReminderTime);
         AppLogger.info('Next pending orders reminder scheduled for tomorrow');
@@ -65,25 +76,20 @@ class PendingOrdersReminderService {
     }
   }
 
-  static Future<AppSettings> _getSettings() async {
-    final settingsBox = Hive.box<AppSettings>(AppConstants.settingsBoxName);
-    return settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
-  }
-
-  static Future<PendingOrdersData> _aggregatePendingOrdersData() async {
-    final ordersBox = Hive.box<Order>(AppConstants.ordersBoxName);
-    final customersBox = Hive.box<Customer>(AppConstants.customersBoxName);
-    final settingsBox = Hive.box<AppSettings>(AppConstants.settingsBoxName);
-
-    final settings = settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
+  static Future<PendingOrdersData> _aggregatePendingOrdersData({
+    required OrderRepository orderRepository,
+    required CustomerRepository customerRepository,
+    required SettingsRepository settingsRepository,
+  }) async {
+    final settings = await settingsRepository.getSettings();
     final thresholdDays = settings.dueDateWarningThreshold;
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final thresholdDate = today.add(Duration(days: thresholdDays));
 
-    final allOrders = ordersBox.values.toList();
-    final allCustomers = customersBox.values.toList();
+    final allOrders = await orderRepository.getAllOrders();
+    final allCustomers = await customerRepository.getAllCustomers();
 
     final customerMap = {for (var c in allCustomers) c.id: c};
 
@@ -139,36 +145,7 @@ class PendingOrdersReminderService {
   }
 
   static Future<void> _initializeForBackground() async {
-    if (!Hive.isBoxOpen(AppConstants.customersBoxName)) {
-      await Hive.initFlutter();
-      _registerAdaptersIfNeeded();
-      await Hive.openBox<Customer>(AppConstants.customersBoxName);
-      await Hive.openBox<Order>(AppConstants.ordersBoxName);
-      await Hive.openBox<AppSettings>(AppConstants.settingsBoxName);
-      await Hive.openBox<Measurement>(AppConstants.measurementsBoxName);
-    }
+    await DatabaseService.initialize();
     await NotificationService.initialize();
   }
-
-  static void _registerAdaptersIfNeeded() {
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(CustomerAdapter());
-    }
-    if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(OrderAdapter());
-    }
-    if (!Hive.isAdapterRegistered(2)) {
-      Hive.registerAdapter(OrderStatusAdapter());
-    }
-    if (!Hive.isAdapterRegistered(3)) {
-      Hive.registerAdapter(AppSettingsAdapter());
-    }
-    if (!Hive.isAdapterRegistered(4)) {
-      Hive.registerAdapter(MeasurementAdapter());
-    }
-    if (!Hive.isAdapterRegistered(5)) {
-      Hive.registerAdapter(PaymentEntryAdapter());
-    }
-  }
 }
-

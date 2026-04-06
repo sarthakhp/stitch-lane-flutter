@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import '../../backend/backend.dart';
-import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
 import 'auto_backup_service.dart';
 import 'drive_service.dart';
@@ -11,10 +10,15 @@ class AppLifecycleBackupService with WidgetsBindingObserver {
   bool _isBackupInProgress = false;
   bool _isInitialized = false;
   VoidCallback? _onBackupComplete;
+  SettingsRepository? _settingsRepository;
 
-  void initialize({VoidCallback? onBackupComplete}) {
+  void initialize({
+    required SettingsRepository settingsRepository,
+    VoidCallback? onBackupComplete,
+  }) {
     if (_isInitialized) return;
 
+    _settingsRepository = settingsRepository;
     _onBackupComplete = onBackupComplete;
     WidgetsBinding.instance.addObserver(this);
     _isInitialized = true;
@@ -27,6 +31,7 @@ class AppLifecycleBackupService with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _isInitialized = false;
     _onBackupComplete = null;
+    _settingsRepository = null;
     AppLogger.info('AppLifecycleBackupService: Disposed');
   }
 
@@ -47,7 +52,7 @@ class AppLifecycleBackupService with WidgetsBindingObserver {
     try {
       _isBackupInProgress = true;
 
-      final settings = await _getSettings();
+      final settings = await _settingsRepository!.getSettings();
 
       if (!settings.autoBackupEnabled) {
         AppLogger.info('AppLifecycleBackupService: Auto backup is disabled');
@@ -87,11 +92,6 @@ class AppLifecycleBackupService with WidgetsBindingObserver {
     return timeSinceLastBackup > backupThreshold;
   }
 
-  Future<AppSettings> _getSettings() async {
-    final settingsBox = DatabaseService.getSettingsBox();
-    return settingsBox.get(AppConstants.settingsKey) ?? AppSettings();
-  }
-
   Future<bool> _isDriveSignedIn() async {
     try {
       return await DriveService.isSignedIn();
@@ -100,4 +100,3 @@ class AppLifecycleBackupService with WidgetsBindingObserver {
     }
   }
 }
-

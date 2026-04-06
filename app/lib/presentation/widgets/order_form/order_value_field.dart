@@ -31,7 +31,15 @@ class OrderValueField extends StatelessWidget {
       textInputAction: TextInputAction.next,
       enabled: enabled,
       onChanged: onChanged != null ? (_) => onChanged!() : null,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Please enter order value';
+        }
+        if (int.tryParse(value.trim()) == null) {
+          return 'Please enter a valid number';
+        }
+        return null;
+      },
     );
   }
 }
-

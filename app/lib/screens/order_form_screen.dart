@@ -98,17 +98,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   }
 
   Future<void> _saveOrder() async {
-    _controller.setHasAttemptedSubmit(true);
-
     if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final validationError = _controller.validateForSave();
-    if (validationError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(validationError)),
-      );
       return;
     }
 
