@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_chat_models.dart';
 
+/// Max exchanges to include in history text sent to the model.
+const int _maxHistoryExchanges = 10;
+
 /// Number of recent exchanges that include full tool call + response details.
 const int _recentFullDetailCount = 2;
 
@@ -126,22 +129,30 @@ class AiChatHistory {
   static String? buildHistoryText(List<ChatExchange> exchanges) {
     if (exchanges.isEmpty) return null;
 
-    final buf = StringBuffer();
-    final cutoff = exchanges.length - _recentFullDetailCount;
+    // Only include the last N exchanges
+    final included = exchanges.length > _maxHistoryExchanges
+        ? exchanges.sublist(exchanges.length - _maxHistoryExchanges)
+        : exchanges;
 
-    for (int i = 0; i < exchanges.length; i++) {
-      final e = exchanges[i];
+    final buf = StringBuffer();
+    final cutoff = included.length - _recentFullDetailCount;
+
+    for (int i = 0; i < included.length; i++) {
+      final e = included[i];
       final isRecent = i >= cutoff;
 
       buf.writeln('User: ${e.userText}');
 
-      if (isRecent && e.toolCalls.isNotEmpty) {
-        // Recent: include tool call details
+      if (isRecent) {
+        // Recent: include tool call details and ui_components
         for (final tc in e.toolCalls) {
           buf.writeln('Tool call: ${tc.name}(${jsonEncode(tc.arguments)})');
           buf.writeln('Tool result: ${_truncate(tc.response)}');
         }
         buf.writeln('Assistant: ${e.assistantText}');
+        if (e.uiComponents.isNotEmpty) {
+          buf.writeln('Shown to user: ${e.uiComponents.map((c) => c.historyLabel).join('; ')}');
+        }
       } else {
         // Older: truncate assistant response
         buf.writeln('Assistant: ${_truncate(e.assistantText)}');

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../constants/gemini_prompts.dart';
 import '../domain/services/ai_chat_models.dart';
@@ -62,7 +64,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     });
     _scrollToBottom();
 
-    final response = await _chatService.sendMessage(trimmed);
+    final response = await _chatService.sendMessage(
+      trimmed,
+      customerRepo: context.read<CustomerRepository>(),
+      orderRepo: context.read<OrderRepository>(),
+    );
 
     if (mounted) {
       setState(() {

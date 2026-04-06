@@ -1,6 +1,7 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
+import '../../backend/backend.dart';
 import '../../utils/app_logger.dart';
 import 'ai_chat_config.dart';
 import 'ai_chat_history.dart';
@@ -73,7 +74,11 @@ class AiChatService {
     await AiChatHistory.clear();
   }
 
-  Future<AiChatResponse> sendMessage(String userMessage) async {
+  Future<AiChatResponse> sendMessage(
+    String userMessage, {
+    required CustomerRepository customerRepo,
+    required OrderRepository orderRepo,
+  }) async {
     _ensureModel();
 
     var systemPrompt = buildAiSystemPrompt();
@@ -89,18 +94,24 @@ class AiChatService {
     try {
       final result = await AiExecutor.run(_model!, history, systemPrompt: systemPrompt);
 
+      final enriched = await _enrichComponents(
+        result.uiComponents,
+        customerRepo,
+        orderRepo,
+      );
+
       _exchanges.add(ChatExchange(
         userText: userMessage,
         assistantText: result.responseText,
         toolCalls: result.toolCalls,
-        uiComponents: result.uiComponents,
+        uiComponents: enriched,
       ));
       _sessionUsage = _sessionUsage + result.usage;
 
       return AiChatResponse(
         text: result.responseText,
         usage: result.usage,
-        uiComponents: result.uiComponents,
+        uiComponents: enriched,
       );
     } catch (e) {
       AppLogger.error('AI chat error', e);
@@ -110,6 +121,62 @@ class AiChatService {
         usage: AiTokenUsage.zero,
       );
     }
+  }
+
+  Future<List<UiComponent>> _enrichComponents(
+    List<UiComponent> components,
+    CustomerRepository customerRepo,
+    OrderRepository orderRepo,
+  ) async {
+    final enriched = <UiComponent>[];
+    for (final c in components) {
+      try {
+        if (c.type == 'customer') {
+          final customer = await customerRepo.getCustomerById(c.id);
+          if (customer == null) { enriched.add(c); continue; }
+
+          final orders = await orderRepo.getOrdersByCustomerId(customer.id);
+          final pending = orders.where((o) => o.status == OrderStatus.pending).length;
+          final ready = orders.where((o) => o.status == OrderStatus.ready).length;
+          final unpaid = orders
+              .where((o) => !o.isPaid)
+              .fold<int>(0, (sum, o) => sum + o.value - o.totalPaidAmount);
+
+          final details = <String>[];
+          if (pending > 0) details.add('$pending pending');
+          if (ready > 0) details.add('$ready ready');
+          if (unpaid > 0) details.add('₹$unpaid unpaid');
+
+          enriched.add(UiComponent(
+            type: c.type, id: c.id,
+            title: customer.name,
+            details: details,
+          ));
+        } else if (c.type == 'order') {
+          final order = await orderRepo.getOrderById(c.id);
+          if (order == null) { enriched.add(c); continue; }
+
+          final customer = await customerRepo.getCustomerById(order.customerId);
+          final dueDateStr = '${order.dueDate.day}/${order.dueDate.month}/${order.dueDate.year}';
+
+          final details = <String>[];
+          if (order.title != null && order.title!.trim().isNotEmpty) details.add(order.title!);
+          details.add('₹${order.value}');
+          details.add('Due $dueDateStr');
+
+          enriched.add(UiComponent(
+            type: c.type, id: c.id,
+            title: customer?.name ?? 'Order',
+            details: details,
+          ));
+        } else {
+          enriched.add(c);
+        }
+      } catch (_) {
+        enriched.add(c);
+      }
+    }
+    return enriched;
   }
 
   void dispose() {
