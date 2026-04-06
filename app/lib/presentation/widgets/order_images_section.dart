@@ -7,6 +7,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../config/app_config.dart';
 import '../../domain/domain.dart';
+import '../../utils/app_logger.dart';
 
 class OrderImagesSection extends StatelessWidget {
   final List<String> imagePaths;
@@ -251,16 +252,27 @@ class _ImageThumbnail extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
+    if (!kIsWeb) {
+      final file = File(imagePath);
+      final exists = file.existsSync();
+      AppLogger.info('Image thumbnail: path=$imagePath, exists=$exists${exists ? ', size=${file.lengthSync()} bytes' : ''}');
+    }
     return kIsWeb
         ? Image.network(
             imagePath,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _buildErrorWidget(context),
+            errorBuilder: (context, error, stackTrace) {
+              AppLogger.error('Image load failed: $imagePath', error);
+              return _buildErrorWidget(context);
+            },
           )
         : Image.file(
             File(imagePath),
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _buildErrorWidget(context),
+            errorBuilder: (context, error, stackTrace) {
+              AppLogger.error('Image load failed: $imagePath', error);
+              return _buildErrorWidget(context);
+            },
           );
   }
 

@@ -6,9 +6,11 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:path_provider/path_provider.dart';
 import '../../config/auth_config.dart';
 import '../../backend/backend.dart';
-import '../../backend/database/sqlite_database.dart';
 import '../../utils/app_logger.dart';
+import 'auto_backup_service.dart';
+import 'notification_service.dart';
 import 'onboarding_service.dart';
+import 'pending_orders_reminder_service.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -84,6 +86,9 @@ class AuthService {
           settingsRepository: settingsRepository,
         ),
         _clearLocalFiles(),
+        AutoBackupService.cancelAutoBackup(),
+        PendingOrdersReminderService.cancelReminder(),
+        NotificationService.cancelAllNotifications(),
       ]);
 
       if (userId != null) {

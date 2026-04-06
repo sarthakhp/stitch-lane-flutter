@@ -486,6 +486,54 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.0"
+  flutter_image_compress:
+    dependency: "direct main"
+    description:
+      name: flutter_image_compress
+      sha256: "51d23be39efc2185e72e290042a0da41aed70b14ef97db362a6b5368d0523b27"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.0"
+  flutter_image_compress_common:
+    dependency: transitive
+    description:
+      name: flutter_image_compress_common
+      sha256: c5c5d50c15e97dd7dc72ff96bd7077b9f791932f2076c5c5b6c43f2c88607bfb
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.6"
+  flutter_image_compress_macos:
+    dependency: transitive
+    description:
+      name: flutter_image_compress_macos
+      sha256: "20019719b71b743aba0ef874ed29c50747461e5e8438980dfa5c2031898f7337"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.3"
+  flutter_image_compress_ohos:
+    dependency: transitive
+    description:
+      name: flutter_image_compress_ohos
+      sha256: e76b92bbc830ee08f5b05962fc78a532011fcd2041f620b5400a593e96da3f51
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.3"
+  flutter_image_compress_platform_interface:
+    dependency: transitive
+    description:
+      name: flutter_image_compress_platform_interface
+      sha256: "579cb3947fd4309103afe6442a01ca01e1e6f93dc53bb4cbd090e8ce34a41889"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.5"
+  flutter_image_compress_web:
+    dependency: transitive
+    description:
+      name: flutter_image_compress_web
+      sha256: b9b141ac7c686a2ce7bb9a98176321e1182c9074650e47bb140741a44b6f5a96
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.5"
   flutter_keyboard_visibility_linux:
     dependency: transitive
     description:
@@ -641,10 +689,10 @@ packages:
     dependency: transitive
     description:
       name: gcloud
-      sha256: caa415a0145ec8afac457322872c3e8b38379a88800d2944c53798ea8fbce386
+      sha256: "19e8f105b1087371f37d567d1b6335260d84f970e70bf1c2e9c3616c0247f9f2"
       url: "https://pub.dev"
     source: hosted
-    version: "0.8.19"
+    version: "0.9.0"
   glob:
     dependency: transitive
     description:
@@ -653,14 +701,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.3"
-  google_generative_ai:
-    dependency: transitive
-    description:
-      name: google_generative_ai
-      sha256: "71f613d0247968992ad87a0eb21650a566869757442ba55a31a81be6746e0d1f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.4.7"
   google_identity_services_web:
     dependency: transitive
     description:
@@ -709,14 +749,23 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.12.4+4"
+  googleai_dart:
+    dependency: "direct overridden"
+    description:
+      path: "packages/googleai_dart"
+      ref: HEAD
+      resolved-ref: "3377860c9237bee22b401e1533cceb9baeb48cb5"
+      url: "https://github.com/davidmigloz/ai_clients_dart.git"
+    source: git
+    version: "5.0.1"
   googleapis:
     dependency: "direct main"
     description:
       name: googleapis
-      sha256: "864f222aed3f2ff00b816c675edf00a39e2aaf373d728d8abec30b37bee1a81c"
+      sha256: "692fb9e90c321b61a7a2123de0353ec8a20691cd979db2553d8d732f710f6535"
       url: "https://pub.dev"
     source: hosted
-    version: "13.2.0"
+    version: "15.0.0"
   googleapis_auth:
     dependency: transitive
     description:
@@ -897,26 +946,25 @@ packages:
     dependency: "direct main"
     description:
       name: langchain
-      sha256: "8a9b80fc09fcc4b17d8fed636d2dfa7a10ab598c1e0ec9533b8bf1a4ae87115f"
+      sha256: b7035e0903953cb065734499296e66d9fa0f6e15934aa2f57389b9fb6b001aab
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.8"
+    version: "0.8.1"
   langchain_core:
     dependency: transitive
     description:
       name: langchain_core
-      sha256: d761f364077543d77b6fc3242ddf9dbcf7b6c7b2419f81ab8feb55ffd3a7970f
+      sha256: fce3cd0e31dcbac80d209f6361207936a58b05506b800f13227cbe83f6e3e721
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.7"
+    version: "0.4.1"
   langchain_google:
     dependency: "direct main"
     description:
-      name: langchain_google
-      sha256: "07290fb28a967709969dde8fef5c2c2181553ccd4dc134e1975ac964143014de"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.6.5"
+      path: "../langchain_google_patch"
+      relative: true
+    source: path
+    version: "0.7.1+2"
   leak_tracker:
     dependency: transitive
     description:
@@ -1570,6 +1618,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  toonx:
+    dependency: "direct main"
+    description:
+      name: toonx
+      sha256: ed4b22dccc79ac781f896d862469369aff2ea3b4c5fb2dafd8991032c1088c54
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
   typed_data:
     dependency: transitive
     description:
@@ -1670,10 +1726,10 @@ packages:
     dependency: transitive
     description:
       name: vertex_ai
-      sha256: ba79b891af936944fa681e0d646b95ec445842b5dbdd60fa62844eec7c954c9f
+      sha256: eeb0b166a0a51c651b3be63db54a13960fce68a668eadd589af0a5723bc5d29d
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.1"
+    version: "0.2.1"
   vm_service:
     dependency: transitive
     description:
@@ -1770,6 +1826,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.6.1"
+  xml2json:
+    dependency: transitive
+    description:
+      name: xml2json
+      sha256: "8a7ae63b76676f083d81287b61f03222952609c0507893bc62e60a4a588a9702"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.2.7"
   yaml:
     dependency: transitive
     description:

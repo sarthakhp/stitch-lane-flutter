@@ -102,16 +102,16 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         orderRepository: orderRepository,
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
-        onImageProgress: (current, total) {
+        onImageProgress: (current, total, message) {
           backupState.setDetailedProgress(
             0.5 + (current / total) * 0.2,
-            'Restoring images $current / $total',
+            message,
           );
         },
-        onAudioProgress: (current, total) {
+        onAudioProgress: (current, total, message) {
           backupState.setDetailedProgress(
             0.7 + (current / total) * 0.2,
-            'Restoring audio $current / $total',
+            message,
           );
         },
       );

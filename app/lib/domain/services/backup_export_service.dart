@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
+import 'backup_service.dart';
 import 'drive_service.dart';
+import 'image_storage_service.dart';
 
 class BackupExportService {
   static Future<void> exportDriveBackupAsZip({
@@ -81,6 +86,76 @@ class BackupExportService {
       throw Exception('Save cancelled');
     }
 
-    AppLogger.info('BackupExport: Saved to $savedPath');
+    AppLogger.info('BackupExport: Drive backup saved to $savedPath');
+  }
+
+  static Future<void> exportLocalBackupAsZip({
+    required CustomerRepository customerRepository,
+    required OrderRepository orderRepository,
+    required MeasurementRepository measurementRepository,
+    required SettingsRepository settingsRepository,
+    void Function(String status)? onProgress,
+  }) async {
+    final archive = Archive();
+
+    // 1. Create backup JSON from local DB
+    onProgress?.call('Reading local data...');
+    final backupJson = await BackupService.createBackup(
+      customerRepository: customerRepository,
+      orderRepository: orderRepository,
+      measurementRepository: measurementRepository,
+      settingsRepository: settingsRepository,
+    );
+    final jsonBytes = utf8.encode(backupJson);
+    archive.addFile(ArchiveFile(AppConstants.backupFileName, jsonBytes.length, jsonBytes));
+    AppLogger.info('BackupExport: Added local backup JSON');
+
+    // 2. Read local images
+    final imagePaths = await ImageStorageService.getAllImagePaths();
+    onProgress?.call('Adding ${imagePaths.length} images...');
+    for (int i = 0; i < imagePaths.length; i++) {
+      final path = imagePaths[i];
+      final fileName = path.split('/').last;
+      onProgress?.call('Adding image ${i + 1}/${imagePaths.length}...');
+      final bytes = await ImageStorageService.getImageBytes(path);
+      if (bytes != null) {
+        archive.addFile(ArchiveFile('images/$fileName', bytes.length, bytes));
+      }
+    }
+    AppLogger.info('BackupExport: Added ${imagePaths.length} local images');
+
+    // 3. Read local audio files
+    final appDir = await getApplicationDocumentsDirectory();
+    final audioFiles = Directory(appDir.path)
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.m4a') && f.path.contains('measurement_'))
+        .toList();
+    onProgress?.call('Adding ${audioFiles.length} audio files...');
+    for (int i = 0; i < audioFiles.length; i++) {
+      final file = audioFiles[i];
+      final fileName = file.path.split('/').last;
+      onProgress?.call('Adding audio ${i + 1}/${audioFiles.length}...');
+      final bytes = await file.readAsBytes();
+      archive.addFile(ArchiveFile('audios/$fileName', bytes.length, bytes));
+    }
+    AppLogger.info('BackupExport: Added ${audioFiles.length} local audio files');
+
+    // 4. Encode zip
+    onProgress?.call('Creating zip file...');
+    final zipData = ZipEncoder().encode(archive);
+    AppLogger.info('BackupExport: Local zip created (${zipData.length} bytes)');
+
+    // 5. Save to device
+    onProgress?.call('Saving...');
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final savedPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Local Backup',
+      fileName: '${AppConstants.backupZipPrefix}_local_$timestamp.zip',
+      bytes: Uint8List.fromList(zipData),
+    );
+
+    if (savedPath == null) throw Exception('Save cancelled');
+    AppLogger.info('BackupExport: Local backup saved to $savedPath');
   }
 }

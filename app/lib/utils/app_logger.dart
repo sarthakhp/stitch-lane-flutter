@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'file_log_output.dart';
 
@@ -14,6 +15,7 @@ class AppLogger {
 
   static void _initializeLogger() {
     _logger = Logger(
+      filter: ProductionFilter(),
       printer: PrettyPrinter(
         methodCount: 0,
         errorMethodCount: 5,
@@ -22,7 +24,11 @@ class AppLogger {
         printEmojis: true,
         dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
       ),
-      output: _fileLoggingEnabled ? MultiOutput([ConsoleOutput(), FileLogOutput()]) : null,
+      output: _fileLoggingEnabled
+          ? (kDebugMode
+              ? MultiOutput([ConsoleOutput(), FileLogOutput()])
+              : FileLogOutput())
+          : (kDebugMode ? null : null),
     );
   }
 

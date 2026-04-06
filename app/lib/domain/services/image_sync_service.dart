@@ -1,10 +1,13 @@
 import 'dart:typed_data';
+import 'package:googleapis/drive/v3.dart' as drive;
 import '../../utils/app_logger.dart';
 import 'image_storage_service.dart';
 import 'drive_service.dart';
 
 class ImageSyncService {
-  static Future<void> syncImagesToDrive() async {
+  static Future<void> syncImagesToDrive({
+    void Function(int current, int total, String message)? onProgress,
+  }) async {
     try {
       AppLogger.info('Starting image sync to Drive');
 
@@ -20,17 +23,26 @@ class ImageSyncService {
           .map((path) => ImageStorageService.getFileNameFromPath(path))
           .toSet();
 
-      final imagesToUpload = localImageNames.difference(driveImageNames);
-      AppLogger.info('Images to upload: ${imagesToUpload.length}');
+      final imagesToUpload = localImageNames.difference(driveImageNames).toList();
+      final total = imagesToUpload.length;
+      AppLogger.info('Images to upload (diff): $total');
 
-      for (final imageName in imagesToUpload) {
+      for (int i = 0; i < total; i++) {
+        final imageName = imagesToUpload[i];
+        final current = i + 1;
         final imagePath = localImagePaths.firstWhere(
           (path) => ImageStorageService.getFileNameFromPath(path) == imageName,
         );
 
         final imageBytes = await ImageStorageService.getImageBytes(imagePath);
         if (imageBytes != null) {
-          await DriveServiceImageOperations.uploadImage(driveApi, imageName, imageBytes);
+          onProgress?.call(current, total, 'Uploading image $current of $total');
+          await _uploadWithRetry(driveApi, imageName, imageBytes,
+            onRetry: (nextAttempt, max) {
+              onProgress?.call(current, total,
+                'Retrying image $current of $total (attempt $nextAttempt/$max)');
+            },
+          );
           AppLogger.info('Uploaded image: $imageName');
         }
       }
@@ -53,8 +65,34 @@ class ImageSyncService {
     }
   }
 
+  static Future<void> _uploadWithRetry(
+    drive.DriveApi initialDriveApi,
+    String imageName,
+    Uint8List imageBytes, {
+    int maxAttempts = 3,
+    void Function(int nextAttempt, int max)? onRetry,
+  }) async {
+    drive.DriveApi driveApi = initialDriveApi;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await DriveServiceImageOperations.uploadImage(driveApi, imageName, imageBytes);
+        return;
+      } catch (e) {
+        if (attempt == maxAttempts) rethrow;
+        final delaySeconds = attempt * 2;
+        AppLogger.warning(
+          'Image upload failed (attempt $attempt/$maxAttempts): $imageName. '
+          'Reconnecting in ${delaySeconds}s...',
+        );
+        onRetry?.call(attempt + 1, maxAttempts);
+        await Future.delayed(Duration(seconds: delaySeconds));
+        driveApi = await DriveService.getDriveApi();
+      }
+    }
+  }
+
   static Future<void> downloadImagesFromDrive({
-    void Function(int current, int total)? onProgress,
+    void Function(int current, int total, String message)? onProgress,
   }) async {
     try {
       AppLogger.info('Starting image download from Drive');
@@ -68,8 +106,18 @@ class ImageSyncService {
         final imageFile = driveImages[i];
         final imageName = imageFile['name'] as String;
         final imageId = imageFile['id'] as String;
+        final current = i + 1;
 
-        final imageBytes = await DriveServiceImageOperations.downloadImage(driveApi, imageId);
+        onProgress?.call(current, total, 'Downloading image $current of $total');
+        final imageBytes = await _downloadImageWithRetry(
+          driveApi,
+          imageId,
+          imageName,
+          onRetry: (nextAttempt, max) {
+            onProgress?.call(current, total,
+              'Retrying image $current of $total (attempt $nextAttempt/$max)');
+          },
+        );
         if (imageBytes != null) {
           final extension = imageName.contains('.')
               ? '.${imageName.split('.').last}'
@@ -79,10 +127,10 @@ class ImageSyncService {
             Uint8List.fromList(imageBytes),
             extension: extension,
             customFileName: imageName,
+            compress: false,
           );
           AppLogger.info('Downloaded and saved image: $imageName');
         }
-        onProgress?.call(i + 1, total);
       }
 
       AppLogger.info('Image download completed successfully');
@@ -90,6 +138,32 @@ class ImageSyncService {
       AppLogger.error('Failed to download images from Drive', e);
       rethrow;
     }
+  }
+
+  static Future<List<int>?> _downloadImageWithRetry(
+    drive.DriveApi initialDriveApi,
+    String fileId,
+    String fileName, {
+    int maxAttempts = 3,
+    void Function(int nextAttempt, int max)? onRetry,
+  }) async {
+    drive.DriveApi driveApi = initialDriveApi;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await DriveServiceImageOperations.downloadImage(driveApi, fileId);
+      } catch (e) {
+        if (attempt == maxAttempts) rethrow;
+        final delaySeconds = attempt * 2;
+        AppLogger.warning(
+          'Image download failed (attempt $attempt/$maxAttempts): $fileName. '
+          'Reconnecting in ${delaySeconds}s...',
+        );
+        onRetry?.call(attempt + 1, maxAttempts);
+        await Future.delayed(Duration(seconds: delaySeconds));
+        driveApi = await DriveService.getDriveApi();
+      }
+    }
+    return null;
   }
 }
 

@@ -224,6 +224,11 @@ class NotificationService {
     await _notifications.cancel(_NotificationId.backupInProgress.value);
   }
 
+  static Future<void> cancelAllNotifications() async {
+    await _notifications.cancelAll();
+    AppLogger.info('All notifications cancelled');
+  }
+
   static Future<void> showPendingOrdersReminderNotification(
     PendingOrdersData data,
   ) async {

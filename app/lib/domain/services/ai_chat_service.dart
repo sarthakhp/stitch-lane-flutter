@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
+import 'package:toonx/toonx.dart' as toonx;
 import '../../utils/app_logger.dart';
 import 'ai_chat_config.dart';
 import 'ai_chat_history.dart';
@@ -71,7 +72,7 @@ class AiChatService {
   Future<AiChatResponse> sendMessage(String userMessage) async {
     _ensureModel();
 
-    final history = AiChatHistory.buildLangchainHistory(aiSystemPrompt, _exchanges);
+    final history = AiChatHistory.buildLangchainHistory(buildAiSystemPrompt(), _exchanges);
     history.add(ChatMessage.humanText(userMessage));
 
     final toolCallRecords = <ToolCallRecord>[];
@@ -137,17 +138,21 @@ class AiChatService {
       log.writeln('  tool sql: $sql');
 
       final toolResult = await AiToolService.queryDatabase(sql);
-      final resultJson = jsonEncode(toolResult.toJson());
+      final resultToon = toonx.encode(toolResult.toJson());
 
-      log.writeln('  tool result: ${toolResult.success ? "${toolResult.totalRows} rows, ${resultJson.length} chars" : "ERROR: ${toolResult.error}"}');
+      if (toolResult.success) {
+        log.writeln('  tool result: ${toolResult.totalRows} rows\n  $resultToon');
+      } else {
+        log.writeln('  tool result ERROR: ${toolResult.error}');
+      }
 
       records.add(ToolCallRecord(
         id: toolCall.id,
         name: toolCall.name,
         arguments: toolCall.arguments,
-        response: resultJson,
+        response: resultToon,
       ));
-      return resultJson;
+      return resultToon;
     }
 
     final errorJson = jsonEncode({'error': 'Unknown tool: ${toolCall.name}'});

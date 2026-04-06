@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:path_provider/path_provider.dart';
 import '../../utils/app_logger.dart';
 import 'drive_service.dart';
 
 class AudioSyncService {
-  static Future<void> syncAudiosToDrive() async {
+  static Future<void> syncAudiosToDrive({
+    void Function(int current, int total, String message)? onProgress,
+  }) async {
     try {
       AppLogger.info('Starting audio sync to Drive');
 
@@ -20,17 +23,26 @@ class AudioSyncService {
           .map((path) => _getFileNameFromPath(path))
           .toSet();
 
-      final audiosToUpload = localAudioNames.difference(driveAudioNames);
-      AppLogger.info('Audio files to upload: ${audiosToUpload.length}');
+      final audiosToUpload = localAudioNames.difference(driveAudioNames).toList();
+      final total = audiosToUpload.length;
+      AppLogger.info('Audio files to upload: $total');
 
-      for (final audioName in audiosToUpload) {
+      for (int i = 0; i < total; i++) {
+        final audioName = audiosToUpload[i];
+        final current = i + 1;
         final audioPath = localAudioPaths.firstWhere(
           (path) => _getFileNameFromPath(path) == audioName,
         );
 
         final audioBytes = await _getAudioBytes(audioPath);
         if (audioBytes != null) {
-          await DriveServiceAudioOperations.uploadAudio(driveApi, audioName, audioBytes);
+          onProgress?.call(current, total, 'Uploading audio $current of $total');
+          await _uploadWithRetry(driveApi, audioName, audioBytes,
+            onRetry: (nextAttempt, max) {
+              onProgress?.call(current, total,
+                'Retrying audio $current of $total (attempt $nextAttempt/$max)');
+            },
+          );
           AppLogger.info('Uploaded audio: $audioName');
         }
       }
@@ -53,8 +65,34 @@ class AudioSyncService {
     }
   }
 
+  static Future<void> _uploadWithRetry(
+    drive.DriveApi initialDriveApi,
+    String audioName,
+    List<int> audioBytes, {
+    int maxAttempts = 3,
+    void Function(int nextAttempt, int max)? onRetry,
+  }) async {
+    drive.DriveApi driveApi = initialDriveApi;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await DriveServiceAudioOperations.uploadAudio(driveApi, audioName, audioBytes);
+        return;
+      } catch (e) {
+        if (attempt == maxAttempts) rethrow;
+        final delaySeconds = attempt * 2;
+        AppLogger.warning(
+          'Audio upload failed (attempt $attempt/$maxAttempts): $audioName. '
+          'Reconnecting in ${delaySeconds}s...',
+        );
+        onRetry?.call(attempt + 1, maxAttempts);
+        await Future.delayed(Duration(seconds: delaySeconds));
+        driveApi = await DriveService.getDriveApi();
+      }
+    }
+  }
+
   static Future<void> downloadAudiosFromDrive({
-    void Function(int current, int total)? onProgress,
+    void Function(int current, int total, String message)? onProgress,
   }) async {
     try {
       AppLogger.info('Starting audio download from Drive');
@@ -70,15 +108,24 @@ class AudioSyncService {
         final audioFile = driveAudios[i];
         final audioName = audioFile['name'] as String;
         final audioId = audioFile['id'] as String;
+        final current = i + 1;
 
-        final audioBytes = await DriveServiceAudioOperations.downloadAudio(driveApi, audioId);
+        onProgress?.call(current, total, 'Downloading audio $current of $total');
+        final audioBytes = await _downloadAudioWithRetry(
+          driveApi,
+          audioId,
+          audioName,
+          onRetry: (nextAttempt, max) {
+            onProgress?.call(current, total,
+              'Retrying audio $current of $total (attempt $nextAttempt/$max)');
+          },
+        );
         if (audioBytes != null) {
           final filePath = '${directory.path}/$audioName';
           final file = File(filePath);
           await file.writeAsBytes(audioBytes);
           AppLogger.info('Downloaded and saved audio: $audioName');
         }
-        onProgress?.call(i + 1, total);
       }
 
       AppLogger.info('Audio download completed successfully');
@@ -86,6 +133,32 @@ class AudioSyncService {
       AppLogger.error('Failed to download audio files from Drive', e);
       rethrow;
     }
+  }
+
+  static Future<List<int>?> _downloadAudioWithRetry(
+    drive.DriveApi initialDriveApi,
+    String fileId,
+    String fileName, {
+    int maxAttempts = 3,
+    void Function(int nextAttempt, int max)? onRetry,
+  }) async {
+    drive.DriveApi driveApi = initialDriveApi;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await DriveServiceAudioOperations.downloadAudio(driveApi, fileId);
+      } catch (e) {
+        if (attempt == maxAttempts) rethrow;
+        final delaySeconds = attempt * 2;
+        AppLogger.warning(
+          'Audio download failed (attempt $attempt/$maxAttempts): $fileName. '
+          'Reconnecting in ${delaySeconds}s...',
+        );
+        onRetry?.call(attempt + 1, maxAttempts);
+        await Future.delayed(Duration(seconds: delaySeconds));
+        driveApi = await DriveService.getDriveApi();
+      }
+    }
+    return null;
   }
 
   static Future<List<String>> _getAllAudioPaths() async {

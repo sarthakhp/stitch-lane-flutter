@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,8 @@ import '../config/app_config.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
 import 'widgets/confirmation_dialog.dart';
+
+enum _ExportSource { local, drive }
 
 class BackupSettingsScreen extends StatefulWidget {
   const BackupSettingsScreen({super.key});
@@ -138,10 +141,24 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       );
       backupState.setProgress(0.4);
       await DriveService.uploadBackup(backupJson);
-      backupState.setProgress(0.5);
-      await ImageSyncService.syncImagesToDrive();
-      backupState.setProgress(0.7);
-      await AudioSyncService.syncAudiosToDrive();
+      backupState.setDetailedProgress(0.5, 'Syncing images...');
+      await ImageSyncService.syncImagesToDrive(
+        onProgress: (current, total, message) {
+          if (context.mounted) {
+            final fraction = 0.5 + (current / total) * 0.2;
+            backupState.setDetailedProgress(fraction, message);
+          }
+        },
+      );
+      backupState.setDetailedProgress(0.7, 'Syncing audio...');
+      await AudioSyncService.syncAudiosToDrive(
+        onProgress: (current, total, message) {
+          if (context.mounted) {
+            final fraction = 0.7 + (current / total) * 0.2;
+            backupState.setDetailedProgress(fraction, message);
+          }
+        },
+      );
       backupState.setProgress(0.9);
       await BackupTimeService.updateLastBackupTime(
         settingsRepository: settingsRepository,
@@ -224,13 +241,29 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       final measurementRepository = context.read<MeasurementRepository>();
       final settingsRepository = context.read<SettingsRepository>();
 
-      backupState.setProgress(0.6);
+      backupState.setDetailedProgress(0.6, 'Restoring data...');
       await BackupService.restoreBackup(
         backupJson,
         customerRepository: customerRepository,
         orderRepository: orderRepository,
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
+        onImageProgress: (current, total, message) {
+          if (context.mounted) {
+            backupState.setDetailedProgress(
+              0.6 + (current / total) * 0.2,
+              message,
+            );
+          }
+        },
+        onAudioProgress: (current, total, message) {
+          if (context.mounted) {
+            backupState.setDetailedProgress(
+              0.8 + (current / total) * 0.1,
+              message,
+            );
+          }
+        },
       );
       backupState.setProgress(0.9);
       await CustomerService.loadCustomers(customerState, customerRepository);
@@ -263,16 +296,62 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
   }
 
   Future<void> _handleExport(BuildContext context) async {
+    final source = await showDialog<_ExportSource>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Export Zip'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, _ExportSource.local),
+            child: const ListTile(
+              leading: Icon(Icons.phone_android),
+              title: Text('Export Local Data'),
+              subtitle: Text('Current data on this device'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, _ExportSource.drive),
+            child: const ListTile(
+              leading: Icon(Icons.cloud),
+              title: Text('Export Drive Data'),
+              subtitle: Text('Data stored on Google Drive'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !context.mounted) return;
+
     final backupState = context.read<BackupState>();
     try {
       backupState.setLoading(true);
-      await BackupExportService.exportDriveBackupAsZip(
-        onProgress: (status) {
-          if (context.mounted) {
-            backupState.setDetailedProgress(0.5, status);
-          }
-        },
-      );
+      if (source == _ExportSource.local) {
+        final customerRepository = context.read<CustomerRepository>();
+        final orderRepository = context.read<OrderRepository>();
+        final measurementRepository = context.read<MeasurementRepository>();
+        final settingsRepository = context.read<SettingsRepository>();
+        await BackupExportService.exportLocalBackupAsZip(
+          customerRepository: customerRepository,
+          orderRepository: orderRepository,
+          measurementRepository: measurementRepository,
+          settingsRepository: settingsRepository,
+          onProgress: (status) {
+            if (context.mounted) {
+              backupState.setDetailedProgress(0.5, status);
+            }
+          },
+        );
+      } else {
+        await BackupExportService.exportDriveBackupAsZip(
+          onProgress: (status) {
+            if (context.mounted) {
+              backupState.setDetailedProgress(0.5, status);
+            }
+          },
+        );
+      }
       backupState.setLoading(false);
     } catch (e) {
       backupState.setError('Export failed: ${e.toString()}');
@@ -286,6 +365,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       }
     }
   }
+
 
   Future<void> _handleImport(BuildContext context) async {
     final backupState = context.read<BackupState>();
@@ -527,6 +607,13 @@ class _BackupStatusSection extends StatelessWidget {
               const SizedBox(height: AppConfig.spacing8),
               _buildInfoRow(
                 context,
+                Icons.account_circle,
+                'Account',
+                FirebaseAuth.instance.currentUser?.email ?? '—',
+              ),
+              const SizedBox(height: AppConfig.spacing8),
+              _buildInfoRow(
+                context,
                 Icons.storage,
                 'Backup Size',
                 backupState.backupInfo!.formattedSize,
@@ -540,6 +627,15 @@ class _BackupStatusSection extends StatelessWidget {
             ],
             if (backupState.isLoading) ...[
               const SizedBox(height: AppConfig.spacing16),
+              if (backupState.progressMessage != null) ...[
+                Text(
+                  backupState.progressMessage!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: AppConfig.spacing8),
+              ],
               LinearProgressIndicator(
                   value:
                       backupState.progress > 0 ? backupState.progress : null),
@@ -801,4 +897,5 @@ class _AutoBackupSection extends StatelessWidget {
     return '3:00 AM';
   }
 }
+
 

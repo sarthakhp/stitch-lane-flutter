@@ -5,6 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 import '../../config/app_config.dart';
 import '../../domain/services/audio_recording_service.dart';
 import '../../domain/services/transcription_service.dart';
+import 'transcription_error_dialog.dart';
 import 'transcription_voice_button.dart';
 
 class _DividerEmbedBuilder extends EmbedBuilder {
@@ -120,17 +121,48 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
   Future<void> _handleTranscription(String? audioFilePath) async {
     if (audioFilePath == null) return;
 
-    final newText = await TranscriptionService.transcribeAndGetAction(
-      context: context,
-      audioFilePath: audioFilePath,
-      currentText: getMarkdown(),
-    );
+    while (true) {
+      if (!mounted) break;
 
-    if (newText != null && mounted) {
-      setMarkdown(newText);
-      widget.onChanged?.call(newText);
+      final result = await TranscriptionService.transcribe(
+        context: context,
+        audioFilePath: audioFilePath,
+      );
+
+      if (result.type == TranscriptionResultType.success) {
+        if (!mounted) break;
+        final newText = await TranscriptionService.getActionResult(
+          context: context,
+          transcription: result.text!,
+          currentText: getMarkdown(),
+        );
+
+        if (newText != null && mounted) {
+          setMarkdown(newText);
+          widget.onChanged?.call(newText);
+        }
+        break;
+      }
+
+      if (result.type == TranscriptionResultType.cancelled) {
+        break;
+      }
+
+      // Error — show error dialog with Retry/Play/Discard
+      if (!mounted) break;
+      final action = await TranscriptionErrorDialog.show(
+        context,
+        errorMessage: result.errorMessage ?? 'An unknown error occurred',
+        audioFilePath: audioFilePath,
+      );
+
+      if (action != TranscriptionErrorAction.retry) {
+        break; // Discard or dismissed
+      }
+      // Retry — loop continues
     }
 
+    // Clean up temp file after we're done (success, cancel, or discard)
     try {
       await AudioRecordingService.deleteTemporaryAudio();
     } catch (_) {}

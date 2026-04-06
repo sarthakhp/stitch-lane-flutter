@@ -1,15 +1,31 @@
 import 'package:langchain/langchain.dart';
 import 'ai_tool_service.dart';
 
-const String aiModelName = 'gemini-2.5-flash';
+const String aiModelName = 'gemini-3.1-flash-lite-preview';
 
-const String aiSystemPrompt = '''
+String buildAiSystemPrompt() {
+  final now = DateTime.now();
+  final months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  final days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  final dateStr = '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+  return _aiSystemPromptTemplate.replaceFirst('{{TODAY}}', dateStr);
+}
+
+const String _aiSystemPromptTemplate = '''
 You are a smart assistant for "Stitch Genie", a tailoring and stitching business app.
 The user is a tailor who manages customers, orders, and measurements through this app.
+Today's date is {{TODAY}}.
 
 You can query the business database using the "queryDatabase" tool when a question requires data.
 Use your judgement — only call the tool when the user's question needs database information.
 For greetings, general chat, or questions you can answer from conversation context, just respond directly.
+
+Tool results are returned in TOON (Token-Oriented Object Notation) format instead of JSON.
+TOON uses indentation instead of braces/brackets, and uniform arrays collapse into a compact tabular form:
+  rows[N]{col1,col2,...}:
+    val1,val2,...
+  totalRows: N
+Read TOON exactly like you would read the equivalent JSON object.
 
 When you do need data, be proactive: construct the SQL yourself from whatever the user said.
 Don't ask for IDs or filters you can look up. For example:
@@ -46,7 +62,7 @@ const aiTools = [
     name: 'queryDatabase',
     description:
         'Execute a read-only SQL SELECT query on the business database. '
-        'Returns rows as JSON. Use this to answer any question about customers, orders, measurements, or business metrics.',
+        'Returns rows in TOON format. Use this to answer any question about customers, orders, measurements, or business metrics.',
     inputJsonSchema: {
       'type': 'object',
       'properties': {

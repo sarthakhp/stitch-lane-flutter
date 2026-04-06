@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/app_logger.dart';
@@ -8,15 +9,18 @@ class ImageStorageService {
   static const String _imagesFolderName = 'order_images';
   static const _uuid = Uuid();
 
+  static const int _compressQuality = 80;
+  static const int _maxDimension = 1200;
+
   static Future<Directory> _getImagesDirectory() async {
     final Directory appDir = await getApplicationDocumentsDirectory();
     final Directory imagesDir = Directory('${appDir.path}/$_imagesFolderName');
-    
+
     if (!await imagesDir.exists()) {
       await imagesDir.create(recursive: true);
       AppLogger.info('Created images directory: ${imagesDir.path}');
     }
-    
+
     return imagesDir;
   }
 
@@ -24,16 +28,22 @@ class ImageStorageService {
     Uint8List imageBytes, {
     String? extension,
     String? customFileName,
+    bool compress = true,
   }) async {
     try {
       final Directory imagesDir = await _getImagesDirectory();
       final String fileName = customFileName ?? '${_uuid.v4()}${extension ?? '.jpg'}';
       final String filePath = '${imagesDir.path}/$fileName';
 
-      final File imageFile = File(filePath);
-      await imageFile.writeAsBytes(imageBytes);
+      Uint8List bytesToSave = imageBytes;
+      if (compress) {
+        bytesToSave = await compressImageBytes(imageBytes) ?? imageBytes;
+      }
 
-      AppLogger.info('Image saved: $filePath');
+      final File imageFile = File(filePath);
+      await imageFile.writeAsBytes(bytesToSave);
+
+      AppLogger.info('Image saved: $filePath (${imageBytes.length} -> ${bytesToSave.length} bytes)');
       return filePath;
     } catch (e) {
       AppLogger.error('Failed to save image', e);
@@ -41,10 +51,26 @@ class ImageStorageService {
     }
   }
 
+  static Future<Uint8List?> compressImageBytes(Uint8List imageBytes) async {
+    try {
+      final result = await FlutterImageCompress.compressWithList(
+        imageBytes,
+        minWidth: _maxDimension,
+        minHeight: _maxDimension,
+        quality: _compressQuality,
+        format: CompressFormat.jpeg,
+      );
+      return result;
+    } catch (e) {
+      AppLogger.warning('Image compression failed, using original: $e');
+      return null;
+    }
+  }
+
   static Future<void> deleteImage(String imagePath) async {
     try {
       final File imageFile = File(imagePath);
-      
+
       if (await imageFile.exists()) {
         await imageFile.delete();
         AppLogger.info('Image deleted: $imagePath');
@@ -66,7 +92,7 @@ class ImageStorageService {
   static Future<File?> getImageFile(String imagePath) async {
     try {
       final File imageFile = File(imagePath);
-      
+
       if (await imageFile.exists()) {
         return imageFile;
       } else {
@@ -82,11 +108,11 @@ class ImageStorageService {
   static Future<Uint8List?> getImageBytes(String imagePath) async {
     try {
       final File? imageFile = await getImageFile(imagePath);
-      
+
       if (imageFile != null) {
         return await imageFile.readAsBytes();
       }
-      
+
       return null;
     } catch (e) {
       AppLogger.error('Failed to read image bytes', e);
@@ -97,11 +123,11 @@ class ImageStorageService {
   static Future<List<String>> getAllImagePaths() async {
     try {
       final Directory imagesDir = await _getImagesDirectory();
-      
+
       if (!await imagesDir.exists()) {
         return [];
       }
-      
+
       final List<FileSystemEntity> files = imagesDir.listSync();
       return files
           .whereType<File>()
@@ -130,7 +156,7 @@ class ImageStorageService {
     try {
       final List<String> allImagePaths = await getAllImagePaths();
       final Set<String> validPathsSet = validImagePaths.toSet();
-      
+
       for (final imagePath in allImagePaths) {
         if (!validPathsSet.contains(imagePath)) {
           await deleteImage(imagePath);
@@ -142,4 +168,3 @@ class ImageStorageService {
     }
   }
 }
-

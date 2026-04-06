@@ -43,6 +43,8 @@ class HomeTab extends StatelessWidget {
                 Navigator.pushNamed(context, AppConstants.settingsRoute);
               } else if (value == 'backup') {
                 Navigator.pushNamed(context, AppConstants.backupSettingsRoute);
+              } else if (value == 'developer') {
+                Navigator.pushNamed(context, AppConstants.developerRoute);
               }
             },
             itemBuilder: (context) => [
@@ -60,6 +62,15 @@ class HomeTab extends StatelessWidget {
                 child: ListTile(
                   leading: Icon(Icons.cloud_sync),
                   title: Text('Backup & Restore'),
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'developer',
+                child: ListTile(
+                  leading: Icon(Icons.code),
+                  title: Text('Developer'),
                   contentPadding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),

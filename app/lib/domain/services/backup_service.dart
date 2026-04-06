@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
+import '../../constants/app_constants.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
 import '../../utils/app_logger.dart';
@@ -58,8 +60,8 @@ class BackupService {
     required OrderRepository orderRepository,
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
-    void Function(int current, int total)? onImageProgress,
-    void Function(int current, int total)? onAudioProgress,
+    void Function(int current, int total, String message)? onImageProgress,
+    void Function(int current, int total, String message)? onAudioProgress,
   }) async {
     final backupData = jsonDecode(backupJson) as Map<String, dynamic>;
     _validateBackup(backupData);
@@ -120,9 +122,21 @@ class BackupService {
     final ordersList = boxes[_ordersKey] as List?;
     if (ordersList == null) return;
 
+    final appDir = await getApplicationDocumentsDirectory();
+    final localImagesDir = '${appDir.path}/${AppConstants.imagesFolderName}';
+
     for (var json in ordersList) {
       final order = Order.fromJson(json as Map<String, dynamic>);
-      await orderRepository.addOrder(order);
+      // Fix image paths to point to current device's directory
+      if (order.imagePaths.isNotEmpty) {
+        final fixedPaths = order.imagePaths.map((path) {
+          final fileName = path.split('/').last;
+          return '$localImagesDir/$fileName';
+        }).toList();
+        await orderRepository.addOrder(order.copyWith(imagePaths: fixedPaths));
+      } else {
+        await orderRepository.addOrder(order);
+      }
     }
   }
 

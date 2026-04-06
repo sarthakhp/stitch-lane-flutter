@@ -14,6 +14,7 @@ import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/backup_settings_screen.dart';
+import '../screens/developer_screen.dart';
 	import '../screens/business_analysis_screen.dart';
 import '../screens/ai_assistant_screen.dart';
 import '../backend/backend.dart';
@@ -151,6 +152,11 @@ class AppRoutes {
       case AppConstants.backupSettingsRoute:
         return MaterialPageRoute(
           builder: (_) => const BackupSettingsScreen(),
+        );
+
+      case AppConstants.developerRoute:
+        return MaterialPageRoute(
+          builder: (_) => const DeveloperScreen(),
         );
 
 	      case AppConstants.businessAnalysisRoute:

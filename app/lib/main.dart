@@ -126,6 +126,7 @@ class _AppInitializerState extends State<AppInitializer> {
     await SettingsService.loadSettings(settingsState, settingsRepository);
 
     await _initializeDebugLogs(settingsState);
+    await _runImageCompressionMigration();
     await _initializeAutoBackup(settingsState, settingsRepository);
     await _initializePendingOrdersReminder(settingsState);
 
@@ -157,6 +158,14 @@ class _AppInitializerState extends State<AppInitializer> {
       } catch (_) {
         // Even if logging the warning fails, continue app startup
       }
+    }
+  }
+
+  Future<void> _runImageCompressionMigration() async {
+    try {
+      await ImageCompressionMigration.run();
+    } catch (e) {
+      AppLogger.warning('Image compression migration failed: $e');
     }
   }
 

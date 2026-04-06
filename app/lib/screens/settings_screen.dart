@@ -4,7 +4,6 @@ import '../presentation/presentation.dart';
 import 'widgets/settings/due_date_warning_card.dart';
 import 'widgets/settings/notification_settings_card.dart';
 import 'widgets/settings/account_card.dart';
-import 'widgets/settings/debug_logs_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -26,8 +25,6 @@ class SettingsScreen extends StatelessWidget {
                 DueDateWarningCard(),
                 SizedBox(height: AppConfig.spacing24),
                 NotificationSettingsCard(),
-                SizedBox(height: AppConfig.spacing24),
-                DebugLogsCard(),
                 SizedBox(height: AppConfig.spacing24),
                 AccountCard(),
               ],

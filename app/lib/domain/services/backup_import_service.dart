@@ -117,9 +117,21 @@ class BackupImportService {
 
         final ordersList = boxes['orders'] as List?;
         if (ordersList != null) {
+          final appDir = await getApplicationDocumentsDirectory();
+          final localImagesDir = '${appDir.path}/${AppConstants.imagesFolderName}';
+
           for (var json in ordersList) {
             final order = Order.fromJson(json as Map<String, dynamic>);
-            await orderRepository.addOrder(order);
+            // Fix image paths to point to current device's directory
+            if (order.imagePaths.isNotEmpty) {
+              final fixedPaths = order.imagePaths.map((path) {
+                final fileName = path.split('/').last;
+                return '$localImagesDir/$fileName';
+              }).toList();
+              await orderRepository.addOrder(order.copyWith(imagePaths: fixedPaths));
+            } else {
+              await orderRepository.addOrder(order);
+            }
           }
         }
 
