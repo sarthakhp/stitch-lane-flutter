@@ -11,8 +11,10 @@ import '../domain/services/transcription_service.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/recording_dialog.dart';
 import '../presentation/widgets/transcription_error_dialog.dart';
+import 'widgets/ai/ai_input_bar.dart';
 import 'widgets/ai/ai_message_bubble.dart';
 import 'widgets/ai/ai_typing_indicator.dart';
+import 'widgets/ai/ai_welcome_view.dart';
 
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
@@ -43,7 +45,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _messages.addAll(saved);
         _isInitializing = false;
       });
-      if (_messages.isNotEmpty) _scrollToBottom();
+      if (_messages.isNotEmpty) _scrollToBottom(jump: true);
     }
   }
 
@@ -100,7 +102,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final audioPath = await RecordingDialog.show(context);
     if (audioPath == null || !mounted) return;
 
-    // Transcribe loop with retry support
     var shouldRetry = true;
     while (shouldRetry && mounted) {
       shouldRetry = false;
@@ -116,7 +117,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       );
 
       if (result.type == TranscriptionResultType.success && result.text != null) {
-        _inputController.text = result.text!;
+        final existing = _inputController.text.trim();
+        _inputController.text = existing.isEmpty ? result.text! : '$existing ${result.text!}';
+        _inputController.selection = TextSelection.collapsed(offset: _inputController.text.length);
         break;
       }
 
@@ -135,9 +138,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     await AudioRecordingService.deleteTemporaryAudio();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (!_scrollController.hasClients) return;
+      if (jump) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        // Second pass after cards finish loading
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        });
+      } else {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
@@ -151,7 +163,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBar(
-        title: const Text('AI Assistant'),
+        title: const Text('Stitch Genie'),
         actions: [
           if (_messages.isNotEmpty)
             IconButton(
@@ -167,77 +179,52 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         children: [
           Expanded(
             child: _messages.isEmpty
-                ? _buildWelcomeView(context)
+                ? AiWelcomeView(onSuggestionTap: _sendMessage)
                 : _buildMessageList(context),
           ),
           _buildTokenUsage(context),
-          _buildInputBar(context),
+          AiInputBar(
+            controller: _inputController,
+            isLoading: _isLoading,
+            onSend: _sendMessage,
+            onMicTap: _handleVoiceInput,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildWelcomeView(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final suggestions = [
-      'How many pending orders do I have?',
-      'How much did I earn this month?',
-      'Which customer has the most orders?',
-      'Show orders due this week',
-    ];
-
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppConfig.spacing24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.auto_awesome,
-              size: 48,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(height: AppConfig.spacing16),
-            Text(
-              'Ask me anything about your business',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppConfig.spacing24),
-            Wrap(
-              spacing: AppConfig.spacing8,
-              runSpacing: AppConfig.spacing8,
-              alignment: WrapAlignment.center,
-              children: suggestions.map((suggestion) {
-                return ActionChip(
-                  label: Text(suggestion),
-                  onPressed: () => _sendMessage(suggestion),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMessageList(BuildContext context) {
+    final totalItems = _messages.length + (_isLoading ? 1 : 0);
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(
         horizontal: AppConfig.spacing16,
         vertical: AppConfig.spacing8,
       ),
-      itemCount: _messages.length + (_isLoading ? 1 : 0),
+      itemCount: totalItems,
       itemBuilder: (context, index) {
         if (index == _messages.length) {
           return const AiTypingIndicator();
         }
-        return AiMessageBubble(message: _messages[index]);
+        final bubble = AiMessageBubble(message: _messages[index]);
+        final isLastMessage = index == _messages.length - 1;
+        if (!isLastMessage) return bubble;
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 12 * (1 - value)),
+                child: child,
+              ),
+            );
+          },
+          child: bubble,
+        );
       },
     );
   }
@@ -249,80 +236,50 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Pricing: $0.25/M input, $1.50/M output → ₹ at 93/USD
     const inputRatePerToken = 0.25 / 1000000 * 93;
     const outputRatePerToken = 1.50 / 1000000 * 93;
     final costInr = (usage.promptTokens * inputRatePerToken) +
         (usage.responseTokens * outputRatePerToken);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppConfig.spacing16,
-        vertical: AppConfig.spacing4,
-      ),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
-        ),
-      ),
-      child: Text(
-        'Tokens — in: ${usage.promptTokens}  |  out: ${usage.responseTokens}  |  ~₹${costInr.toStringAsFixed(3)}',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputBar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: EdgeInsets.only(
-        left: AppConfig.spacing12,
-        right: AppConfig.spacing4,
-        top: AppConfig.spacing8,
-        bottom: MediaQuery.of(context).padding.bottom + AppConfig.spacing8,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _inputController,
-              decoration: InputDecoration(
-                hintText: 'Ask anything...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppConfig.spacing16,
-                  vertical: AppConfig.spacing12,
-                ),
-              ),
-              textInputAction: TextInputAction.send,
-              onSubmitted: _sendMessage,
-              enabled: !_isLoading,
-              maxLines: null,
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Token Usage'),
+            content: Text(
+              'Input tokens: ${usage.promptTokens}\n'
+              'Output tokens: ${usage.responseTokens}\n'
+              'Total tokens: ${usage.totalTokens}\n'
+              'Estimated cost: ~\u20B9${costInr.toStringAsFixed(3)}',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-          const SizedBox(width: AppConfig.spacing4),
-          IconButton(
-            onPressed: _isLoading ? null : _handleVoiceInput,
-            icon: const Icon(Icons.mic),
-          ),
-          IconButton.filled(
-            onPressed: _isLoading ? null : () => _sendMessage(_inputController.text),
-            icon: const Icon(Icons.send),
-          ),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConfig.spacing16,
+          vertical: AppConfig.spacing4,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.bolt, size: 14, color: colorScheme.onSurfaceVariant),
+            const SizedBox(width: AppConfig.spacing4),
+            Text(
+              '~\u20B9${costInr.toStringAsFixed(3)}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

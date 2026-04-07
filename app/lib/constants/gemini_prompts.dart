@@ -59,6 +59,7 @@ Preserve the exact mix of languages as spoken.
   static const String chatTranscriptionPrompt = '''
 Transcribe this audio as a plain text query or message.
 Output ONLY the transcribed text — no formatting, no markdown, no bullet points.
+When a person's name is mentioned, include both English transliteration and Gujarati script in brackets. Example: "Ramesh (રમેશ)" or "Hittu (હિત્તુ)".
 If silent, respond: "No one is speaking"
 ''';
 }

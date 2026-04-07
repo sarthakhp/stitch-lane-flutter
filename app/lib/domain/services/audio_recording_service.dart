@@ -146,6 +146,9 @@ class AudioRecordingService {
   static bool get isRecording => _isRecording;
   static bool get isPaused => _isPaused;
 
+  /// Get current amplitude (dBFS). Poll this periodically for voice level feedback.
+  static Future<Amplitude> getAmplitude() => _recorder.getAmplitude();
+
   static Future<void> dispose() async {
     if (_isRecording) {
       await stopRecording();

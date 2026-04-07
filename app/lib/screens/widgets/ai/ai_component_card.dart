@@ -17,17 +17,26 @@ class AiComponentCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isCustomer = component.type == 'customer';
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 140,
-        padding: const EdgeInsets.all(AppConfig.spacing12),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
-        ),
-        child: Column(
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final cardWidth = 140.0 * textScale;
+
+    final borderRadius = BorderRadius.circular(12);
+    return Material(
+      color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+      borderRadius: borderRadius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: borderRadius,
+        splashColor: colorScheme.primary.withValues(alpha: 0.12),
+        highlightColor: colorScheme.primary.withValues(alpha: 0.08),
+        child: Container(
+          width: cardWidth.clamp(120.0, 200.0),
+          padding: const EdgeInsets.all(AppConfig.spacing12),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -65,6 +74,7 @@ class AiComponentCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
           ],
+        ),
         ),
       ),
     );

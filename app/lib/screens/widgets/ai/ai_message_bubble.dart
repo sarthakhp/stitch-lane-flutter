@@ -19,87 +19,106 @@ class AiMessageBubble extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isUser = message.isUser;
 
-    final hasCustomers = !isUser && message.uiComponents.any((c) => c.type == 'customer');
-    final hasOrders = !isUser && message.uiComponents.any((c) => c.type == 'order');
+    final customers = !isUser ? message.uiComponents.where((c) => c.type == 'customer').toList() : <UiComponent>[];
+    final orders = !isUser ? message.uiComponents.where((c) => c.type == 'order').toList() : <UiComponent>[];
+
+    // Avatar icon (16) + gap (spacing4=4) + list padding (spacing16*2=32) = ~52
+    const avatarSpace = 16.0 + AppConfig.spacing4;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxBubbleWidth = screenWidth * 0.8 - (isUser ? 0 : avatarSpace);
+
+    final bubble = Container(
+      constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+      margin: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppConfig.spacing12,
+        vertical: AppConfig.spacing8,
+      ),
+      decoration: BoxDecoration(
+        color: isUser ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
+          bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
+        ),
+      ),
+      child: isUser
+          ? SelectableText(
+              message.text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+              ),
+            )
+          : MarkdownBody(
+              data: message.text,
+              styleSheet: MarkdownStyleSheet(
+                p: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+                strong: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                ),
+                tableHead: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+                tableBody: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+                tableBorder: TableBorder.all(
+                  color: colorScheme.outlineVariant,
+                  width: 0.5,
+                ),
+                tableCellsPadding: const EdgeInsets.symmetric(
+                  horizontal: AppConfig.spacing8,
+                  vertical: AppConfig.spacing4,
+                ),
+                listBullet: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
+                code: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.primary,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                ),
+              ),
+              selectable: true,
+            ),
+    );
 
     return Column(
       crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.8,
-            ),
-            margin: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppConfig.spacing12,
-              vertical: AppConfig.spacing8,
-            ),
-            decoration: BoxDecoration(
-              color: isUser ? colorScheme.primaryContainer : colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
-                bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
+        if (isUser)
+          Align(alignment: Alignment.centerRight, child: bubble)
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: AppConfig.spacing8),
+                child: Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
               ),
-            ),
-            child: isUser
-                ? SelectableText(
-                    message.text,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  )
-                : MarkdownBody(
-                    data: message.text,
-                    styleSheet: MarkdownStyleSheet(
-                      p: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                      ),
-                      strong: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      tableHead: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                      tableBody: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface,
-                      ),
-                      tableBorder: TableBorder.all(
-                        color: colorScheme.outlineVariant,
-                        width: 0.5,
-                      ),
-                      tableCellsPadding: const EdgeInsets.symmetric(
-                        horizontal: AppConfig.spacing8,
-                        vertical: AppConfig.spacing4,
-                      ),
-                      listBullet: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                      ),
-                      code: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.primary,
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                      ),
-                    ),
-                    selectable: true,
-                  ),
+              const SizedBox(width: AppConfig.spacing4),
+              Flexible(child: bubble),
+            ],
           ),
-        ),
-        if (hasCustomers)
+        if (customers.isNotEmpty)
           _buildLabeledCarousel(
             context,
-            'Customers',
-            message.uiComponents.where((c) => c.type == 'customer').toList(),
+            customers.length == 1 ? 'Customer' : 'Customers',
+            customers,
           ),
-        if (hasOrders)
+        if (orders.isNotEmpty)
           _buildLabeledCarousel(
             context,
-            'Orders',
-            message.uiComponents.where((c) => c.type == 'order').toList(),
+            orders.length == 1 ? 'Order' : 'Orders',
+            orders,
           ),
       ],
     );
@@ -107,20 +126,23 @@ class AiMessageBubble extends StatelessWidget {
 
   Widget _buildLabeledCarousel(BuildContext context, String label, List<UiComponent> components) {
     final theme = Theme.of(context);
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final carouselHeight = (110.0 * textScale).clamp(100.0, 180.0);
+
     return Padding(
-      padding: const EdgeInsets.only(top: AppConfig.spacing8),
+      padding: const EdgeInsets.only(top: AppConfig.spacing4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: theme.textTheme.labelMedium?.copyWith(
+            style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: AppConfig.spacing4),
           SizedBox(
-            height: 110,
+            height: carouselHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: components.length,

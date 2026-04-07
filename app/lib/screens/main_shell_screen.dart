@@ -140,6 +140,7 @@ class _MainShellScreenState extends State<MainShellScreen>
               selectedIndex: selectedIndex,
               onDestinationSelected: _onDestinationSelected,
               labelType: NavigationRailLabelType.all,
+              groupAlignment: 0.0,
               destinations: const [
                 NavigationRailDestination(
                   icon: Icon(Icons.home_outlined),

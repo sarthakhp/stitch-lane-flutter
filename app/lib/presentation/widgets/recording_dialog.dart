@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/services/audio_recording_service.dart';
+import '../../domain/services/amplitude_tracker.dart';
 import '../../config/app_config.dart';
+import 'audio_waveform.dart';
 
 enum _RecordingState { loading, recording, paused, error }
 
@@ -21,12 +23,12 @@ class RecordingDialog extends StatefulWidget {
 }
 
 class _RecordingDialogState extends State<RecordingDialog>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   _RecordingState _state = _RecordingState.loading;
   String? _errorMessage;
-  late AnimationController _pulseController;
   Timer? _elapsedTimer;
   int _elapsedSeconds = 0;
+  late final AmplitudeTracker _amplitudeTracker;
 
   static const String _tempFileName = 'temp_order_transcription';
   static const int _maxRecordingSeconds = 180;
@@ -35,10 +37,9 @@ class _RecordingDialogState extends State<RecordingDialog>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    _amplitudeTracker = AmplitudeTracker(
+      onUpdate: () { if (mounted) setState(() {}); },
+    );
     _startRecording();
   }
 
@@ -46,7 +47,6 @@ class _RecordingDialogState extends State<RecordingDialog>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      // Auto-pause on interruption instead of cancelling
       if (_state == _RecordingState.recording) {
         _togglePauseResume();
       }
@@ -76,6 +76,7 @@ class _RecordingDialogState extends State<RecordingDialog>
           _elapsedSeconds = 0;
         });
         _startElapsedTimer();
+        _amplitudeTracker.start();
       } else if (mounted) {
         setState(() {
           _state = _RecordingState.error;
@@ -96,9 +97,7 @@ class _RecordingDialogState extends State<RecordingDialog>
     _elapsedTimer?.cancel();
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _state == _RecordingState.recording) {
-        setState(() {
-          _elapsedSeconds++;
-        });
+        setState(() => _elapsedSeconds++);
         if (_elapsedSeconds >= _maxRecordingSeconds) {
           _completeRecording(triggeredByTimeout: true);
         }
@@ -115,37 +114,29 @@ class _RecordingDialogState extends State<RecordingDialog>
     if (_state == _RecordingState.recording) {
       await AudioRecordingService.pauseRecording();
       _stopElapsedTimer();
-      _pulseController.stop();
-      if (mounted) {
-        setState(() {
-          _state = _RecordingState.paused;
-        });
-      }
+      _amplitudeTracker.stop();
+      if (mounted) setState(() => _state = _RecordingState.paused);
     } else if (_state == _RecordingState.paused) {
       await AudioRecordingService.resumeRecording();
       _startElapsedTimer();
-      _pulseController.repeat(reverse: true);
-      if (mounted) {
-        setState(() {
-          _state = _RecordingState.recording;
-        });
-      }
+      _amplitudeTracker.start();
+      if (mounted) setState(() => _state = _RecordingState.recording);
     }
   }
 
   Future<void> _cancelRecording() async {
     _stopElapsedTimer();
+    _amplitudeTracker.stop();
     try {
       await AudioRecordingService.stopRecording();
       await AudioRecordingService.deleteTemporaryAudio();
     } catch (_) {}
-    if (mounted) {
-      Navigator.of(context).pop(null);
-    }
+    if (mounted) Navigator.of(context).pop(null);
   }
 
   Future<void> _completeRecording({bool triggeredByTimeout = false}) async {
     _stopElapsedTimer();
+    _amplitudeTracker.stop();
     try {
       final filePath = await AudioRecordingService.stopRecording();
       if (mounted) {
@@ -160,23 +151,21 @@ class _RecordingDialogState extends State<RecordingDialog>
         Navigator.of(context).pop(filePath);
       }
     } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(null);
-      }
+      if (mounted) Navigator.of(context).pop(null);
     }
   }
 
   String _formatDuration(int seconds) {
     final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+    final secs = seconds % 60;
+    return '$minutes:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopElapsedTimer();
-    _pulseController.dispose();
+    _amplitudeTracker.dispose();
     super.dispose();
   }
 
@@ -185,9 +174,7 @@ class _RecordingDialogState extends State<RecordingDialog>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          _cancelRecording();
-        }
+        if (!didPop) _cancelRecording();
       },
       child: AlertDialog(
         content: _buildContent(context),
@@ -198,165 +185,94 @@ class _RecordingDialogState extends State<RecordingDialog>
 
   Widget _buildContent(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     final isRecordingOrPaused =
         _state == _RecordingState.recording || _state == _RecordingState.paused;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_state == _RecordingState.loading) ...[
-          const CircularProgressIndicator(),
-          const SizedBox(height: AppConfig.spacing24),
-          Text(
-            'Starting microphone...',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ] else if (_state == _RecordingState.error) ...[
-          Icon(
-            Icons.error_outline,
-            size: 48,
-            color: colorScheme.error,
-          ),
-          const SizedBox(height: AppConfig.spacing16),
-          Text(
-            _errorMessage ?? 'An error occurred',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ] else if (isRecordingOrPaused) ...[
-          _buildMicIcon(colorScheme),
-          const SizedBox(height: AppConfig.spacing24),
-          Text(
-            _formatDuration(_elapsedSeconds),
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontFeatures: [const FontFeature.tabularFigures()],
-                ),
-          ),
-          const SizedBox(height: AppConfig.spacing8),
-          Text(
-            _state == _RecordingState.paused ? 'Paused' : 'Recording...',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: AppConfig.spacing24),
-          _buildPauseResumeButton(colorScheme),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildMicIcon(ColorScheme colorScheme) {
-    if (_state == _RecordingState.paused) {
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: colorScheme.surfaceContainerHighest,
-        ),
-        child: Icon(
-          Icons.mic_off,
-          size: 40,
-          color: colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        return Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colorScheme.errorContainer,
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.error
-                    .withValues(alpha: 0.3 + _pulseController.value * 0.2),
-                blurRadius: 8 + _pulseController.value * 8,
-                spreadRadius: _pulseController.value * 4,
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_state == _RecordingState.loading) ...[
+            const CircularProgressIndicator(),
+            const SizedBox(height: AppConfig.spacing24),
+            Text('Starting microphone...', style: theme.textTheme.titleMedium),
+          ] else if (_state == _RecordingState.error) ...[
+            Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+            const SizedBox(height: AppConfig.spacing16),
+            Text(
+              _errorMessage ?? 'An error occurred',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ] else if (isRecordingOrPaused) ...[
+            AudioWaveform(
+              levels: _amplitudeTracker.levels,
+              isPaused: _state == _RecordingState.paused,
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            Text(
+              _formatDuration(_elapsedSeconds),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFeatures: [const FontFeature.tabularFigures()],
               ),
-            ],
-          ),
-          child: Icon(
-            Icons.mic,
-            size: 40,
-            color: colorScheme.onErrorContainer,
-          ),
-        );
-      },
+            ),
+            const SizedBox(height: AppConfig.spacing4),
+            Text(
+              _state == _RecordingState.paused ? 'Paused' : 'Recording...',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppConfig.spacing16),
+            _buildPauseResumeButton(colorScheme),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildPauseResumeButton(ColorScheme colorScheme) {
     final isPaused = _state == _RecordingState.paused;
-
-    if (isPaused) {
-      return SizedBox(
-        width: double.infinity,
-        child: FilledButton.tonal(
-          onPressed: _togglePauseResume,
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.play_arrow),
-              SizedBox(width: AppConfig.spacing8),
-              Text('Resume'),
-            ],
-          ),
-        ),
-      );
-    }
-
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton(
-        onPressed: _togglePauseResume,
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.pause),
-            SizedBox(width: AppConfig.spacing8),
-            Text('Pause'),
-          ],
-        ),
-      ),
+      child: isPaused
+          ? FilledButton.tonal(
+              onPressed: _togglePauseResume,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.play_arrow),
+                  SizedBox(width: AppConfig.spacing8),
+                  Text('Resume'),
+                ],
+              ),
+            )
+          : OutlinedButton(
+              onPressed: _togglePauseResume,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.pause),
+                  SizedBox(width: AppConfig.spacing8),
+                  Text('Pause'),
+                ],
+              ),
+            ),
     );
   }
 
   List<Widget> _buildActions(BuildContext context) {
     if (_state == _RecordingState.loading) {
-      return [
-        TextButton(
-          onPressed: _cancelRecording,
-          child: const Text('Cancel'),
-        ),
-      ];
+      return [TextButton(onPressed: _cancelRecording, child: const Text('Cancel'))];
     }
-
     if (_state == _RecordingState.error) {
-      return [
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('OK'),
-        ),
-      ];
+      return [FilledButton(onPressed: () => Navigator.of(context).pop(null), child: const Text('OK'))];
     }
-
     return [
-      TextButton(
-        onPressed: _cancelRecording,
-        child: const Text('Cancel'),
-      ),
-      FilledButton(
-        onPressed: () => _completeRecording(),
-        child: const Text('Done'),
-      ),
+      TextButton(onPressed: _cancelRecording, child: const Text('Cancel')),
+      FilledButton(onPressed: () => _completeRecording(), child: const Text('Done')),
     ];
   }
 }
-

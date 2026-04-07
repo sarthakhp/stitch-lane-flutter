@@ -20,7 +20,7 @@ Tool results use TOON format (tabular: rows[N]{cols}: val1,val2,...).
 ${AiToolService.schemaDescription}
 
 SQL rules:
-- Names: ALWAYS use LOWER(name) LIKE LOWER('%term%'), never exact match
+- Names: ALWAYS use LOWER(name) LIKE LOWER('%term%'), never exact match. If input has both scripts like "Ramesh (રમેશ)", search with OR: WHERE LOWER(name) LIKE '%ramesh%' OR LOWER(name) LIKE '%રમેશ%'. If 0 results, try shorter/phonetic variants (e.g. "Hittu" → also try "Hitu").
 - Earnings by date: SELECT SUM(CAST(json_each.value->>'amount' AS INTEGER)) FROM orders, json_each(orders.payments) WHERE json_each.value->>'date' >= 'YYYY-MM-DD'. Do NOT use total_paid_amount for date-based queries.
 - orders.status: pending/ready/done. orders.value and total_paid_amount are in rupees.
 
