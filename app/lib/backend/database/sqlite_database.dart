@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 class SqliteDatabase {
   static Database? _database;
   static const String _dbName = 'stitch_genie.db';
-  static const int _dbVersion = 1;
+  static const int _dbVersion = 2;
 
   static Future<Database> get database async {
     _database ??= await _initDatabase();
@@ -80,13 +80,18 @@ class SqliteDatabase {
         auto_backup_enabled INTEGER NOT NULL DEFAULT 0,
         auto_backup_time TEXT NOT NULL DEFAULT '03:00',
         last_backup_time TEXT,
-        debug_logs_enabled INTEGER NOT NULL DEFAULT 0
+        debug_logs_enabled INTEGER NOT NULL DEFAULT 0,
+        ai_chat_model TEXT,
+        ai_voice_model TEXT
       )
     ''');
   }
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Future schema migrations go here
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE settings ADD COLUMN ai_chat_model TEXT');
+      await db.execute('ALTER TABLE settings ADD COLUMN ai_voice_model TEXT');
+    }
   }
 
   /// For the AI assistant feature — execute arbitrary read-only SQL

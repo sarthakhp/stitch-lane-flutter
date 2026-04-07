@@ -10,13 +10,14 @@ import 'ai_executor.dart';
 
 class AiChatService {
   ChatGoogleGenerativeAI? _model;
+  String? _currentModelName;
   List<ChatExchange> _exchanges = [];
   AiTokenUsage _sessionUsage = AiTokenUsage.zero;
 
   AiTokenUsage get sessionUsage => _sessionUsage;
 
-  void _ensureModel() {
-    if (_model != null) return;
+  void _ensureModel(String modelName) {
+    if (_model != null && _currentModelName == modelName) return;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
@@ -25,17 +26,18 @@ class AiChatService {
 
     _model = ChatGoogleGenerativeAI(
       apiKey: apiKey,
-      defaultOptions: const ChatGoogleGenerativeAIOptions(
-        model: aiModelName,
+      defaultOptions: ChatGoogleGenerativeAIOptions(
+        model: modelName,
         tools: aiTools,
         responseMimeType: 'application/json',
         responseSchema: aiResponseSchema,
       ),
     );
+    _currentModelName = modelName;
   }
 
-  Future<List<AiChatMessage>> loadChat() async {
-    _ensureModel();
+  Future<List<AiChatMessage>> loadChat({String modelName = defaultAiChatModel}) async {
+    _ensureModel(modelName);
     _exchanges = await AiChatHistory.load();
 
     final savedUsage = await AiChatHistory.loadUsage();
@@ -78,8 +80,9 @@ class AiChatService {
     String userMessage, {
     required CustomerRepository customerRepo,
     required OrderRepository orderRepo,
+    String modelName = defaultAiChatModel,
   }) async {
-    _ensureModel();
+    _ensureModel(modelName);
 
     var systemPrompt = buildAiSystemPrompt();
     final historyText = AiChatHistory.buildHistoryText(_exchanges);

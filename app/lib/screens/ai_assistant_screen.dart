@@ -5,6 +5,7 @@ import '../config/app_config.dart';
 import '../constants/gemini_prompts.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
+import '../domain/state/settings_state.dart';
 import '../domain/services/audio_recording_service.dart';
 import '../domain/services/transcription_service.dart';
 import '../presentation/presentation.dart';
@@ -35,7 +36,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Future<void> _loadSavedChat() async {
-    final saved = await _chatService.loadChat();
+    final modelName = context.read<SettingsState>().settings.aiChatModel;
+    final saved = await _chatService.loadChat(modelName: modelName);
     if (mounted) {
       setState(() {
         _messages.addAll(saved);
@@ -68,6 +70,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       trimmed,
       customerRepo: context.read<CustomerRepository>(),
       orderRepo: context.read<OrderRepository>(),
+      modelName: context.read<SettingsState>().settings.aiChatModel,
     );
 
     if (mounted) {
@@ -108,6 +111,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         audioFilePath: audioPath,
         systemInstruction: GeminiPrompts.chatSystemInstruction,
         transcriptionPrompt: GeminiPrompts.chatTranscriptionPrompt,
+        // ignore: use_build_context_synchronously
+        modelName: context.read<SettingsState>().settings.aiVoiceModel,
       );
 
       if (result.type == TranscriptionResultType.success && result.text != null) {

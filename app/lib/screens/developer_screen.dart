@@ -19,18 +19,131 @@ class DeveloperScreen extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DebugLogsCard(),
-                SizedBox(height: AppConfig.spacing24),
-                _DriveSyncStatusSection(),
+                const DebugLogsCard(),
+                const SizedBox(height: AppConfig.spacing24),
+                _AiModelsCard(),
+                const SizedBox(height: AppConfig.spacing24),
+                const _DriveSyncStatusSection(),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _AiModelsCard extends StatelessWidget {
+  static const _chatModels = [
+    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+  ];
+
+  static const _voiceModels = [
+    'gemini-2.5-flash-lite',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Consumer<SettingsState>(
+      builder: (context, settingsState, _) {
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConfig.spacing16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.smart_toy, color: theme.colorScheme.primary),
+                    const SizedBox(width: AppConfig.spacing8),
+                    Text('AI Models', style: theme.textTheme.titleMedium),
+                  ],
+                ),
+                const SizedBox(height: AppConfig.spacing16),
+                _buildDropdown(
+                  context,
+                  label: 'Chat Model',
+                  value: settingsState.settings.aiChatModel,
+                  items: _chatModels,
+                  onChanged: (value) => _updateSetting(
+                    context,
+                    settingsState.settings.copyWith(aiChatModel: value),
+                  ),
+                ),
+                const SizedBox(height: AppConfig.spacing12),
+                _buildDropdown(
+                  context,
+                  label: 'Voice Model',
+                  value: settingsState.settings.aiVoiceModel,
+                  items: _voiceModels,
+                  onChanged: (value) => _updateSetting(
+                    context,
+                    settingsState.settings.copyWith(aiVoiceModel: value),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDropdown(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required List<String> items,
+    required void Function(String) onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppConfig.spacing4),
+        DropdownButtonFormField<String>(
+          initialValue: items.contains(value) ? value : null,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppConfig.spacing12,
+              vertical: AppConfig.spacing8,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          items: items
+              .map((m) => DropdownMenuItem(value: m, child: Text(m, style: theme.textTheme.bodySmall)))
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _updateSetting(BuildContext context, AppSettings newSettings) async {
+    final settingsState = context.read<SettingsState>();
+    final settingsRepository = context.read<SettingsRepository>();
+    await SettingsService.updateSettings(settingsState, settingsRepository, newSettings);
   }
 }
 

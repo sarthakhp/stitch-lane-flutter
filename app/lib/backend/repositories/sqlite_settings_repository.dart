@@ -50,6 +50,8 @@ class SqliteSettingsRepository implements SettingsRepository {
         'auto_backup_time': s.autoBackupTime,
         'last_backup_time': s.lastBackupTime?.toIso8601String(),
         'debug_logs_enabled': s.debugLogsEnabled ? 1 : 0,
+        'ai_chat_model': s.aiChatModelRaw,
+        'ai_voice_model': s.aiVoiceModelRaw,
       };
 
   static AppSettings fromMap(Map<String, dynamic> map) => AppSettings(
@@ -64,5 +66,7 @@ class SqliteSettingsRepository implements SettingsRepository {
             ? DateTime.parse(map['last_backup_time'] as String)
             : null,
         debugLogsEnabledRaw: (map['debug_logs_enabled'] as int? ?? 0) == 1,
+        aiChatModelRaw: map['ai_chat_model'] as String?,
+        aiVoiceModelRaw: map['ai_voice_model'] as String?,
       );
 }

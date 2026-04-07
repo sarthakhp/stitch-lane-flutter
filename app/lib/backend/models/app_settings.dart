@@ -25,11 +25,19 @@ class AppSettings {
   @HiveField(6)
   final bool? debugLogsEnabledRaw;
 
+  @HiveField(7)
+  final String? aiChatModelRaw;
+
+  @HiveField(8)
+  final String? aiVoiceModelRaw;
+
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
   String get autoBackupTime => autoBackupTimeRaw ?? '03:00';
   bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
+  String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite-preview';
+  String get aiVoiceModel => aiVoiceModelRaw ?? 'gemini-2.5-flash-lite';
 
   AppSettings({
     this.dueDateWarningThreshold = 3,
@@ -39,6 +47,8 @@ class AppSettings {
     this.autoBackupTimeRaw,
     this.lastBackupTime,
     this.debugLogsEnabledRaw,
+    this.aiChatModelRaw,
+    this.aiVoiceModelRaw,
   });
 
   AppSettings copyWith({
@@ -49,6 +59,8 @@ class AppSettings {
     String? autoBackupTime,
     DateTime? lastBackupTime,
     bool? debugLogsEnabled,
+    String? aiChatModel,
+    String? aiVoiceModel,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -58,6 +70,8 @@ class AppSettings {
       autoBackupTimeRaw: autoBackupTime ?? this.autoBackupTime,
       lastBackupTime: lastBackupTime ?? this.lastBackupTime,
       debugLogsEnabledRaw: debugLogsEnabled ?? this.debugLogsEnabled,
+      aiChatModelRaw: aiChatModel ?? aiChatModelRaw,
+      aiVoiceModelRaw: aiVoiceModel ?? aiVoiceModelRaw,
     );
   }
 
@@ -70,6 +84,8 @@ class AppSettings {
       'autoBackupTime': autoBackupTime,
       'lastBackupTime': lastBackupTime?.toIso8601String(),
       'debugLogsEnabled': debugLogsEnabled,
+      'aiChatModel': aiChatModelRaw,
+      'aiVoiceModel': aiVoiceModelRaw,
     };
   }
 
@@ -89,12 +105,14 @@ class AppSettings {
       autoBackupTimeRaw: json['autoBackupTime'] as String?,
       lastBackupTime: backupTime,
       debugLogsEnabledRaw: json['debugLogsEnabled'] as bool?,
+      aiChatModelRaw: json['aiChatModel'] as String?,
+      aiVoiceModelRaw: json['aiVoiceModel'] as String?,
     );
   }
 
   @override
   String toString() {
-    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime, debugLogsEnabled: $debugLogsEnabled)';
+    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime, debugLogsEnabled: $debugLogsEnabled, aiChatModel: $aiChatModel, aiVoiceModel: $aiVoiceModel)';
   }
 
   @override
@@ -107,7 +125,9 @@ class AppSettings {
            other.autoBackupEnabled == autoBackupEnabled &&
            other.autoBackupTime == autoBackupTime &&
            other.lastBackupTime == lastBackupTime &&
-           other.debugLogsEnabled == debugLogsEnabled;
+           other.debugLogsEnabled == debugLogsEnabled &&
+           other.aiChatModelRaw == aiChatModelRaw &&
+           other.aiVoiceModelRaw == aiVoiceModelRaw;
   }
 
   @override
@@ -119,6 +139,8 @@ class AppSettings {
     autoBackupTime,
     lastBackupTime,
     debugLogsEnabled,
+    aiChatModelRaw,
+    aiVoiceModelRaw,
   );
 }
 

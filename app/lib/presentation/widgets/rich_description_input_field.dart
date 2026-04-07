@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown_quill/markdown_quill.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../domain/services/audio_recording_service.dart';
 import '../../domain/services/transcription_service.dart';
+import '../../domain/state/settings_state.dart';
 import 'transcription_error_dialog.dart';
 import 'transcription_voice_button.dart';
 
@@ -127,6 +129,7 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
       final result = await TranscriptionService.transcribe(
         context: context,
         audioFilePath: audioFilePath,
+        modelName: context.read<SettingsState>().settings.aiVoiceModel,
       );
 
       if (result.type == TranscriptionResultType.success) {

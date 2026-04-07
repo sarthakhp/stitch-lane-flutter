@@ -5,12 +5,14 @@ import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
 import '../../constants/gemini_prompts.dart';
 import '../../utils/app_logger.dart';
+import 'ai_chat_config.dart';
 
 class GeminiService {
   static ChatGoogleGenerativeAI? _model;
+  static String? _currentModelName;
 
-  static ChatGoogleGenerativeAI _getModel() {
-    if (_model != null) return _model!;
+  static ChatGoogleGenerativeAI _getModel({String modelName = defaultAiVoiceModel}) {
+    if (_model != null && _currentModelName == modelName) return _model!;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
@@ -22,10 +24,11 @@ class GeminiService {
 
     _model = ChatGoogleGenerativeAI(
       apiKey: apiKey,
-      defaultOptions: const ChatGoogleGenerativeAIOptions(
-        model: 'gemini-3.1-flash-lite-preview',
+      defaultOptions: ChatGoogleGenerativeAIOptions(
+        model: modelName,
       ),
     );
+    _currentModelName = modelName;
 
     return _model!;
   }
@@ -34,6 +37,7 @@ class GeminiService {
     String audioFilePath, {
     String? systemInstruction,
     String? transcriptionPrompt,
+    String modelName = defaultAiVoiceModel,
   }) async {
     try {
       AppLogger.info('Starting audio transcription for: $audioFilePath');
@@ -47,7 +51,7 @@ class GeminiService {
       final audioBytes = await audioFile.readAsBytes();
       AppLogger.info('Audio file size: ${audioBytes.length} bytes');
 
-      final model = _getModel();
+      final model = _getModel(modelName: modelName);
       final audioBase64 = base64Encode(audioBytes);
 
       final system = systemInstruction ?? GeminiPrompts.systemInstruction;

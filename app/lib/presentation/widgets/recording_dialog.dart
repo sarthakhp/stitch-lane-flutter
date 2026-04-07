@@ -25,7 +25,6 @@ class _RecordingDialogState extends State<RecordingDialog>
   _RecordingState _state = _RecordingState.loading;
   String? _errorMessage;
   late AnimationController _pulseController;
-  Timer? _maxDurationTimer;
   Timer? _elapsedTimer;
   int _elapsedSeconds = 0;
 
@@ -46,10 +45,10 @@ class _RecordingDialogState extends State<RecordingDialog>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      if (_state == _RecordingState.recording || _state == _RecordingState.paused) {
-        _cancelRecording();
+        state == AppLifecycleState.inactive) {
+      // Auto-pause on interruption instead of cancelling
+      if (_state == _RecordingState.recording) {
+        _togglePauseResume();
       }
     }
   }
@@ -76,7 +75,7 @@ class _RecordingDialogState extends State<RecordingDialog>
           _state = _RecordingState.recording;
           _elapsedSeconds = 0;
         });
-        _startTimers();
+        _startElapsedTimer();
       } else if (mounted) {
         setState(() {
           _state = _RecordingState.error;
@@ -93,25 +92,21 @@ class _RecordingDialogState extends State<RecordingDialog>
     }
   }
 
-  void _startTimers() {
-    _maxDurationTimer = Timer(const Duration(seconds: _maxRecordingSeconds), () {
-      if (_state == _RecordingState.recording && mounted) {
-        _completeRecording(triggeredByTimeout: true);
-      }
-    });
-
+  void _startElapsedTimer() {
+    _elapsedTimer?.cancel();
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _state == _RecordingState.recording) {
         setState(() {
           _elapsedSeconds++;
         });
+        if (_elapsedSeconds >= _maxRecordingSeconds) {
+          _completeRecording(triggeredByTimeout: true);
+        }
       }
     });
   }
 
-  void _cancelTimers() {
-    _maxDurationTimer?.cancel();
-    _maxDurationTimer = null;
+  void _stopElapsedTimer() {
     _elapsedTimer?.cancel();
     _elapsedTimer = null;
   }
@@ -119,8 +114,7 @@ class _RecordingDialogState extends State<RecordingDialog>
   Future<void> _togglePauseResume() async {
     if (_state == _RecordingState.recording) {
       await AudioRecordingService.pauseRecording();
-      _elapsedTimer?.cancel();
-      _elapsedTimer = null;
+      _stopElapsedTimer();
       _pulseController.stop();
       if (mounted) {
         setState(() {
@@ -129,13 +123,7 @@ class _RecordingDialogState extends State<RecordingDialog>
       }
     } else if (_state == _RecordingState.paused) {
       await AudioRecordingService.resumeRecording();
-      _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (mounted && _state == _RecordingState.recording) {
-          setState(() {
-            _elapsedSeconds++;
-          });
-        }
-      });
+      _startElapsedTimer();
       _pulseController.repeat(reverse: true);
       if (mounted) {
         setState(() {
@@ -146,7 +134,7 @@ class _RecordingDialogState extends State<RecordingDialog>
   }
 
   Future<void> _cancelRecording() async {
-    _cancelTimers();
+    _stopElapsedTimer();
     try {
       await AudioRecordingService.stopRecording();
       await AudioRecordingService.deleteTemporaryAudio();
@@ -157,7 +145,7 @@ class _RecordingDialogState extends State<RecordingDialog>
   }
 
   Future<void> _completeRecording({bool triggeredByTimeout = false}) async {
-    _cancelTimers();
+    _stopElapsedTimer();
     try {
       final filePath = await AudioRecordingService.stopRecording();
       if (mounted) {
@@ -187,7 +175,7 @@ class _RecordingDialogState extends State<RecordingDialog>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cancelTimers();
+    _stopElapsedTimer();
     _pulseController.dispose();
     super.dispose();
   }

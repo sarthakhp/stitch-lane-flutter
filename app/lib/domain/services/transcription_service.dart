@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ai_chat_config.dart';
 import 'gemini_service.dart';
 import '../../presentation/widgets/transcription_progress_dialog.dart';
 import '../../presentation/widgets/transcription_action_dialog.dart';
@@ -30,6 +31,7 @@ class TranscriptionService {
     required String audioFilePath,
     String? systemInstruction,
     String? transcriptionPrompt,
+    String? modelName,
   }) async {
     bool isCancelled = false;
 
@@ -49,6 +51,7 @@ class TranscriptionService {
         audioFilePath,
         systemInstruction: systemInstruction,
         transcriptionPrompt: transcriptionPrompt,
+        modelName: modelName ?? defaultAiVoiceModel,
       );
     } catch (e) {
       if (context.mounted && !isCancelled) {
