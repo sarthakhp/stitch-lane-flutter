@@ -66,7 +66,7 @@ class AutoBackupService {
         settingsRepository: settingsRepository,
       );
       await DriveService.uploadBackup(backupJson);
-      await ImageSyncService.syncImagesToDrive();
+      await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
       await AudioSyncService.syncAudiosToDrive();
 
       await BackupTimeService.updateLastBackupTime(

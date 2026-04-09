@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
+import 'image_storage_service.dart';
 
 class BackupImportResult {
   final bool success;
@@ -146,7 +147,8 @@ class BackupImportService {
         final settingsJson = boxes['settings'] as Map<String, dynamic>?;
         if (settingsJson != null) {
           final settings = AppSettings.fromJson(settingsJson);
-          await settingsRepository.saveSettings(settings);
+          final safeSettings = settings.copyWith(autoBackupEnabled: false);
+          await settingsRepository.saveSettings(safeSettings);
         }
 
         // 5. Write image files to local storage
@@ -174,6 +176,11 @@ class BackupImportService {
           }
           AppLogger.info('BackupImport: Restored ${contents.audioFiles.length} audio files');
         }
+
+        // Verify: log any images referenced by orders but missing locally.
+        // Restore never deletes local image files.
+        final restoredOrders = await orderRepository.getAllOrders();
+        await ImageStorageService.verifyReferencedImages(restoredOrders);
 
         AppLogger.info('BackupImport: Import completed successfully');
         return BackupImportResult.success(contents.metadata);
@@ -266,24 +273,34 @@ class BackupImportService {
       'measurementCount': metadata['measurementCount'] ?? 0,
     };
 
-    // Extract image files
+    // Log all files in archive for debugging
+    AppLogger.info(
+      'BackupImport: Zip contains ${archive.files.length} entries: '
+      '${archive.files.map((f) => '${f.name} (isFile=${f.isFile}, size=${f.size})').join(', ')}',
+    );
+
+    // Extract image files (handle wrapper folder: images/x.jpg or folder/images/x.jpg)
     final Map<String, List<int>> imageFiles = {};
     for (final archiveFile in archive.files) {
-      if (archiveFile.isFile && archiveFile.name.startsWith('images/')) {
-        final fileName = archiveFile.name.replaceFirst('images/', '');
-        if (fileName.isNotEmpty) {
+      if (!archiveFile.isFile) continue;
+      final imagesIdx = archiveFile.name.indexOf('images/');
+      if (imagesIdx != -1) {
+        final fileName = archiveFile.name.substring(imagesIdx + 'images/'.length);
+        if (fileName.isNotEmpty && !fileName.startsWith('.')) {
           imageFiles[fileName] = archiveFile.content as List<int>;
         }
       }
     }
     enrichedMetadata['imageCount'] = imageFiles.length;
 
-    // Extract audio files
+    // Extract audio files (handle wrapper folder: audios/x.m4a or folder/audios/x.m4a)
     final Map<String, List<int>> audioFiles = {};
     for (final archiveFile in archive.files) {
-      if (archiveFile.isFile && archiveFile.name.startsWith('audios/')) {
-        final fileName = archiveFile.name.replaceFirst('audios/', '');
-        if (fileName.isNotEmpty) {
+      if (!archiveFile.isFile) continue;
+      final audiosIdx = archiveFile.name.indexOf('audios/');
+      if (audiosIdx != -1) {
+        final fileName = archiveFile.name.substring(audiosIdx + 'audios/'.length);
+        if (fileName.isNotEmpty && !fileName.startsWith('.')) {
           audioFiles[fileName] = archiveFile.content as List<int>;
         }
       }

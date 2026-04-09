@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
+import 'image_storage_service.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
 import '../../utils/app_logger.dart';
@@ -100,6 +101,15 @@ class BackupService {
     } catch (e) {
       AppLogger.error('Failed to restore audio files from Drive', e);
     }
+
+    // Verify: log any images referenced by orders but missing locally.
+    // Restore never deletes local image files.
+    try {
+      final orders = await orderRepository.getAllOrders();
+      await ImageStorageService.verifyReferencedImages(orders);
+    } catch (e) {
+      AppLogger.error('Image verification failed after restore', e);
+    }
   }
 
   static Future<void> _restoreCustomers(
@@ -161,7 +171,8 @@ class BackupService {
     if (settingsJson == null) return;
 
     final settings = AppSettings.fromJson(settingsJson);
-    await settingsRepository.saveSettings(settings);
+    final safeSettings = settings.copyWith(autoBackupEnabled: false);
+    await settingsRepository.saveSettings(safeSettings);
   }
 
   static void _validateBackup(Map<String, dynamic> backupData) {

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:googleapis/drive/v3.dart' as drive;
+import '../../backend/backend.dart';
 import '../../utils/app_logger.dart';
 import 'image_storage_service.dart';
 import 'drive_service.dart';
@@ -7,6 +8,7 @@ import 'drive_service.dart';
 class ImageSyncService {
   static Future<void> syncImagesToDrive({
     void Function(int current, int total, String message)? onProgress,
+    required OrderRepository orderRepository,
   }) async {
     try {
       AppLogger.info('Starting image sync to Drive');
@@ -47,15 +49,28 @@ class ImageSyncService {
         }
       }
 
+      // Only delete Drive images that are NOT referenced by any order in the DB
       final imagesToDelete = driveImageNames.difference(localImageNames);
-      AppLogger.info('Images to delete from Drive: ${imagesToDelete.length}');
+      AppLogger.info('Images on Drive but not local: ${imagesToDelete.length}');
 
-      for (final imageName in imagesToDelete) {
-        final imageFile = driveImages.firstWhere(
-          (img) => img['name'] == imageName,
-        );
-        await DriveServiceImageOperations.deleteImageFromDrive(driveApi, imageFile['id'] as String);
-        AppLogger.info('Deleted image from Drive: $imageName');
+      if (imagesToDelete.isNotEmpty) {
+        final allOrders = await orderRepository.getAllOrders();
+        final referencedFileNames = allOrders
+            .expand((o) => o.imagePaths)
+            .map((path) => path.split('/').last)
+            .toSet();
+
+        for (final imageName in imagesToDelete) {
+          if (referencedFileNames.contains(imageName)) {
+            AppLogger.warning('Skipping Drive delete (still referenced in DB): $imageName');
+            continue;
+          }
+          final imageFile = driveImages.firstWhere(
+            (img) => img['name'] == imageName,
+          );
+          await DriveServiceImageOperations.deleteImageFromDrive(driveApi, imageFile['id'] as String);
+          AppLogger.info('Deleted orphaned image from Drive: $imageName');
+        }
       }
 
       AppLogger.info('Image sync completed successfully');

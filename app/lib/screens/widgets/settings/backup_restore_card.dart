@@ -187,7 +187,7 @@ class BackupRestoreCard extends StatelessWidget {
       await DriveService.uploadBackup(backupJson);
       backupState.setProgress(0.5);
 
-      await ImageSyncService.syncImagesToDrive();
+      await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
       backupState.setProgress(0.7);
 
       await AudioSyncService.syncAudiosToDrive();

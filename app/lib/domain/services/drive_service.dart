@@ -251,22 +251,31 @@ extension DriveServiceImageOperations on DriveService {
     final imagesFolderId = await _getImagesFolderId(driveApi);
     if (imagesFolderId == null) return [];
 
-    final fileList = await driveApi.files.list(
-      q: "'$imagesFolderId' in parents and trashed=false",
-      spaces: 'appDataFolder',
-      $fields: 'files(id, name, size, modifiedTime)',
-    );
+    final results = <Map<String, dynamic>>[];
+    String? pageToken;
 
-    if (fileList.files == null || fileList.files!.isEmpty) {
-      return [];
-    }
+    do {
+      final fileList = await driveApi.files.list(
+        q: "'$imagesFolderId' in parents and trashed=false",
+        spaces: 'appDataFolder',
+        $fields: 'nextPageToken, files(id, name, size, modifiedTime)',
+        pageSize: 1000,
+        pageToken: pageToken,
+      );
 
-    return fileList.files!.map((file) => {
-      'id': file.id,
-      'name': file.name,
-      'size': file.size,
-      'modifiedTime': file.modifiedTime,
-    }).toList();
+      if (fileList.files != null) {
+        results.addAll(fileList.files!.map((file) => {
+          'id': file.id,
+          'name': file.name,
+          'size': file.size,
+          'modifiedTime': file.modifiedTime,
+        }));
+      }
+
+      pageToken = fileList.nextPageToken;
+    } while (pageToken != null);
+
+    return results;
   }
 
   static Future<void> uploadImage(drive.DriveApi driveApi, String fileName, List<int> imageBytes) async {
@@ -369,22 +378,31 @@ extension DriveServiceAudioOperations on DriveService {
     final audiosFolderId = await _getAudiosFolderId(driveApi);
     if (audiosFolderId == null) return [];
 
-    final fileList = await driveApi.files.list(
-      q: "'$audiosFolderId' in parents and trashed=false",
-      spaces: 'appDataFolder',
-      $fields: 'files(id, name, size, modifiedTime)',
-    );
+    final results = <Map<String, dynamic>>[];
+    String? pageToken;
 
-    if (fileList.files == null || fileList.files!.isEmpty) {
-      return [];
-    }
+    do {
+      final fileList = await driveApi.files.list(
+        q: "'$audiosFolderId' in parents and trashed=false",
+        spaces: 'appDataFolder',
+        $fields: 'nextPageToken, files(id, name, size, modifiedTime)',
+        pageSize: 1000,
+        pageToken: pageToken,
+      );
 
-    return fileList.files!.map((file) => {
-      'id': file.id,
-      'name': file.name,
-      'size': file.size,
-      'modifiedTime': file.modifiedTime,
-    }).toList();
+      if (fileList.files != null) {
+        results.addAll(fileList.files!.map((file) => {
+          'id': file.id,
+          'name': file.name,
+          'size': file.size,
+          'modifiedTime': file.modifiedTime,
+        }));
+      }
+
+      pageToken = fileList.nextPageToken;
+    } while (pageToken != null);
+
+    return results;
   }
 
   static Future<void> uploadAudio(drive.DriveApi driveApi, String fileName, List<int> audioBytes) async {

@@ -143,6 +143,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       await DriveService.uploadBackup(backupJson);
       backupState.setDetailedProgress(0.5, 'Syncing images...');
       await ImageSyncService.syncImagesToDrive(
+        orderRepository: orderRepository,
         onProgress: (current, total, message) {
           if (context.mounted) {
             final fraction = 0.5 + (current / total) * 0.2;
