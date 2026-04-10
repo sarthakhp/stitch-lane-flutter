@@ -1,5 +1,4 @@
 import 'dart:convert';
-import '../../backend/database/database_service.dart';
 import '../../backend/database/sqlite_database.dart';
 
 const int _defaultMaxRows = 50;
@@ -48,10 +47,6 @@ All dates are ISO8601 strings. Booleans are 0/1. payments is a JSON array: [{"id
 
   /// Execute a read-only SQL query. Only SELECT statements are allowed.
   static Future<AiToolResult> queryDatabase(String sql, {int? maxRows}) async {
-    if (!DatabaseService.isUsingSqlite) {
-      return AiToolResult.error('Database is not using SQLite. AI tools are not available.');
-    }
-
     final trimmed = sql.trim();
 
     // Only allow SELECT statements

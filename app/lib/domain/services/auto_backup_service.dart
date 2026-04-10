@@ -45,6 +45,15 @@ class AutoBackupService {
       final measurementRepository = RepositoryFactory.createMeasurementRepository();
       final settingsRepository = RepositoryFactory.createSettingsRepository();
 
+      // Safety check: verify backup is still enabled (WorkManager tasks persist
+      // even after toggle is turned off)
+      final settings = await settingsRepository.getSettings();
+      if (!settings.autoBackupEnabled) {
+        AppLogger.info('Auto-backup aborted: backup is disabled in settings');
+        await cancelAutoBackup();
+        return;
+      }
+
       if (!await _checkBatteryLevel()) {
         AppLogger.warning('Battery level too low (below 15%)');
         await _scheduleNextIfEnabled(settingsRepository);
@@ -59,6 +68,7 @@ class AutoBackupService {
 
       await NotificationService.showBackupInProgressNotification();
 
+      // Core backup: JSON data upload (if this fails, it's a full failure)
       final backupJson = await BackupService.createBackup(
         customerRepository: customerRepository,
         orderRepository: orderRepository,
@@ -66,16 +76,34 @@ class AutoBackupService {
         settingsRepository: settingsRepository,
       );
       await DriveService.uploadBackup(backupJson);
-      await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
-      await AudioSyncService.syncAudiosToDrive();
 
-      await BackupTimeService.updateLastBackupTime(
-        settingsRepository: settingsRepository,
-      );
+      // File sync: image + audio (if these fail, it's a partial backup)
+      final syncErrors = <String>[];
+      try {
+        await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
+      } catch (e) {
+        syncErrors.add('Images: $e');
+        AppLogger.error('Auto-backup: image sync failed', e);
+      }
+      try {
+        await AudioSyncService.syncAudiosToDrive();
+      } catch (e) {
+        syncErrors.add('Audio: $e');
+        AppLogger.error('Auto-backup: audio sync failed', e);
+      }
 
-      await NotificationService.showBackupSuccessNotification();
-
-      AppLogger.info('Auto-backup completed successfully');
+      if (syncErrors.isEmpty) {
+        await BackupTimeService.recordSuccess(settingsRepository: settingsRepository);
+        await NotificationService.showBackupSuccessNotification();
+        AppLogger.info('Auto-backup completed successfully');
+      } else {
+        await BackupTimeService.recordPartial(
+          settingsRepository: settingsRepository,
+          error: syncErrors.join('; '),
+        );
+        await NotificationService.showBackupPartialNotification();
+        AppLogger.warning('Auto-backup completed with errors: ${syncErrors.join('; ')}');
+      }
 
       await _scheduleNextIfEnabled(settingsRepository);
     } catch (e) {
@@ -83,9 +111,14 @@ class AutoBackupService {
       await NotificationService.cancelBackupInProgressNotification();
       try {
         final settingsRepository = RepositoryFactory.createSettingsRepository();
+        await BackupTimeService.recordFailed(
+          settingsRepository: settingsRepository,
+          error: e.toString(),
+        );
+        await NotificationService.showBackupFailedNotification(e.toString());
         await _scheduleNextIfEnabled(settingsRepository);
-      } catch (scheduleError) {
-        AppLogger.error('Failed to schedule next backup after failure', scheduleError);
+      } catch (statusError) {
+        AppLogger.error('Failed to record backup failure', statusError);
       }
       rethrow;
     }

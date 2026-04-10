@@ -46,7 +46,9 @@ class DailyTaskScheduler {
 
   Future<void> cancel() async {
     await Workmanager().cancelByTag(taskTag);
-    AppLogger.info('[$taskTag] Task cancelled');
+    await Workmanager().cancelByUniqueName(taskName);
+    await Workmanager().cancelByUniqueName('$taskName.test');
+    AppLogger.info('[$taskTag] All tasks cancelled');
   }
 
   Future<void> scheduleTest({int delaySeconds = 15}) async {
@@ -55,6 +57,7 @@ class DailyTaskScheduler {
     await Workmanager().registerOneOffTask(
       '$taskName.test',
       taskName,
+      tag: taskTag,
       initialDelay: Duration(seconds: delaySeconds),
       existingWorkPolicy: ExistingWorkPolicy.replace,
     );

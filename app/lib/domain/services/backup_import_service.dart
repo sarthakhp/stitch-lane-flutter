@@ -186,11 +186,7 @@ class BackupImportService {
         return BackupImportResult.success(contents.metadata);
       }
 
-      if (DatabaseService.isUsingSqlite) {
-        return await SqliteDatabase.withForeignKeysDisabled(doImport);
-      } else {
-        return await doImport();
-      }
+      return await SqliteDatabase.withForeignKeysDisabled(doImport);
     } catch (e) {
       // ROLLBACK: Restore original data from memory
       AppLogger.error('BackupImport: Import failed, rolling back...', e);
@@ -214,11 +210,7 @@ class BackupImportService {
           await settingsRepository.saveSettings(currentSettings);
         }
 
-        if (DatabaseService.isUsingSqlite) {
-          await SqliteDatabase.withForeignKeysDisabled(doRollback);
-        } else {
-          await doRollback();
-        }
+        await SqliteDatabase.withForeignKeysDisabled(doRollback);
 
         AppLogger.info('BackupImport: Rollback successful');
       } catch (rollbackError) {

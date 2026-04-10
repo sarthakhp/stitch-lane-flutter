@@ -191,6 +191,32 @@ class NotificationService {
     AppLogger.info('Backup success notification shown');
   }
 
+  static Future<void> showBackupPartialNotification() async {
+    await cancelBackupInProgressNotification();
+
+    final androidDetails = _buildAndroidDetails(
+      _NotificationChannel.backup,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+    );
+    final darwinDetails = _buildDarwinDetails(
+      presentAlert: true,
+      presentBadge: false,
+      presentSound: true,
+    );
+    final details = _buildNotificationDetails(
+      android: androidDetails,
+      darwin: darwinDetails,
+    );
+
+    await _notifications.show(
+      _NotificationId.backupFailed.value,
+      'Backup Partially Complete',
+      'Data was backed up, but some files failed to sync',
+      details,
+    );
+  }
+
   static Future<void> showBackupInProgressNotification() async {
     final androidDetails = _buildAndroidDetails(
       _NotificationChannel.backup,

@@ -187,15 +187,29 @@ class BackupRestoreCard extends StatelessWidget {
       await DriveService.uploadBackup(backupJson);
       backupState.setProgress(0.5);
 
-      await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
+      final syncErrors = <String>[];
+      try {
+        await ImageSyncService.syncImagesToDrive(orderRepository: orderRepository);
+      } catch (e) {
+        syncErrors.add('Images: $e');
+      }
       backupState.setProgress(0.7);
 
-      await AudioSyncService.syncAudiosToDrive();
+      try {
+        await AudioSyncService.syncAudiosToDrive();
+      } catch (e) {
+        syncErrors.add('Audio: $e');
+      }
       backupState.setProgress(0.9);
 
-      await BackupTimeService.updateLastBackupTime(
-        settingsRepository: settingsRepository,
-      );
+      if (syncErrors.isEmpty) {
+        await BackupTimeService.recordSuccess(settingsRepository: settingsRepository);
+      } else {
+        await BackupTimeService.recordPartial(
+          settingsRepository: settingsRepository,
+          error: syncErrors.join('; '),
+        );
+      }
 
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
@@ -212,13 +226,25 @@ class BackupRestoreCard extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Backup completed successfully'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
+            content: Text(syncErrors.isEmpty
+                ? 'Backup completed successfully'
+                : 'Backup completed, but some files failed to sync'),
+            backgroundColor: syncErrors.isEmpty
+                ? Theme.of(context).colorScheme.primary
+                : Colors.orange,
           ),
         );
       }
     } catch (e) {
       backupState.setError('Backup failed: ${e.toString()}');
+      try {
+        // ignore: use_build_context_synchronously
+        final repo = context.read<SettingsRepository>();
+        await BackupTimeService.recordFailed(
+          settingsRepository: repo,
+          error: e.toString(),
+        );
+      } catch (_) {}
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

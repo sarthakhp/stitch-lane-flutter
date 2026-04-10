@@ -162,6 +162,7 @@ class _ImageIntegritySectionState extends State<_ImageIntegritySection> {
   DateTime? _lastChecked;
   int _totalRefs = 0;
   int _missingCount = 0;
+  int _orphanedCount = 0;
   List<_MissingImage> _missingImages = [];
 
   Future<void> _check() async {
@@ -193,10 +194,21 @@ class _ImageIntegritySectionState extends State<_ImageIntegritySection> {
         }
       }
 
+      // Check for orphaned files (on disk but not referenced by any order)
+      final allLocalPaths = await ImageStorageService.getAllImagePaths();
+      final referencedFileNames = orders
+          .expand((o) => o.imagePaths)
+          .map((p) => p.split('/').last)
+          .toSet();
+      final orphaned = allLocalPaths
+          .where((p) => !referencedFileNames.contains(p.split('/').last))
+          .length;
+
       if (mounted) {
         setState(() {
           _totalRefs = totalRefs;
           _missingCount = missing.length;
+          _orphanedCount = orphaned;
           _missingImages = missing;
           _lastChecked = DateTime.now();
         });
@@ -259,15 +271,15 @@ class _ImageIntegritySectionState extends State<_ImageIntegritySection> {
                     const Icon(Icons.check_circle, color: Colors.green, size: 18),
                     const SizedBox(width: AppConfig.spacing8),
                     Text(
-                      'All $_totalRefs images OK',
+                      'All $_totalRefs referenced images OK',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.green,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
-                )
-              else ...[
+                ),
+              if (_missingCount > 0) ...[
                 Row(
                   children: [
                     Icon(Icons.warning_amber, color: theme.colorScheme.error, size: 18),
@@ -305,6 +317,23 @@ class _ImageIntegritySectionState extends State<_ImageIntegritySection> {
                       ],
                     ),
                   )),
+                ),
+              ],
+              if (_orphanedCount > 0) ...[
+                const SizedBox(height: AppConfig.spacing8),
+                Row(
+                  children: [
+                    const Icon(Icons.folder_delete_outlined, color: Colors.orange, size: 18),
+                    const SizedBox(width: AppConfig.spacing8),
+                    Expanded(
+                      child: Text(
+                        '$_orphanedCount orphaned ${_orphanedCount == 1 ? 'file' : 'files'} on disk (not referenced by any order)',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

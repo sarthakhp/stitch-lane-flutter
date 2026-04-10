@@ -141,29 +141,46 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       );
       backupState.setProgress(0.4);
       await DriveService.uploadBackup(backupJson);
+
+      // File sync — track errors separately for partial status
+      final syncErrors = <String>[];
       backupState.setDetailedProgress(0.5, 'Syncing images...');
-      await ImageSyncService.syncImagesToDrive(
-        orderRepository: orderRepository,
-        onProgress: (current, total, message) {
-          if (context.mounted) {
-            final fraction = 0.5 + (current / total) * 0.2;
-            backupState.setDetailedProgress(fraction, message);
-          }
-        },
-      );
+      try {
+        await ImageSyncService.syncImagesToDrive(
+          orderRepository: orderRepository,
+          onProgress: (current, total, message) {
+            if (context.mounted) {
+              final fraction = 0.5 + (current / total) * 0.2;
+              backupState.setDetailedProgress(fraction, message);
+            }
+          },
+        );
+      } catch (e) {
+        syncErrors.add('Images: $e');
+      }
       backupState.setDetailedProgress(0.7, 'Syncing audio...');
-      await AudioSyncService.syncAudiosToDrive(
-        onProgress: (current, total, message) {
-          if (context.mounted) {
-            final fraction = 0.7 + (current / total) * 0.2;
-            backupState.setDetailedProgress(fraction, message);
-          }
-        },
-      );
+      try {
+        await AudioSyncService.syncAudiosToDrive(
+          onProgress: (current, total, message) {
+            if (context.mounted) {
+              final fraction = 0.7 + (current / total) * 0.2;
+              backupState.setDetailedProgress(fraction, message);
+            }
+          },
+        );
+      } catch (e) {
+        syncErrors.add('Audio: $e');
+      }
+
       backupState.setProgress(0.9);
-      await BackupTimeService.updateLastBackupTime(
-        settingsRepository: settingsRepository,
-      );
+      if (syncErrors.isEmpty) {
+        await BackupTimeService.recordSuccess(settingsRepository: settingsRepository);
+      } else {
+        await BackupTimeService.recordPartial(
+          settingsRepository: settingsRepository,
+          error: syncErrors.join('; '),
+        );
+      }
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
       backupState.setProgress(1.0);
@@ -175,14 +192,26 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Backup completed successfully'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
+              content: Text(syncErrors.isEmpty
+                  ? 'Backup completed successfully'
+                  : 'Backup completed, but some files failed to sync'),
+              backgroundColor: syncErrors.isEmpty
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.orange,
             ),
           );
         }
       }
     } catch (e) {
       backupState.setError('Backup failed: ${e.toString()}');
+      try {
+        // ignore: use_build_context_synchronously
+        final repo = context.read<SettingsRepository>();
+        await BackupTimeService.recordFailed(
+          settingsRepository: repo,
+          error: e.toString(),
+        );
+      } catch (_) {}
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -596,15 +625,7 @@ class _BackupStatusSection extends StatelessWidget {
             if (backupState.isCheckingBackup)
               _buildCheckingRow(context)
             else if (backupState.backupInfo != null) ...[
-              _buildInfoRow(
-                context,
-                Icons.cloud_done,
-                'Last Backup',
-                settingsState.lastBackupTime != null
-                    ? DateFormat('MMM d, y h:mm a')
-                        .format(settingsState.lastBackupTime!)
-                    : 'Never',
-              ),
+              _buildBackupStatusRow(context, settingsState),
               const SizedBox(height: AppConfig.spacing8),
               _buildInfoRow(
                 context,
@@ -668,6 +689,72 @@ class _BackupStatusSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildBackupStatusRow(BuildContext context, SettingsState settingsState) {
+    final status = settingsState.settings.lastBackupStatus;
+    final error = settingsState.settings.lastBackupError;
+    final lastTime = settingsState.lastBackupTime;
+
+    final timeStr = lastTime != null
+        ? DateFormat('MMM d, y h:mm a').format(lastTime)
+        : 'Never';
+
+    if (status == 'failed') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoRow(context, Icons.error_outline, 'Last Backup', 'Failed'),
+          if (error != null && error.isNotEmpty) ...[
+            const SizedBox(height: AppConfig.spacing4),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Text(
+                error,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          if (lastTime != null) ...[
+            const SizedBox(height: AppConfig.spacing4),
+            _buildInfoRow(context, Icons.cloud_done, 'Last Successful', timeStr),
+          ],
+        ],
+      );
+    }
+
+    if (status == 'partial') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoRow(context, Icons.warning_amber, 'Last Backup', 'Partial — $timeStr'),
+          if (error != null && error.isNotEmpty) ...[
+            const SizedBox(height: AppConfig.spacing4),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Text(
+                error,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.orange,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          if (lastTime != null) ...[
+            const SizedBox(height: AppConfig.spacing4),
+            _buildInfoRow(context, Icons.cloud_done, 'Last Successful', timeStr),
+          ],
+        ],
+      );
+    }
+
+    return _buildInfoRow(context, Icons.cloud_done, 'Last Backup', timeStr);
   }
 
   Widget _buildInfoRow(

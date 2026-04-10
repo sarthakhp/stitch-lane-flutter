@@ -1,16 +1,8 @@
-import 'package:hive/hive.dart';
-
-part 'payment_entry.g.dart';
-
-@HiveType(typeId: 5)
 class PaymentEntry {
-  @HiveField(0)
   final String id;
 
-  @HiveField(1)
   final DateTime date;
 
-  @HiveField(2)
   final int amount;
 
   PaymentEntry({

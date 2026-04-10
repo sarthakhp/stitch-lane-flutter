@@ -1,48 +1,31 @@
-import 'package:hive/hive.dart';
 import 'order_status.dart';
 import 'payment_entry.dart';
 
-part 'order.g.dart';
-
-@HiveType(typeId: 1)
 class Order {
-  @HiveField(0)
   final String id;
 
-  @HiveField(1)
   final String customerId;
 
-  @HiveField(2)
   final String? title;
 
-  @HiveField(3)
   final DateTime dueDate;
 
-  @HiveField(4)
   final String? description;
 
-  @HiveField(5)
   final DateTime created;
 
-  @HiveField(6)
   final OrderStatus status;
 
-  @HiveField(7)
   final int value;
 
-  @HiveField(8)
   final bool isPaid;
 
-  @HiveField(9)
   final List<String> imagePaths;
 
-  @HiveField(10)
   final DateTime? paymentDate;
 
-  @HiveField(11)
   final List<PaymentEntry> payments;
 
-  @HiveField(12)
   final int totalPaidAmount;
 
   Order({

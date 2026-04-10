@@ -80,11 +80,7 @@ class BackupService {
       await _restoreSettings(boxes, settingsRepository);
     }
 
-    if (DatabaseService.isUsingSqlite) {
-      await SqliteDatabase.withForeignKeysDisabled(doRestore);
-    } else {
-      await doRestore();
-    }
+    await SqliteDatabase.withForeignKeysDisabled(doRestore);
 
     try {
       AppLogger.info('Starting image download from Drive after restore');

@@ -1,25 +1,14 @@
-import 'package:hive/hive.dart';
-
-part 'measurement.g.dart';
-
-@HiveType(typeId: 4)
 class Measurement {
-  @HiveField(0)
   final String id;
 
-  @HiveField(1)
   final String customerId;
 
-  @HiveField(2)
   final String description;
 
-  @HiveField(3)
   final DateTime created;
 
-  @HiveField(4)
   final DateTime modified;
 
-  @HiveField(5)
   final String? audioFilePath;
 
   Measurement({

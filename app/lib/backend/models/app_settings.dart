@@ -1,35 +1,25 @@
-import 'package:hive/hive.dart';
-
-part 'app_settings.g.dart';
-
-@HiveType(typeId: 3)
 class AppSettings {
-  @HiveField(0)
   final int dueDateWarningThreshold;
 
-  @HiveField(1)
   final bool? pendingOrdersReminderEnabledRaw;
 
-  @HiveField(2)
   final String? pendingOrdersReminderTimeRaw;
 
-  @HiveField(3)
   final bool? autoBackupEnabledRaw;
 
-  @HiveField(4)
   final String? autoBackupTimeRaw;
 
-  @HiveField(5)
   final DateTime? lastBackupTime;
 
-  @HiveField(6)
   final bool? debugLogsEnabledRaw;
 
-  @HiveField(7)
   final String? aiChatModelRaw;
 
-  @HiveField(8)
   final String? aiVoiceModelRaw;
+
+  final String? lastBackupStatus; // 'success', 'partial', 'failed'
+
+  final String? lastBackupError;
 
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
@@ -49,6 +39,8 @@ class AppSettings {
     this.debugLogsEnabledRaw,
     this.aiChatModelRaw,
     this.aiVoiceModelRaw,
+    this.lastBackupStatus,
+    this.lastBackupError,
   });
 
   AppSettings copyWith({
@@ -61,6 +53,8 @@ class AppSettings {
     bool? debugLogsEnabled,
     String? aiChatModel,
     String? aiVoiceModel,
+    String? lastBackupStatus,
+    String? lastBackupError,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -72,6 +66,8 @@ class AppSettings {
       debugLogsEnabledRaw: debugLogsEnabled ?? this.debugLogsEnabled,
       aiChatModelRaw: aiChatModel ?? aiChatModelRaw,
       aiVoiceModelRaw: aiVoiceModel ?? aiVoiceModelRaw,
+      lastBackupStatus: lastBackupStatus ?? this.lastBackupStatus,
+      lastBackupError: lastBackupError ?? this.lastBackupError,
     );
   }
 
@@ -86,6 +82,8 @@ class AppSettings {
       'debugLogsEnabled': debugLogsEnabled,
       'aiChatModel': aiChatModelRaw,
       'aiVoiceModel': aiVoiceModelRaw,
+      'lastBackupStatus': lastBackupStatus,
+      'lastBackupError': lastBackupError,
     };
   }
 
@@ -107,6 +105,8 @@ class AppSettings {
       debugLogsEnabledRaw: json['debugLogsEnabled'] as bool?,
       aiChatModelRaw: json['aiChatModel'] as String?,
       aiVoiceModelRaw: json['aiVoiceModel'] as String?,
+      lastBackupStatus: json['lastBackupStatus'] as String?,
+      lastBackupError: json['lastBackupError'] as String?,
     );
   }
 
@@ -127,7 +127,9 @@ class AppSettings {
            other.lastBackupTime == lastBackupTime &&
            other.debugLogsEnabled == debugLogsEnabled &&
            other.aiChatModelRaw == aiChatModelRaw &&
-           other.aiVoiceModelRaw == aiVoiceModelRaw;
+           other.aiVoiceModelRaw == aiVoiceModelRaw &&
+           other.lastBackupStatus == lastBackupStatus &&
+           other.lastBackupError == lastBackupError;
   }
 
   @override
@@ -141,6 +143,8 @@ class AppSettings {
     debugLogsEnabled,
     aiChatModelRaw,
     aiVoiceModelRaw,
+    lastBackupStatus,
+    lastBackupError,
   );
 }
 

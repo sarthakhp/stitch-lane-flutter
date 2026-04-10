@@ -1,9 +1,5 @@
 class AppConstants {
   static const String appName = 'Stitch Genie';
-  static const String customersBoxName = 'customers_box';
-  static const String ordersBoxName = 'orders_box';
-  static const String settingsBoxName = 'settings_box';
-  static const String measurementsBoxName = 'measurements_box';
   static const String settingsKey = 'app_settings';
   static const String backupFileName = 'stitch_genie_backup.json';
   static const String backupZipPrefix = 'stitch_genie_backup';
