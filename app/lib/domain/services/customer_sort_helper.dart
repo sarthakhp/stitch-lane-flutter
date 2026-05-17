@@ -22,7 +22,7 @@ class CustomerSortHelper {
   static int getTotalPendingAmount(String customerId, List<Order> orders) {
     return orders
         .where((order) => order.customerId == customerId && !order.isPaid)
-        .fold(0, (sum, order) => sum + order.value);
+        .fold(0, (sum, order) => sum + order.value - order.totalPaidAmount);
   }
 
   static List<Customer> sortCustomers(

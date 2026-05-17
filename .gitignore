@@ -24,3 +24,6 @@ app/android/key.properties
 # Documentation (project-specific)
 *.md.backup
 
+# Serena MCP
+.serena/
+
