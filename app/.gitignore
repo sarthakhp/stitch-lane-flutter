@@ -47,6 +47,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
 
 # Android Gradle build cache (NOT the wrapper files - those should be committed)
 android/.gradle/
