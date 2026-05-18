@@ -2,16 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
-import '../constants/gemini_prompts.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
 import '../domain/state/settings_state.dart';
-import '../domain/services/audio_recording_service.dart';
-import '../domain/services/transcription_service.dart';
 import '../presentation/presentation.dart';
-import '../presentation/widgets/recording_dialog.dart';
-import '../presentation/widgets/transcription_error_dialog.dart';
-import 'widgets/ai/ai_input_bar.dart';
+import 'widgets/ai/ai_input_area.dart';
 import 'widgets/ai/ai_message_bubble.dart';
 import 'widgets/ai/ai_typing_indicator.dart';
 import 'widgets/ai/ai_welcome_view.dart';
@@ -98,45 +93,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
-  Future<void> _handleVoiceInput() async {
-    final audioPath = await RecordingDialog.show(context);
-    if (audioPath == null || !mounted) return;
-
-    var shouldRetry = true;
-    while (shouldRetry && mounted) {
-      shouldRetry = false;
-
-      final result = await TranscriptionService.transcribe(
-        // ignore: use_build_context_synchronously
-        context: context,
-        audioFilePath: audioPath,
-        systemInstruction: GeminiPrompts.chatSystemInstruction,
-        transcriptionPrompt: GeminiPrompts.chatTranscriptionPrompt,
-        // ignore: use_build_context_synchronously
-        modelName: context.read<SettingsState>().settings.aiVoiceModel,
-      );
-
-      if (result.type == TranscriptionResultType.success && result.text != null) {
-        final existing = _inputController.text.trim();
-        _inputController.text = existing.isEmpty ? result.text! : '$existing ${result.text!}';
-        _inputController.selection = TextSelection.collapsed(offset: _inputController.text.length);
-        break;
-      }
-
-      if (result.type == TranscriptionResultType.cancelled || !mounted) break;
-
-      final action = await TranscriptionErrorDialog.show(
-        // ignore: use_build_context_synchronously
-        context,
-        errorMessage: result.errorMessage ?? 'Transcription failed',
-        audioFilePath: audioPath,
-      );
-
-      shouldRetry = action == TranscriptionErrorAction.retry;
-    }
-
-    await AudioRecordingService.deleteTemporaryAudio();
-  }
+  
 
   void _scrollToBottom({bool jump = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -183,11 +140,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                 : _buildMessageList(context),
           ),
           _buildTokenUsage(context),
-          AiInputBar(
+          AiInputArea(
             controller: _inputController,
             isLoading: _isLoading,
             onSend: _sendMessage,
-            onMicTap: _handleVoiceInput,
           ),
         ],
       ),

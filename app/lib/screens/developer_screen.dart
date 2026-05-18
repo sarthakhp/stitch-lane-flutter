@@ -6,6 +6,7 @@ import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
+import '../presentation/widgets/streaming_stt_test_dialog.dart';
 import 'widgets/settings/debug_logs_card.dart';
 
 class DeveloperScreen extends StatelessWidget {
@@ -26,6 +27,8 @@ class DeveloperScreen extends StatelessWidget {
                 const DebugLogsCard(),
                 const SizedBox(height: AppConfig.spacing24),
                 _AiModelsCard(),
+                const SizedBox(height: AppConfig.spacing24),
+                _StreamingSttTestCard(),
                 const SizedBox(height: AppConfig.spacing24),
                 const _ImageIntegritySection(),
                 const SizedBox(height: AppConfig.spacing24),
@@ -94,6 +97,17 @@ class _AiModelsCard extends StatelessWidget {
                     settingsState.settings.copyWith(aiVoiceModel: value),
                   ),
                 ),
+                const SizedBox(height: AppConfig.spacing12),
+                _buildDropdown(
+                  context,
+                  label: 'STT Provider',
+                  value: settingsState.settings.sttProvider,
+                  items: const [sttProviderGemini, sttProviderSarvam],
+                  onChanged: (value) => _updateSetting(
+                    context,
+                    settingsState.settings.copyWith(sttProvider: value),
+                  ),
+                ),
               ],
             ),
           ),
@@ -147,6 +161,60 @@ class _AiModelsCard extends StatelessWidget {
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
     await SettingsService.updateSettings(settingsState, settingsRepository, newSettings);
+  }
+}
+
+class _StreamingSttTestCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConfig.spacing16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.stream, color: theme.colorScheme.primary),
+                const SizedBox(width: AppConfig.spacing8),
+                Text('Streaming STT', style: theme.textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            Text(
+              'Test real-time transcription via Sarvam WebSocket',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: () => StreamingSttTestDialog.show(context),
+                  icon: const Icon(Icons.mic),
+                  label: const Text('Test Streaming'),
+                ),
+                const SizedBox(width: AppConfig.spacing8),
+                FilledButton.tonalIcon(
+                  onPressed: () async {
+                    final text = await StreamingVoiceBottomSheet.show(context);
+                    if (context.mounted && text != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Got: $text')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Bottom Sheet'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

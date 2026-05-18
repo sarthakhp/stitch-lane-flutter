@@ -1,4 +1,6 @@
 export 'widgets/customer_autocomplete_field.dart';
+export 'widgets/streaming_voice_bottom_sheet.dart';
+export 'widgets/streaming_voice_input.dart';
 export 'widgets/customer_list_item.dart';
 export 'widgets/customer_sort_dropdown.dart';
 export 'widgets/empty_customers_state.dart';

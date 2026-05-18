@@ -21,6 +21,8 @@ class AppSettings {
 
   final String? lastBackupError;
 
+  final String? sttProviderRaw;
+
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
@@ -28,6 +30,7 @@ class AppSettings {
   bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
   String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite-preview';
   String get aiVoiceModel => aiVoiceModelRaw ?? 'gemini-2.5-flash-lite';
+  String get sttProvider => sttProviderRaw ?? 'gemini';
 
   AppSettings({
     this.dueDateWarningThreshold = 3,
@@ -41,6 +44,7 @@ class AppSettings {
     this.aiVoiceModelRaw,
     this.lastBackupStatus,
     this.lastBackupError,
+    this.sttProviderRaw,
   });
 
   AppSettings copyWith({
@@ -55,6 +59,7 @@ class AppSettings {
     String? aiVoiceModel,
     String? lastBackupStatus,
     String? lastBackupError,
+    String? sttProvider,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -68,6 +73,7 @@ class AppSettings {
       aiVoiceModelRaw: aiVoiceModel ?? aiVoiceModelRaw,
       lastBackupStatus: lastBackupStatus ?? this.lastBackupStatus,
       lastBackupError: lastBackupError ?? this.lastBackupError,
+      sttProviderRaw: sttProvider ?? sttProviderRaw,
     );
   }
 
@@ -84,6 +90,7 @@ class AppSettings {
       'aiVoiceModel': aiVoiceModelRaw,
       'lastBackupStatus': lastBackupStatus,
       'lastBackupError': lastBackupError,
+      'sttProvider': sttProviderRaw,
     };
   }
 
@@ -107,6 +114,7 @@ class AppSettings {
       aiVoiceModelRaw: json['aiVoiceModel'] as String?,
       lastBackupStatus: json['lastBackupStatus'] as String?,
       lastBackupError: json['lastBackupError'] as String?,
+      sttProviderRaw: json['sttProvider'] as String?,
     );
   }
 
@@ -129,7 +137,8 @@ class AppSettings {
            other.aiChatModelRaw == aiChatModelRaw &&
            other.aiVoiceModelRaw == aiVoiceModelRaw &&
            other.lastBackupStatus == lastBackupStatus &&
-           other.lastBackupError == lastBackupError;
+           other.lastBackupError == lastBackupError &&
+           other.sttProviderRaw == sttProviderRaw;
   }
 
   @override
@@ -145,6 +154,7 @@ class AppSettings {
     aiVoiceModelRaw,
     lastBackupStatus,
     lastBackupError,
+    sttProviderRaw,
   );
 }
 

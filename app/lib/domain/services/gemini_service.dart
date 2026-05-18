@@ -1,18 +1,16 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File, SocketException;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:langchain/langchain.dart';
-import 'package:langchain_google/langchain_google.dart';
+import 'package:googleai_dart/googleai_dart.dart' hide File;
 import '../../constants/gemini_prompts.dart';
 import '../../utils/app_logger.dart';
 import 'ai_chat_config.dart';
 
 class GeminiService {
-  static ChatGoogleGenerativeAI? _model;
-  static String? _currentModelName;
+  static GoogleAIClient? _client;
 
-  static ChatGoogleGenerativeAI _getModel({String modelName = defaultAiVoiceModel}) {
-    if (_model != null && _currentModelName == modelName) return _model!;
+  static GoogleAIClient _getClient() {
+    if (_client != null) return _client!;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
@@ -22,15 +20,23 @@ class GeminiService {
       );
     }
 
-    _model = ChatGoogleGenerativeAI(
-      apiKey: apiKey,
-      defaultOptions: ChatGoogleGenerativeAIOptions(
-        model: modelName,
-      ),
+    _client = GoogleAIClient(
+      config: GoogleAIConfig(authProvider: ApiKeyProvider(apiKey)),
     );
-    _currentModelName = modelName;
+    return _client!;
+  }
 
-    return _model!;
+  static GenerationConfig _buildGenerationConfig(String modelName) {
+    if (modelName.startsWith('gemini-3')) {
+      AppLogger.info('GenerationConfig: model=$modelName, thinkingLevel=MINIMAL');
+      return const GenerationConfig(
+        thinkingConfig: ThinkingConfig(thinkingLevel: ThinkingLevel.minimal),
+      );
+    }
+    AppLogger.info('GenerationConfig: model=$modelName, thinkingBudget=0');
+    return const GenerationConfig(
+      thinkingConfig: ThinkingConfig(thinkingBudget: 0),
+    );
   }
 
   static Future<String?> transcribeAudio(
@@ -51,31 +57,32 @@ class GeminiService {
       final audioBytes = await audioFile.readAsBytes();
       AppLogger.info('Audio file size: ${audioBytes.length} bytes');
 
-      final model = _getModel(modelName: modelName);
+      final client = _getClient();
       final audioBase64 = base64Encode(audioBytes);
 
       final system = systemInstruction ?? GeminiPrompts.systemInstruction;
       final prompt = transcriptionPrompt ?? GeminiPrompts.transcriptionPrompt;
 
-      final response = await model.invoke(
-        PromptValue.chat([
-          ChatMessage.system(system),
-          ChatMessage.human(
-            ChatMessageContent.multiModal([
-              ChatMessageContent.text(prompt),
-              ChatMessageContent.image(
-                data: audioBase64,
-                mimeType: 'audio/m4a',
-              ),
-            ]),
+      final response = await client.models.generateContent(
+        model: modelName,
+        request: GenerateContentRequest(
+          systemInstruction: Content(
+            parts: [TextPart(system)],
           ),
-        ]),
+          contents: [
+            Content.user([
+              TextPart(prompt),
+              InlineDataPart(Blob(mimeType: 'audio/m4a', data: audioBase64)),
+            ]),
+          ],
+          generationConfig: _buildGenerationConfig(modelName),
+        ),
       );
 
-      final transcription = response.output.content;
+      final transcription = response.text;
       AppLogger.info('Response: $transcription');
 
-      if (transcription.isEmpty) {
+      if (transcription == null || transcription.isEmpty) {
         AppLogger.warning('Gemini returned empty transcription');
         return null;
       }
@@ -88,6 +95,53 @@ class GeminiService {
     } catch (e) {
       AppLogger.error('Unexpected error during transcription', e);
       throw Exception('Transcription failed: $e');
+    }
+  }
+
+  static Future<String?> formatTranscription(
+    String rawText, {
+    String? systemInstruction,
+    String? formattingPrompt,
+    String modelName = defaultAiVoiceModel,
+  }) async {
+    try {
+      AppLogger.info('Formatting transcription (${rawText.length} chars)');
+      AppLogger.info('Formatting INPUT:\n$rawText');
+
+      final client = _getClient();
+      final system = systemInstruction ?? GeminiPrompts.formattingSystemInstruction;
+      final prompt = formattingPrompt ?? GeminiPrompts.formattingPrompt;
+
+      final response = await client.models.generateContent(
+        model: modelName,
+        request: GenerateContentRequest(
+          systemInstruction: Content(
+            parts: [TextPart(system)],
+          ),
+          contents: [
+            Content.user([
+              TextPart('$prompt\n\nINPUT:\n$rawText'),
+            ]),
+          ],
+          generationConfig: _buildGenerationConfig(modelName),
+        ),
+      );
+
+      final formatted = response.text;
+
+      if (formatted == null || formatted.isEmpty) {
+        AppLogger.warning('Gemini returned empty formatting result');
+        return null;
+      }
+
+      AppLogger.info('Formatting OUTPUT:\n$formatted');
+      return formatted;
+    } on SocketException catch (e) {
+      AppLogger.error('Network error during formatting', e);
+      throw Exception('No internet connection. Please check your network');
+    } catch (e) {
+      AppLogger.error('Formatting failed', e);
+      throw Exception('Formatting failed: $e');
     }
   }
 }

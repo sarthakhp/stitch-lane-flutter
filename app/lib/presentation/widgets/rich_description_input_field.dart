@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown_quill/markdown_quill.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
-import '../../domain/services/audio_recording_service.dart';
 import '../../domain/services/transcription_service.dart';
-import '../../domain/state/settings_state.dart';
-import 'transcription_error_dialog.dart';
-import 'transcription_voice_button.dart';
+import 'streaming_voice_bottom_sheet.dart';
 
 class _DividerEmbedBuilder extends EmbedBuilder {
   @override
@@ -120,55 +116,20 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
     widget.onChanged?.call('');
   }
 
-  Future<void> _handleTranscription(String? audioFilePath) async {
-    if (audioFilePath == null) return;
+  Future<void> _handleVoiceInput() async {
+    final transcription = await StreamingVoiceBottomSheet.show(context);
+    if (transcription == null || transcription.isEmpty || !mounted) return;
 
-    while (true) {
-      if (!mounted) break;
+    final newText = await TranscriptionService.getActionResult(
+      context: context,
+      transcription: transcription,
+      currentText: getMarkdown(),
+    );
 
-      final result = await TranscriptionService.transcribe(
-        context: context,
-        audioFilePath: audioFilePath,
-        modelName: context.read<SettingsState>().settings.aiVoiceModel,
-      );
-
-      if (result.type == TranscriptionResultType.success) {
-        if (!mounted) break;
-        final newText = await TranscriptionService.getActionResult(
-          context: context,
-          transcription: result.text!,
-          currentText: getMarkdown(),
-        );
-
-        if (newText != null && mounted) {
-          setMarkdown(newText);
-          widget.onChanged?.call(newText);
-        }
-        break;
-      }
-
-      if (result.type == TranscriptionResultType.cancelled) {
-        break;
-      }
-
-      // Error — show error dialog with Retry/Play/Discard
-      if (!mounted) break;
-      final action = await TranscriptionErrorDialog.show(
-        context,
-        errorMessage: result.errorMessage ?? 'An unknown error occurred',
-        audioFilePath: audioFilePath,
-      );
-
-      if (action != TranscriptionErrorAction.retry) {
-        break; // Discard or dismissed
-      }
-      // Retry — loop continues
+    if (newText != null && mounted) {
+      setMarkdown(newText);
+      widget.onChanged?.call(newText);
     }
-
-    // Clean up temp file after we're done (success, cancel, or discard)
-    try {
-      await AudioRecordingService.deleteTemporaryAudio();
-    } catch (_) {}
   }
 
   @override
@@ -184,9 +145,22 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
         const SizedBox(height: AppConfig.spacing8),
         _buildEditor(colorScheme),
         const SizedBox(height: AppConfig.spacing8),
-        TranscriptionVoiceButton(
-          onRecordingComplete: _handleTranscription,
-          expandWidth: true,
+        GestureDetector(
+          onTap: widget.enabled ? _handleVoiceInput : null,
+          child: Container(
+            width: double.infinity,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppConfig.buttonBorderRadius),
+              border: Border.all(color: colorScheme.primary, width: 2),
+            ),
+            child: Icon(
+              Icons.mic,
+              size: 24,
+              color: colorScheme.onPrimaryContainer,
+            ),
+          ),
         ),
       ],
     );

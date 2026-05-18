@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'ai_chat_config.dart';
-import 'gemini_service.dart';
+import 'stt_provider.dart';
 import '../../presentation/widgets/transcription_progress_dialog.dart';
 import '../../presentation/widgets/transcription_action_dialog.dart';
 
@@ -29,9 +28,7 @@ class TranscriptionService {
   static Future<TranscriptionResult> transcribe({
     required BuildContext context,
     required String audioFilePath,
-    String? systemInstruction,
-    String? transcriptionPrompt,
-    String? modelName,
+    required SttProvider sttProvider,
   }) async {
     bool isCancelled = false;
 
@@ -47,12 +44,7 @@ class TranscriptionService {
 
     String? transcription;
     try {
-      transcription = await GeminiService.transcribeAudio(
-        audioFilePath,
-        systemInstruction: systemInstruction,
-        transcriptionPrompt: transcriptionPrompt,
-        modelName: modelName ?? defaultAiVoiceModel,
-      );
+      transcription = await sttProvider.transcribe(audioFilePath);
     } catch (e) {
       if (context.mounted && !isCancelled) {
         Navigator.of(context).pop();

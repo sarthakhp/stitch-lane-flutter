@@ -1,7 +1,46 @@
-# Customer Management Feature - Quick Start Guide
+# StitchGenie - Quick Start Guide
+
+## Wireless ADB Setup (Android)
+
+Connect your phone once via USB, then switch to wireless:
+
+```bash
+# 1. Verify phone is connected via USB (must show "device", not "unauthorized")
+adb devices
+
+# 2. Switch to TCP/IP mode
+adb tcpip 5555
+
+# 3. Get phone's WiFi IP
+adb shell ip addr show wlan0 | grep 'inet '
+
+# 4. Connect wirelessly (replace IP with yours)
+adb connect 192.168.29.151:5555
+
+# 5. Unplug USB cable. Verify wireless connection:
+adb devices
+```
+
+**Reconnecting** (if connection drops, e.g. after phone sleep):
+```bash
+adb connect 192.168.29.151:5555
+```
+
+**Prerequisites**: USB debugging AND wireless debugging must be enabled in Developer Options.
+
+## Run the App
+
+```bash
+cd app
+flutter run               # auto-picks connected device
+flutter run -d android    # explicit Android target
+flutter run --release     # release build (no hot reload)
+```
+
+---
 
 ## 📋 Overview
-This guide provides a quick reference for implementing the customer management feature.
+This guide provides a quick reference for the customer management feature.
 
 ## 🎯 Feature Summary
 - **Home Screen**: Navigation tile to customers

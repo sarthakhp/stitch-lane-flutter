@@ -54,6 +54,7 @@ class SqliteSettingsRepository implements SettingsRepository {
         'ai_voice_model': s.aiVoiceModelRaw,
         'last_backup_status': s.lastBackupStatus,
         'last_backup_error': s.lastBackupError,
+        'stt_provider': s.sttProviderRaw,
       };
 
   static AppSettings fromMap(Map<String, dynamic> map) => AppSettings(
@@ -72,5 +73,6 @@ class SqliteSettingsRepository implements SettingsRepository {
         aiVoiceModelRaw: map['ai_voice_model'] as String?,
         lastBackupStatus: map['last_backup_status'] as String?,
         lastBackupError: map['last_backup_error'] as String?,
+        sttProviderRaw: map['stt_provider'] as String?,
       );
 }

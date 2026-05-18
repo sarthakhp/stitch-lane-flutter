@@ -4,7 +4,7 @@ import 'package:path/path.dart';
 class SqliteDatabase {
   static Database? _database;
   static const String _dbName = 'stitch_genie.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   static Future<Database> get database async {
     _database ??= await _initDatabase();
@@ -84,7 +84,8 @@ class SqliteDatabase {
         ai_chat_model TEXT,
         ai_voice_model TEXT,
         last_backup_status TEXT,
-        last_backup_error TEXT
+        last_backup_error TEXT,
+        stt_provider TEXT
       )
     ''');
   }
@@ -97,6 +98,9 @@ class SqliteDatabase {
     if (oldVersion < 3) {
       await db.execute('ALTER TABLE settings ADD COLUMN last_backup_status TEXT');
       await db.execute('ALTER TABLE settings ADD COLUMN last_backup_error TEXT');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE settings ADD COLUMN stt_provider TEXT');
     }
   }
 

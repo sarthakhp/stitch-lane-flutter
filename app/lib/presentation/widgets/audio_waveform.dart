@@ -38,7 +38,14 @@ class AudioWaveform extends StatelessWidget {
               width: barWidth,
               height: barHeight,
               decoration: BoxDecoration(
-                color: colorScheme.error.withValues(alpha: opacity),
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    colorScheme.primary.withValues(alpha: opacity),
+                    colorScheme.tertiary.withValues(alpha: opacity),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(barWidth / 2),
               ),
             ),
