@@ -332,15 +332,23 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
                 child: const Text('Cancel'),
               ),
               const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _handleRetryFormatting,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Retry'),
-              ),
-              const SizedBox(width: AppConfig.spacing8),
-              FilledButton(
-                onPressed: () => widget.onDone(_controller.finalText),
-                child: const Text('Use Raw'),
+              Flexible(
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: AppConfig.spacing8,
+                  runSpacing: AppConfig.spacing4,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _handleRetryFormatting,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Retry'),
+                    ),
+                    FilledButton(
+                      onPressed: () => widget.onDone(_controller.finalText),
+                      child: const Text('Use Raw'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -355,30 +363,35 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
           child: const Text('Cancel'),
         ),
         const Spacer(),
-        if (isActive || isPaused) ...[
-          IconButton.filledTonal(
-            onPressed: isListening
-                ? _controller.pause
-                : isPaused
-                    ? _controller.resume
-                    : null,
-            icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
-            tooltip: isPaused ? 'Resume' : 'Pause',
-          ),
-          const SizedBox(width: AppConfig.spacing8),
-          FilledButton.tonal(
-            onPressed: _handleDone,
-            child: const Text('Done'),
-          ),
-          if (widget.onSend != null) ...[
-            const SizedBox(width: AppConfig.spacing8),
-            FilledButton.icon(
-              onPressed: _handleSend,
-              icon: const Icon(Icons.send),
-              label: const Text('Send'),
+        if (isActive || isPaused)
+          Flexible(
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: AppConfig.spacing8,
+              runSpacing: AppConfig.spacing4,
+              children: [
+                IconButton.filledTonal(
+                  onPressed: isListening
+                      ? _controller.pause
+                      : isPaused
+                          ? _controller.resume
+                          : null,
+                  icon: Icon(isPaused ? Icons.play_arrow : Icons.pause),
+                  tooltip: isPaused ? 'Resume' : 'Pause',
+                ),
+                FilledButton.tonal(
+                  onPressed: _handleDone,
+                  child: const Text('Done'),
+                ),
+                if (widget.onSend != null)
+                  FilledButton.icon(
+                    onPressed: _handleSend,
+                    icon: const Icon(Icons.send),
+                    label: const Text('Send'),
+                  ),
+              ],
             ),
-          ],
-        ],
+          ),
         if (_controller.state == VoiceInputState.error)
           TextButton(
             onPressed: _handleCancel,

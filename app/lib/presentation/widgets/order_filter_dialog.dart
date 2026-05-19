@@ -43,7 +43,7 @@ class _OrderFilterDialogState extends State<OrderFilterDialog> {
     return Row(
       children: [
         Checkbox(value: value, onChanged: onChanged),
-        Text(label),
+        Expanded(child: Text(label)),
       ],
     );
   }

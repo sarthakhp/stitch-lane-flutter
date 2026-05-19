@@ -130,9 +130,11 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: AppConfig.spacing8),
-                Text(
-                  'Audio Recording',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Expanded(
+                  child: Text(
+                    'Audio Recording',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                 ),
               ],
             ),

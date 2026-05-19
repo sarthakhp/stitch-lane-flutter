@@ -43,7 +43,7 @@ class _CustomerFilterDialogState extends State<CustomerFilterDialog> {
     return Row(
       children: [
         Checkbox(value: value, onChanged: onChanged),
-        Text(label),
+        Expanded(child: Text(label)),
       ],
     );
   }

@@ -83,20 +83,22 @@ class CustomerListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppConfig.spacing16),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '₹$totalUnpaidAmount',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: hasUnpaidAmount
-                          ? colorScheme.error
-                          : colorScheme.primary,
-                      fontWeight: FontWeight.bold,
+              Flexible(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '₹$totalUnpaidAmount',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: hasUnpaidAmount
+                            ? colorScheme.error
+                            : colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
                   const SizedBox(height: AppConfig.spacing4),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -119,7 +121,8 @@ class CustomerListItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

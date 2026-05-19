@@ -71,7 +71,7 @@ class OrderListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppConfig.spacing16),
-              _buildPaymentInfo(context, colorScheme),
+              Flexible(child: _buildPaymentInfo(context, colorScheme)),
             ],
           ),
         ),
@@ -95,6 +95,7 @@ class OrderListItem extends StatelessWidget {
             color: order.isPaid ? colorScheme.primary : colorScheme.error,
             fontWeight: FontWeight.bold,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppConfig.spacing4),
         Container(

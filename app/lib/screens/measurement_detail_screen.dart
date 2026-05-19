@@ -162,11 +162,13 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: AppConfig.spacing16),
-                          Text(
-                            'No audio recording',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
+                          Expanded(
+                            child: Text(
+                              'No audio recording',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
                           ),
                         ],
                       ),
@@ -210,9 +212,13 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
           label,
           style: Theme.of(context).textTheme.labelMedium,
         ),
-        Text(
-          DateFormat('MMM d, y').format(date),
-          style: Theme.of(context).textTheme.bodyMedium,
+        const SizedBox(width: AppConfig.spacing8),
+        Flexible(
+          child: Text(
+            DateFormat('MMM d, y').format(date),
+            style: Theme.of(context).textTheme.bodyMedium,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

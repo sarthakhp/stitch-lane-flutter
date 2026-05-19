@@ -170,11 +170,14 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          widget.labelText,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+        Flexible(
+          child: Text(
+            widget.labelText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         ListenableBuilder(
           listenable: _controller,

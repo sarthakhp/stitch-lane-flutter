@@ -217,28 +217,33 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       padding: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
       child: Row(
         children: [
-          InkWell(
-            onTap: () => _editDate(payment),
-            borderRadius: BorderRadius.circular(AppConfig.spacing4),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppConfig.spacing8,
-                vertical: AppConfig.spacing4,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: AppConfig.spacing4),
-                  Text(
-                    _formatDate(payment.date),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+          Flexible(
+            child: InkWell(
+              onTap: () => _editDate(payment),
+              borderRadius: BorderRadius.circular(AppConfig.spacing4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConfig.spacing8,
+                  vertical: AppConfig.spacing4,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppConfig.spacing4),
+                    Flexible(
+                      child: Text(
+                        _formatDate(payment.date),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -279,11 +284,14 @@ class _PaymentsSectionState extends State<PaymentsSection> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '₹${payment.amount}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
+            Flexible(
+              child: Text(
+                '₹${payment.amount}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: AppConfig.spacing4),
@@ -300,10 +308,8 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
   Widget _buildAmountEditor(PaymentEntry payment) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: 100,
+        Expanded(
           child: TextField(
             controller: _amountController,
             focusNode: _amountFocusNode,
