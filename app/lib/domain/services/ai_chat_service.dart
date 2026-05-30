@@ -148,7 +148,7 @@ class AiChatService {
           final ready = orders.where((o) => o.status == OrderStatus.ready).length;
           final unpaid = orders
               .where((o) => !o.isPaid)
-              .fold<int>(0, (sum, o) => sum + o.value - o.totalPaidAmount);
+              .fold<int>(0, (sum, o) => sum + o.outstanding);
 
           final details = <String>[];
           if (pending > 0) details.add('$pending pending');
@@ -169,7 +169,7 @@ class AiChatService {
 
           final details = <String>[];
           if (order.title != null && order.title!.trim().isNotEmpty) details.add(order.title!);
-          details.add('₹${order.value}');
+          details.add(order.value == null ? 'Price not set' : '₹${order.value}');
           details.add('Due $dueDateStr');
 
           enriched.add(UiComponent(

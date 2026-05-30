@@ -187,6 +187,7 @@ class OrderCreatorController extends ChangeNotifier {
     String id, {
     String? title,
     int? value,
+    bool clearValue = false,
     DateTime? dueDate,
     String? description,
     bool clearDescription = false,
@@ -196,6 +197,7 @@ class OrderCreatorController extends ChangeNotifier {
     final updated = _draft.orders[index].copyWith(
       title: title,
       value: value,
+      clearValue: clearValue,
       dueDate: dueDate,
       description: description,
       clearDescription: clearDescription,
@@ -221,7 +223,7 @@ class OrderCreatorController extends ChangeNotifier {
     final order = ProposedOrder(
       id: ProposedOrder.generateId(),
       title: null,
-      value: 0,
+      value: null, // price not decided until the tailor sets it
       dueDate: DateTime(defaultDue.year, defaultDue.month, defaultDue.day),
       description: null,
     );
@@ -282,7 +284,7 @@ class OrderCreatorController extends ChangeNotifier {
           description: p.description?.trim().isNotEmpty == true ? p.description : null,
           dueDate: p.dueDate,
           created: now,
-          value: p.value < 0 ? 0 : p.value,
+          value: (p.value != null && p.value! < 0) ? 0 : p.value,
         );
       }).toList();
 

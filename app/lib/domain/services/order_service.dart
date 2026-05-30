@@ -145,10 +145,7 @@ class OrderService {
   }
 
   static int getTotalUnpaidAmount(List<Order> orders) {
-    return orders.fold(0, (sum, order) {
-      final unpaid = order.value - order.totalPaidAmount;
-      return sum + (unpaid > 0 ? unpaid : 0);
-    });
+    return orders.fold(0, (sum, order) => sum + order.outstanding);
   }
 
 
@@ -164,10 +161,7 @@ class OrderService {
         pendingCount++;
         pendingCustomerIds.add(order.customerId);
       }
-      final unpaid = order.value - order.totalPaidAmount;
-      if (unpaid > 0) {
-        unpaidAmount += unpaid;
-      }
+      unpaidAmount += order.outstanding;
     }
 
     return HomeStats(
@@ -181,10 +175,7 @@ class OrderService {
     return order.payments.fold(0, (sum, payment) => sum + payment.amount);
   }
 
-  static int getRemainingAmount(Order order) {
-    final remaining = order.value - order.totalPaidAmount;
-    return remaining > 0 ? remaining : 0;
-  }
+  static int getRemainingAmount(Order order) => order.outstanding;
 
   static Future<Order> toggleOrderStatus(
     OrderState state,

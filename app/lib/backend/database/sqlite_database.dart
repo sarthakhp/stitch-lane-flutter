@@ -8,7 +8,7 @@ class SqliteDatabase {
   /// Public filename of the live SQLite DB. Used by [DbSnapshotService] which
   /// reads / writes the file alongside this class on disk.
   static String get dbName => _dbName;
-  static const int _dbVersion = 8;
+  static const int _dbVersion = 9;
 
   static Future<Database> get database async {
     _database ??= await _initDatabase();
@@ -49,7 +49,7 @@ class SqliteDatabase {
         description TEXT,
         created TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
-        value INTEGER NOT NULL DEFAULT 0,
+        value INTEGER,
         is_paid INTEGER NOT NULL DEFAULT 0,
         image_paths TEXT NOT NULL DEFAULT '[]',
         payment_date TEXT,
@@ -180,6 +180,45 @@ class SqliteDatabase {
       // simply start from this migration's run time.
       await _createAiUsageEventsTable(db);
     }
+    if (oldVersion < 9) {
+      // Make orders.value nullable so "price not decided" (NULL) is distinct
+      // from a real ₹0. SQLite can't drop a NOT NULL constraint in place, so
+      // rebuild the table. Nothing references orders via FK, so this is safe.
+      await _migrateOrdersValueNullable(db);
+    }
+  }
+
+  /// v9: rebuild `orders` with a nullable `value` column, preserving all rows.
+  static Future<void> _migrateOrdersValueNullable(Database db) async {
+    await db.execute('''
+      CREATE TABLE orders_new (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        title TEXT,
+        due_date TEXT NOT NULL,
+        description TEXT,
+        created TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        value INTEGER,
+        is_paid INTEGER NOT NULL DEFAULT 0,
+        image_paths TEXT NOT NULL DEFAULT '[]',
+        payment_date TEXT,
+        payments TEXT NOT NULL DEFAULT '[]',
+        total_paid_amount INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (customer_id) REFERENCES customers(id)
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO orders_new
+      SELECT id, customer_id, title, due_date, description, created, status,
+             value, is_paid, image_paths, payment_date, payments, total_paid_amount
+      FROM orders
+    ''');
+    await db.execute('DROP TABLE orders');
+    await db.execute('ALTER TABLE orders_new RENAME TO orders');
+    await db.execute('CREATE INDEX idx_orders_customer_id ON orders(customer_id)');
+    await db.execute('CREATE INDEX idx_orders_status ON orders(status)');
+    await db.execute('CREATE INDEX idx_orders_due_date ON orders(due_date)');
   }
 
   /// For the AI assistant feature — execute arbitrary read-only SQL

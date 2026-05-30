@@ -49,7 +49,7 @@ class OrderFormController extends ChangeNotifier {
     if (existingOrder != null) {
       _title = existingOrder!.title ?? '';
       _description = existingOrder!.description ?? '';
-      _valueText = existingOrder!.value.toString();
+      _valueText = existingOrder!.value?.toString() ?? '';
       _dueDate = existingOrder!.dueDate;
       _imagePaths = List.from(existingOrder!.imagePaths);
       _payments = List.from(existingOrder!.payments);
@@ -136,7 +136,7 @@ class OrderFormController extends ChangeNotifier {
   Order buildOrder() {
     final titleText = _title.trim();
     final descriptionText = _description.trim();
-    final valueInt = parsedValue ?? 0;
+    final valueInt = parsedValue; // null = "price not decided"
 
     return Order(
       id: isEditing ? existingOrder!.id : const Uuid().v4(),
@@ -156,7 +156,7 @@ class OrderFormController extends ChangeNotifier {
   }
 
   Order buildCurrentOrder() {
-    final valueInt = parsedValue ?? 0;
+    final valueInt = parsedValue; // null = "price not decided"
     return Order(
       id: existingOrder?.id ?? '',
       customerId: _selectedCustomer?.id ?? '',

@@ -18,11 +18,11 @@ class OrderValueField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       decoration: const InputDecoration(
-        labelText: 'Order Value',
-        hintText: 'Enter order value',
+        labelText: 'Order Value (optional)',
+        hintText: 'Leave blank if not decided',
         prefixIcon: Icon(Icons.currency_rupee),
         border: OutlineInputBorder(),
-        helperText: 'Enter positive, negative, or zero value',
+        helperText: 'Leave empty for "price not decided"',
       ),
       keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: false),
       inputFormatters: [
@@ -32,9 +32,8 @@ class OrderValueField extends StatelessWidget {
       enabled: enabled,
       onChanged: onChanged != null ? (_) => onChanged!() : null,
       validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Please enter order value';
-        }
+        // Blank is allowed — it means "price not decided" (stored as NULL).
+        if (value == null || value.trim().isEmpty) return null;
         if (int.tryParse(value.trim()) == null) {
           return 'Please enter a valid number';
         }

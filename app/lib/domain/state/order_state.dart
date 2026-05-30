@@ -32,7 +32,7 @@ class OrderState extends ChangeNotifier {
         .where((order) =>
             order.customerId == customerId &&
             !order.isPaid)
-        .fold(0, (sum, order) => sum + order.value - order.totalPaidAmount);
+        .fold(0, (sum, order) => sum + order.outstanding);
   }
 
   bool hasCustomerPendingOrders(String customerId) {

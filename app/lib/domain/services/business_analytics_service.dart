@@ -156,7 +156,7 @@ class BusinessAnalyticsService {
     int openCount = 0;
     for (final order in orders) {
       if (order.isPaid) continue;
-      final remaining = order.value - order.totalPaidAmount;
+      final remaining = order.outstanding;
       if (remaining <= 0) continue;
       total += remaining;
       openCount++;

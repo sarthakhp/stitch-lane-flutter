@@ -106,7 +106,9 @@ class SqliteOrderRepository implements OrderRepository {
         'created': o.created.toIso8601String(),
         'status': o.status.name,
         'value': o.value,
-        'is_paid': o.isPaid ? 1 : 0,
+        // is_paid is a denormalized cache — always recompute from the derived
+        // rule on write so it can never drift from value/total_paid_amount.
+        'is_paid': o.isFullyPaid ? 1 : 0,
         'image_paths': jsonEncode(o.imagePaths),
         'payment_date': o.paymentDate?.toIso8601String(),
         'payments': jsonEncode(o.payments.map((p) => p.toJson()).toList()),
@@ -124,7 +126,7 @@ class SqliteOrderRepository implements OrderRepository {
           (e) => e.name == map['status'],
           orElse: () => OrderStatus.pending,
         ),
-        value: map['value'] as int? ?? 0,
+        value: map['value'] as int?,
         isPaid: (map['is_paid'] as int? ?? 0) == 1,
         imagePaths: List<String>.from(jsonDecode(map['image_paths'] as String? ?? '[]')),
         paymentDate: map['payment_date'] != null

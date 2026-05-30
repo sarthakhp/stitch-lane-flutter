@@ -262,7 +262,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     OrderDetailCard(
                       icon: Icons.currency_rupee,
                       label: 'Order Value',
-                      value: '${order.value}',
+                      value: order.value == null ? 'Not set' : '₹${order.value}',
                     ),
                     if (order.description != null && order.description!.isNotEmpty) ...[
                       const SizedBox(height: AppConfig.spacing16),

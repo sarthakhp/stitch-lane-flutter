@@ -35,7 +35,8 @@ class OrderCreatorTools {
           'value': {
             'type': 'integer',
             'description':
-                'Price in rupees. Use 0 if the customer has not decided yet.',
+                'Price in rupees. OMIT this field entirely if the customer '
+                'has not decided the price yet (do not pass 0 for undecided).',
           },
           'due_date': {
             'type': 'string',
@@ -48,7 +49,7 @@ class OrderCreatorTools {
                 'MUST NOT contain body measurements.',
           },
         },
-        'required': ['title', 'value', 'due_date'],
+        'required': ['title', 'due_date'],
       },
     ),
     ToolSpec(
@@ -165,14 +166,14 @@ class OrderCreatorTools {
 
   Map<String, dynamic> _handleAddOrder(Map<String, dynamic> args) {
     final title = _requireString(args, 'title');
-    final value = _requireInt(args, 'value');
+    final value = args.containsKey('value') ? _requireInt(args, 'value') : null;
     final dueDate = _requireDate(args, 'due_date');
     final description = _optionalString(args, 'description');
 
     final order = ProposedOrder(
       id: ProposedOrder.generateId(),
       title: title,
-      value: value < 0 ? 0 : value,
+      value: (value != null && value < 0) ? 0 : value,
       dueDate: dueDate,
       description: description,
     );

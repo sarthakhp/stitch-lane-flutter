@@ -7,7 +7,9 @@ import 'package:uuid/uuid.dart';
 class ProposedOrder {
   final String id;
   final String? title;
-  final int value;
+
+  /// Price in rupees. Null means "price not decided yet" (distinct from 0).
+  final int? value;
   final DateTime dueDate;
   final String? description;
 
@@ -23,6 +25,7 @@ class ProposedOrder {
     String? title,
     bool clearTitle = false,
     int? value,
+    bool clearValue = false,
     DateTime? dueDate,
     String? description,
     bool clearDescription = false,
@@ -30,7 +33,7 @@ class ProposedOrder {
     return ProposedOrder(
       id: id,
       title: clearTitle ? null : (title ?? this.title),
-      value: value ?? this.value,
+      value: clearValue ? null : (value ?? this.value),
       dueDate: dueDate ?? this.dueDate,
       description: clearDescription ? null : (description ?? this.description),
     );

@@ -15,6 +15,7 @@ class ProposedOrderCard extends StatefulWidget {
   final void Function({
     String? title,
     int? value,
+    bool clearValue,
     DateTime? dueDate,
     String? description,
     bool clearDescription,
@@ -42,7 +43,7 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.order.title ?? '');
-    _valueCtrl = TextEditingController(text: widget.order.value.toString());
+    _valueCtrl = TextEditingController(text: widget.order.value?.toString() ?? '');
     _descCtrl = TextEditingController(text: widget.order.description ?? '');
   }
 
@@ -57,7 +58,7 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
     if (_titleCtrl.text != incomingTitle && old.order.title != widget.order.title) {
       _titleCtrl.text = incomingTitle;
     }
-    final incomingValue = widget.order.value.toString();
+    final incomingValue = widget.order.value?.toString() ?? '';
     if (_valueCtrl.text != incomingValue && old.order.value != widget.order.value) {
       _valueCtrl.text = incomingValue;
     }
@@ -91,7 +92,7 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final dueLabel = DateFormat('MMM d, y').format(widget.order.dueDate);
-    final isValueTbd = widget.order.value == 0;
+    final isValueTbd = widget.order.value == null;
 
     return Card(
       child: Padding(
@@ -139,8 +140,12 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
                       helperText: isValueTbd ? 'TBD' : null,
                     ),
                     onChanged: (v) {
-                      final parsed = int.tryParse(v) ?? 0;
-                      widget.onEdit(value: parsed);
+                      final parsed = int.tryParse(v.trim());
+                      if (parsed == null) {
+                        widget.onEdit(clearValue: true);
+                      } else {
+                        widget.onEdit(value: parsed);
+                      }
                     },
                   ),
                 ),

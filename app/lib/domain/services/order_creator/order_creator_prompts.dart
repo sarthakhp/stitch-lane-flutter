@@ -62,7 +62,8 @@ CLASSIFYING ORDERS vs MEASUREMENT
 REQUIRED ORDER FIELDS
 - title: short garment label (e.g. "Blouse", "Kurti", "Pant"). REQUIRED.
 - value: price in rupees as an integer. If the customer has not yet decided
-  on the price for this specific item, use 0.
+  on the price for this specific item, OMIT the value field entirely
+  (do not pass 0 — 0 means a real ₹0 price, not "undecided").
 - due_date: ISO date "YYYY-MM-DD". REQUIRED. If no due date was mentioned,
   default to $defaultDueIso (7 days from today).
 - description: short notes about this specific garment (fabric, style,

@@ -1,6 +1,22 @@
 import 'order_status.dart';
 import 'payment_entry.dart';
 
+/// Derived payment state for an order. Computed from [Order.value] and
+/// [Order.totalPaidAmount] — never stored, so it can't drift.
+enum OrderPaymentStatus {
+  /// No price set yet ("price not decided").
+  priceNotSet,
+
+  /// Price set, nothing paid.
+  unpaid,
+
+  /// Price set, some paid but less than the full value.
+  partial,
+
+  /// Fully paid (paid >= value, value > 0).
+  paid,
+}
+
 class Order {
   final String id;
 
@@ -16,8 +32,11 @@ class Order {
 
   final OrderStatus status;
 
-  final int value;
+  /// Price in rupees. Null means "price not decided yet" (distinct from 0).
+  final int? value;
 
+  /// Denormalized cache of [isFullyPaid]. Repositories recompute it on every
+  /// write, so reads stay fast and the flag never drifts from the derived rule.
   final bool isPaid;
 
   final List<String> imagePaths;
@@ -36,13 +55,28 @@ class Order {
     this.description,
     required this.created,
     this.status = OrderStatus.pending,
-    this.value = 0,
+    this.value,
     this.isPaid = false,
     this.imagePaths = const [],
     this.paymentDate,
     this.payments = const [],
     this.totalPaidAmount = 0,
   });
+
+  /// True only when a real price is set and fully covered by payments.
+  bool get isFullyPaid =>
+      value != null && value! > 0 && totalPaidAmount >= value!;
+
+  /// Remaining amount owed in rupees. 0 when fully paid or price not set.
+  int get outstanding =>
+      (value != null && value! > totalPaidAmount) ? value! - totalPaidAmount : 0;
+
+  OrderPaymentStatus get paymentStatus {
+    if (value == null) return OrderPaymentStatus.priceNotSet;
+    if (isFullyPaid) return OrderPaymentStatus.paid;
+    if (totalPaidAmount > 0) return OrderPaymentStatus.partial;
+    return OrderPaymentStatus.unpaid;
+  }
 
   Order copyWith({
     String? id,
@@ -53,6 +87,7 @@ class Order {
     DateTime? created,
     OrderStatus? status,
     int? value,
+    bool clearValue = false,
     bool? isPaid,
     List<String>? imagePaths,
     DateTime? paymentDate,
@@ -68,7 +103,7 @@ class Order {
       description: description ?? this.description,
       created: created ?? this.created,
       status: status ?? this.status,
-      value: value ?? this.value,
+      value: clearValue ? null : (value ?? this.value),
       isPaid: isPaid ?? this.isPaid,
       imagePaths: imagePaths ?? this.imagePaths,
       paymentDate: clearPaymentDate ? null : (paymentDate ?? this.paymentDate),
@@ -109,7 +144,7 @@ class Order {
               orElse: () => OrderStatus.pending,
             )
           : OrderStatus.pending,
-      value: json['value'] as int? ?? 0,
+      value: json['value'] as int?,
       isPaid: json['isPaid'] as bool? ?? false,
       imagePaths: json['imagePaths'] != null
           ? List<String>.from(json['imagePaths'] as List)
@@ -140,4 +175,3 @@ class Order {
   @override
   int get hashCode => id.hashCode;
 }
-

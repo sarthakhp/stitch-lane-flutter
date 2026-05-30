@@ -41,10 +41,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
     return widget.order.payments.fold(0, (sum, p) => sum + p.amount);
   }
 
-  int _getRemainingAmount() {
-    final remaining = widget.order.value - _calculateTotalPaid();
-    return remaining > 0 ? remaining : 0;
-  }
+  int _getRemainingAmount() => widget.order.outstanding;
 
   void _addNewPayment() {
     final now = DateTime.now();
@@ -57,13 +54,9 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
     final updatedPayments = [...widget.order.payments, newPayment];
     final totalPaid = updatedPayments.fold(0, (sum, p) => sum + p.amount);
-    final isPaid = totalPaid >= widget.order.value;
-
-    widget.onOrderUpdated(widget.order.copyWith(
-      payments: updatedPayments,
-      totalPaidAmount: totalPaid,
-      isPaid: isPaid,
-    ));
+    final updated = widget.order
+        .copyWith(payments: updatedPayments, totalPaidAmount: totalPaid);
+    widget.onOrderUpdated(updated.copyWith(isPaid: updated.isFullyPaid));
   }
 
   Future<void> _deletePayment(PaymentEntry payment) async {
@@ -77,13 +70,9 @@ class _PaymentsSectionState extends State<PaymentsSection> {
 
     final updatedPayments = widget.order.payments.where((p) => p.id != payment.id).toList();
     final totalPaid = updatedPayments.fold(0, (sum, p) => sum + p.amount);
-    final isPaid = totalPaid >= widget.order.value;
-
-    widget.onOrderUpdated(widget.order.copyWith(
-      payments: updatedPayments,
-      totalPaidAmount: totalPaid,
-      isPaid: isPaid,
-    ));
+    final updated = widget.order
+        .copyWith(payments: updatedPayments, totalPaidAmount: totalPaid);
+    widget.onOrderUpdated(updated.copyWith(isPaid: updated.isFullyPaid));
   }
 
   Future<void> _editDate(PaymentEntry payment) async {
@@ -131,20 +120,16 @@ class _PaymentsSectionState extends State<PaymentsSection> {
       return p.id == updatedPayment.id ? updatedPayment : p;
     }).toList();
     final totalPaid = updatedPayments.fold(0, (sum, p) => sum + p.amount);
-    final isPaid = totalPaid >= widget.order.value;
-
-    widget.onOrderUpdated(widget.order.copyWith(
-      payments: updatedPayments,
-      totalPaidAmount: totalPaid,
-      isPaid: isPaid,
-    ));
+    final updated = widget.order
+        .copyWith(payments: updatedPayments, totalPaidAmount: totalPaid);
+    widget.onOrderUpdated(updated.copyWith(isPaid: updated.isFullyPaid));
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final totalPaid = _calculateTotalPaid();
-    final remaining = widget.order.value - totalPaid;
+    final remaining = widget.order.outstanding;
 
     return Card(
       child: Padding(

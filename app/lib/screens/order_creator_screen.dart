@@ -253,6 +253,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                     onEdit: ({
                       title,
                       value,
+                      clearValue = false,
                       dueDate,
                       description,
                       clearDescription = false,
@@ -261,6 +262,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                       order.id,
                       title: title,
                       value: value,
+                      clearValue: clearValue,
                       dueDate: dueDate,
                       description: description,
                       clearDescription: clearDescription,
