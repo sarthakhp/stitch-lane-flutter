@@ -558,7 +558,9 @@ class _CustomerPickerRow extends StatelessWidget {
           customers: customerState.customers,
           selectedCustomer: controller.customer,
           enabled: !controller.isAgentBusy,
-          autofocus: true,
+          // Don't pop the keyboard when there are no customers to search —
+          // there's nothing to type; the user must create one first.
+          autofocus: customerState.customers.isNotEmpty,
           onCustomerSelected: (customer) => _onCustomerChosen(context, customer),
           onCustomerCleared: () {},
           onCreateNewCustomer: () =>

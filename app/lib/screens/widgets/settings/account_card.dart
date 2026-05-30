@@ -4,7 +4,7 @@ import '../../../backend/backend.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
-import '../confirmation_dialog.dart';
+import '../../../presentation/widgets/confirmation_dialog.dart';
 
 class AccountCard extends StatelessWidget {
   const AccountCard({super.key});

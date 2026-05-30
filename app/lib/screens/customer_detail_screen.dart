@@ -5,6 +5,7 @@ import '../domain/domain.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
+import '../presentation/widgets/confirmation_dialog.dart';
 import '../presentation/widgets/contact_action_buttons.dart';
 import '../presentation/widgets/measurement_card.dart';
 import '../presentation/widgets/markdown_description_text.dart';
@@ -53,32 +54,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         ? 'all their measurements'
         : 'their $orderCount order${orderCount == 1 ? '' : 's'} and all measurements';
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await ConfirmationDialog.showDouble(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Customer'),
-        content: Text(
+      title: 'Delete Customer',
+      content:
           'This will permanently delete this customer along with $orderLine.\n\n'
           'This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      secondTitle: 'Delete for good?',
+      secondContent:
+          'Are you absolutely sure? The customer and $orderLine will be '
+          'permanently removed. Tap Delete to confirm.',
     );
 
-    if (confirmed == true && context.mounted) {
+    if (confirmed && context.mounted) {
       try {
         final customerState = context.read<CustomerState>();
         final customerRepository = context.read<CustomerRepository>();

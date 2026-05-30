@@ -6,7 +6,7 @@ import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
-import 'widgets/confirmation_dialog.dart';
+import '../presentation/widgets/confirmation_dialog.dart';
 
 enum _ExportSource { local, drive }
 

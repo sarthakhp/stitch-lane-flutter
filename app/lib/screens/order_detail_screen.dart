@@ -136,10 +136,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _deleteOrder(BuildContext context, String orderId) async {
-    final confirmed = await ConfirmationDialog.show(
+    final confirmed = await ConfirmationDialog.showDouble(
       context: context,
       title: 'Delete Order',
-      content: 'Are you sure you want to delete this order?',
+      content: 'Are you sure you want to delete this order? '
+          'This cannot be undone.',
+      secondTitle: 'Delete for good?',
+      secondContent: 'This will permanently delete the order and its payment '
+          'history. Tap Delete to confirm.',
     );
 
     if (!confirmed || !context.mounted) return;

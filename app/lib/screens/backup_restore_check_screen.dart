@@ -6,7 +6,7 @@ import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../utils/app_logger.dart';
 import 'widgets/app_logo.dart';
-import 'widgets/confirmation_dialog.dart';
+import '../presentation/widgets/confirmation_dialog.dart';
 
 class BackupRestoreCheckScreen extends StatefulWidget {
   final bool? hasBackup;
