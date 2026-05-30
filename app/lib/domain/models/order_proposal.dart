@@ -12,6 +12,7 @@ class ProposedOrder {
   final int? value;
   final DateTime dueDate;
   final String? description;
+  final List<String> imagePaths;
 
   const ProposedOrder({
     required this.id,
@@ -19,6 +20,7 @@ class ProposedOrder {
     required this.value,
     required this.dueDate,
     required this.description,
+    this.imagePaths = const [],
   });
 
   ProposedOrder copyWith({
@@ -29,6 +31,7 @@ class ProposedOrder {
     DateTime? dueDate,
     String? description,
     bool clearDescription = false,
+    List<String>? imagePaths,
   }) {
     return ProposedOrder(
       id: id,
@@ -36,6 +39,7 @@ class ProposedOrder {
       value: clearValue ? null : (value ?? this.value),
       dueDate: dueDate ?? this.dueDate,
       description: clearDescription ? null : (description ?? this.description),
+      imagePaths: imagePaths ?? this.imagePaths,
     );
   }
 
@@ -45,6 +49,7 @@ class ProposedOrder {
         'value': value,
         'due_date': dueDate.toIso8601String(),
         'description': description,
+        'image_paths': imagePaths,
       };
 
   static String generateId() => const Uuid().v4();

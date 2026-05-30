@@ -10,6 +10,7 @@ class CustomerAutocompleteField extends FormField<Customer> {
     required VoidCallback onCustomerCleared,
     required VoidCallback onCreateNewCustomer,
     bool enabled = true,
+    bool autofocus = false,
   }) : super(
           initialValue: selectedCustomer,
           validator: (value) => value == null ? 'Please select a customer' : null,
@@ -19,6 +20,7 @@ class CustomerAutocompleteField extends FormField<Customer> {
               selectedCustomer: state.value,
               errorText: state.errorText,
               enabled: enabled,
+              autofocus: autofocus,
               onCustomerSelected: (customer) {
                 state.didChange(customer);
                 onCustomerSelected(customer);
@@ -38,6 +40,7 @@ class _CustomerAutocompleteContent extends StatelessWidget {
   final Customer? selectedCustomer;
   final String? errorText;
   final bool enabled;
+  final bool autofocus;
   final ValueChanged<Customer> onCustomerSelected;
   final VoidCallback onCustomerCleared;
   final VoidCallback onCreateNewCustomer;
@@ -47,6 +50,7 @@ class _CustomerAutocompleteContent extends StatelessWidget {
     required this.selectedCustomer,
     required this.errorText,
     required this.enabled,
+    this.autofocus = false,
     required this.onCustomerSelected,
     required this.onCustomerCleared,
     required this.onCreateNewCustomer,
@@ -82,6 +86,9 @@ class _CustomerAutocompleteContent extends StatelessWidget {
           controller: controller,
           focusNode: focusNode,
           enabled: enabled,
+          // Only grab focus when starting fresh — never when a customer is
+          // already selected (e.g. opened from a customer's page).
+          autofocus: autofocus && selectedCustomer == null,
           errorText: errorText,
           selectedCustomer: selectedCustomer,
           onFieldSubmitted: onFieldSubmitted,
@@ -111,6 +118,7 @@ class _CustomerTextField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
+  final bool autofocus;
   final String? errorText;
   final Customer? selectedCustomer;
   final VoidCallback onFieldSubmitted;
@@ -120,6 +128,7 @@ class _CustomerTextField extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.enabled,
+    this.autofocus = false,
     required this.errorText,
     required this.selectedCustomer,
     required this.onFieldSubmitted,
@@ -132,6 +141,7 @@ class _CustomerTextField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       enabled: enabled,
+      autofocus: autofocus,
       decoration: InputDecoration(
         labelText: 'Customer',
         hintText: 'Search customer by name or phone...',

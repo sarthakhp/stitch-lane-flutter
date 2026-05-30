@@ -257,6 +257,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                       dueDate,
                       description,
                       clearDescription = false,
+                      imagePaths,
                     }) =>
                         _controller.editOrder(
                       order.id,
@@ -266,6 +267,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                       dueDate: dueDate,
                       description: description,
                       clearDescription: clearDescription,
+                      imagePaths: imagePaths,
                     ),
                     onRemove: () => _controller.removeOrder(order.id),
                   ),
@@ -521,6 +523,7 @@ class _CustomerPickerRow extends StatelessWidget {
           customers: customerState.customers,
           selectedCustomer: controller.customer,
           enabled: !controller.isAgentBusy,
+          autofocus: true,
           onCustomerSelected: (customer) => _onCustomerChosen(context, customer),
           onCustomerCleared: () {},
           onCreateNewCustomer: () =>

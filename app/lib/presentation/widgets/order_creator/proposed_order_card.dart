@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../config/app_config.dart';
 import '../../../domain/models/order_proposal.dart';
+import '../order_images_section.dart';
 
 /// Inline-editable card for one [ProposedOrder]. All edits flow up through
 /// the `onEdit` / `onRemove` callbacks — the widget itself is stateless w.r.t.
@@ -19,6 +20,7 @@ class ProposedOrderCard extends StatefulWidget {
     DateTime? dueDate,
     String? description,
     bool clearDescription,
+    List<String>? imagePaths,
   }) onEdit;
   final VoidCallback onRemove;
 
@@ -199,6 +201,11 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
                   widget.onEdit(description: v);
                 }
               },
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            OrderImagesSection(
+              imagePaths: widget.order.imagePaths,
+              onImagesChanged: (paths) => widget.onEdit(imagePaths: paths),
             ),
           ],
         ),

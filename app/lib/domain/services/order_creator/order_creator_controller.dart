@@ -191,6 +191,7 @@ class OrderCreatorController extends ChangeNotifier {
     DateTime? dueDate,
     String? description,
     bool clearDescription = false,
+    List<String>? imagePaths,
   }) {
     final index = _draft.orders.indexWhere((o) => o.id == id);
     if (index == -1) return;
@@ -201,6 +202,7 @@ class OrderCreatorController extends ChangeNotifier {
       dueDate: dueDate,
       description: description,
       clearDescription: clearDescription,
+      imagePaths: imagePaths,
     );
     final list = [..._draft.orders];
     list[index] = updated;
@@ -285,6 +287,7 @@ class OrderCreatorController extends ChangeNotifier {
           dueDate: p.dueDate,
           created: now,
           value: (p.value != null && p.value! < 0) ? 0 : p.value,
+          imagePaths: p.imagePaths,
         );
       }).toList();
 
