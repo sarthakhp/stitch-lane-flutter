@@ -5,17 +5,17 @@ import '../../config/app_config.dart';
 import '../../domain/domain.dart';
 import '../backup_flow.dart';
 
-/// Always-visible "is my data safe in the cloud?" card. Replaces silent
-/// backup failures with a banner that turns red the moment a backup is
-/// missing or failing. Three states:
+/// "Is my data safe in the cloud?" banner, shown on the home screen only when
+/// backup needs attention. It surfaces silent backup problems instead of
+/// letting them go unnoticed:
 ///
-///   - green:  most recent backup succeeded within 24h
+///   - green:  succeeded within 24h  -> card is HIDDEN (nothing to act on)
 ///   - yellow: backup is 24–72h old, OR last attempt was partial
 ///   - red:    backup is >72h old, last attempt failed, or never backed up
 ///
-/// A "Back up now" button triggers [AutoBackupService.performBackup] inline.
-/// After completion the SettingsState is reloaded from disk, so the card
-/// auto-refreshes without a manual rebuild.
+/// The "Back up now" button runs the shared [runManualBackup] flow (same as
+/// the Settings backup button). It reloads SettingsState on completion, so the
+/// Consumer below repaints — and the card hides itself once backup goes green.
 class BackupHealthCard extends StatefulWidget {
   const BackupHealthCard({super.key});
 
@@ -49,6 +49,15 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
         final error = state.settings.lastBackupError;
 
         final health = _computeHealth(last, status);
+
+        // When the last backup succeeded and is recent (green), hide the card
+        // entirely — there's nothing to act on, so it shouldn't take up home
+        // screen space. It reappears only when attention is warranted:
+        // yellow (24-72h old / partial) or red (>72h / failed / never).
+        if (health == _Health.green) {
+          return const SizedBox.shrink();
+        }
+
         final theme = Theme.of(context);
         final scheme = theme.colorScheme;
         final (bg, fg, icon) = switch (health) {
