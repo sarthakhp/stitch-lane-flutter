@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_chat_models.dart';
 
@@ -11,8 +12,17 @@ const int _recentFullDetailCount = 2;
 /// Max chars to show from front/back when truncating.
 const int _truncateEdge = 100;
 
-const String _storageKey = 'ai_chat_history';
-const String _usageStorageKey = 'ai_chat_token_usage';
+const String _storageKeyBase = 'ai_chat_history';
+const String _usageStorageKeyBase = 'ai_chat_token_usage';
+
+/// Per-account storage key. Chat history is stored in SharedPreferences, which
+/// (like the local DB) survives logout/login — so keys MUST be scoped by the
+/// signed-in Firebase UID, or a new account would see the previous account's
+/// chat. Falls back to a shared key only when somehow signed out.
+String _scopedKey(String base) {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  return uid == null ? base : '${base}_$uid';
+}
 
 /// A single tool call and its response, captured during an exchange.
 class ToolCallRecord {
@@ -82,7 +92,7 @@ class AiChatHistory {
   /// Load saved exchanges from storage.
   static Future<List<ChatExchange>> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_storageKey);
+    final json = prefs.getString(_scopedKey(_storageKeyBase));
     if (json == null) return [];
 
     final List<dynamic> list = jsonDecode(json);
@@ -93,26 +103,26 @@ class AiChatHistory {
   static Future<void> save(List<ChatExchange> exchanges) async {
     final prefs = await SharedPreferences.getInstance();
     final json = jsonEncode(exchanges.map((e) => e.toJson()).toList());
-    await prefs.setString(_storageKey, json);
+    await prefs.setString(_scopedKey(_storageKeyBase), json);
   }
 
   /// Clear saved conversation.
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
-    await prefs.remove(_usageStorageKey);
+    await prefs.remove(_scopedKey(_storageKeyBase));
+    await prefs.remove(_scopedKey(_usageStorageKeyBase));
   }
 
   /// Save token usage to storage.
   static Future<void> saveUsage(Map<String, int> usage) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_usageStorageKey, jsonEncode(usage));
+    await prefs.setString(_scopedKey(_usageStorageKeyBase), jsonEncode(usage));
   }
 
   /// Load token usage from storage.
   static Future<Map<String, int>?> loadUsage() async {
     final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_usageStorageKey);
+    final json = prefs.getString(_scopedKey(_usageStorageKeyBase));
     if (json == null) return null;
     final map = jsonDecode(json) as Map<String, dynamic>;
     return map.map((k, v) => MapEntry(k, v as int));
