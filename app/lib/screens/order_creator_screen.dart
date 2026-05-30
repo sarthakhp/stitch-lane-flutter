@@ -334,8 +334,8 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                   horizontal: AppConfig.spacing4,
                 ),
                 child: Text(
-                  'Refine the draft',
-                  style: theme.textTheme.labelMedium?.copyWith(
+                  'Refine',
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -350,8 +350,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
                 controller: _feedbackCtrl,
                 isLoading: _controller.isAgentBusy,
                 inline: true,
-                hintText:
-                    'Refine: "change blouse to ₹2000", "drop the pant"',
+                hintText: 'Refine the draft…',
                 onSend: _submitFeedback,
                 onMicTap: _recordFeedbackViaSheet,
               ),

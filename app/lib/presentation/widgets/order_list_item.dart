@@ -80,6 +80,26 @@ class OrderListItem extends StatelessWidget {
   }
 
   Widget _buildPaymentInfo(BuildContext context, ColorScheme colorScheme) {
+    // No price decided yet — show a neutral "Price not set" instead of a
+    // misleading ₹0 / Not Paid.
+    if (order.value == null) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Price not set',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      );
+    }
+
     final displayAmount =
         order.isPaid ? order.totalPaidAmount : order.outstanding;
 
