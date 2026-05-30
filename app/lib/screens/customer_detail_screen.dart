@@ -44,17 +44,33 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _deleteCustomer(BuildContext context, String customerId) async {
+    final orderCount = context
+        .read<OrderState>()
+        .orders
+        .where((o) => o.customerId == customerId)
+        .length;
+    final orderLine = orderCount == 0
+        ? 'all their measurements'
+        : 'their $orderCount order${orderCount == 1 ? '' : 's'} and all measurements';
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: const Text('Are you sure you want to delete this customer?'),
+        content: Text(
+          'This will permanently delete this customer along with $orderLine.\n\n'
+          'This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),

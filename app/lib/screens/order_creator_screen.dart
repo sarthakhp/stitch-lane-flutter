@@ -129,9 +129,18 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
   Widget _buildPhaseBody() {
     switch (_controller.phase) {
       case CreatorPhase.pickingCustomer:
-        return _buildHint(
-          icon: Icons.person_outline,
-          text: 'Pick a customer above to start.',
+        // When there are no customers yet, the search dropdown (which holds
+        // "Create new customer") never opens, so surface a create button here.
+        return Consumer<CustomerState>(
+          builder: (context, customerState, _) {
+            if (customerState.customers.isEmpty) {
+              return _buildNoCustomersHint();
+            }
+            return _buildHint(
+              icon: Icons.person_outline,
+              text: 'Pick a customer above to start.',
+            );
+          },
         );
       case CreatorPhase.ready:
         return _buildReady();
@@ -398,6 +407,32 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNoCustomersHint() {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_add_alt_1_outlined,
+              size: 48, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(height: AppConfig.spacing12),
+          Text(
+            'No customers yet.',
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppConfig.spacing16),
+          FilledButton.icon(
+            icon: const Icon(Icons.person_add),
+            label: const Text('Create new customer'),
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppConstants.customerFormRoute),
+          ),
+        ],
       ),
     );
   }

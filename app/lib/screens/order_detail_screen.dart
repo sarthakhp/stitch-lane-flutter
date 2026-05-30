@@ -182,7 +182,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             return Scaffold(
               appBar: CustomAppBar(
-                title: Text('Order for ${customer.name}'),
+                title: Text("${customer.name}'s Order"),
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.edit),
