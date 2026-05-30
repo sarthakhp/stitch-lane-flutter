@@ -56,7 +56,14 @@ class SqliteCustomerRepository implements CustomerRepository {
   Future<void> deleteCustomer(String id) async {
     try {
       final db = await _db;
-      await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+      // Orders and measurements have a FK to customers, so deleting the
+      // customer alone fails with a constraint error. Cascade-delete the
+      // dependents first, all in one transaction.
+      await db.transaction((txn) async {
+        await txn.delete('orders', where: 'customer_id = ?', whereArgs: [id]);
+        await txn.delete('measurements', where: 'customer_id = ?', whereArgs: [id]);
+        await txn.delete('customers', where: 'id = ?', whereArgs: [id]);
+      });
     } catch (e) {
       throw Exception('Failed to delete customer: $e');
     }
