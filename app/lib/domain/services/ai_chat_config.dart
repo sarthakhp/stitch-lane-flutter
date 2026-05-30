@@ -1,9 +1,13 @@
-import 'package:langchain/langchain.dart';
-import 'ai_tool_service.dart';
+import 'ai_query/ai_query_schema.dart';
+import 'ai_query/ai_query_tools.dart';
 
 const String defaultAiChatModel = 'gemini-3.1-flash-lite';
 const String defaultAiFormattingModel = 'gemini-2.5-flash-lite';
 const String defaultSttModel = 'sarvam:saaras:v3';
+
+/// Tools exposed to the chat model — the typed query tools plus the run_sql
+/// escape hatch. Defined in [ai_query/ai_query_tools.dart].
+const aiTools = aiQueryToolSpecs;
 
 String buildAiSystemPrompt() {
   final now = DateTime.now();
@@ -13,19 +17,37 @@ String buildAiSystemPrompt() {
   return _aiSystemPromptTemplate.replaceFirst('{{TODAY}}', dateStr);
 }
 
-const String _aiSystemPromptTemplate = '''
+final String _aiSystemPromptTemplate = '''
 You are a tailoring business assistant for "Stitch Genie". Today: {{TODAY}}.
-Use the queryDatabase tool ONLY when the question needs data. For greetings/general chat, respond directly.
-Tool results use TOON format (tabular: rows[N]{cols}: val1,val2,...).
+Answer questions about customers, orders, payments, and measurements using the
+tools below. For greetings or general chat, reply directly without tools.
 
-${AiToolService.schemaDescription}
+TOOLS (pick the specific one that fits; use run_sql only when none do):
+- find_customers — look up customers by name, or list those with dues / pending orders.
+- get_customer_summary(customerId) — one customer's orders, totals, measurement count.
+- get_orders — filter orders by customerName, status, dueBefore/dueAfter, paidState.
+- get_due_orders(withinDays) — orders due soon and overdue (e.g. "due in next 3 days").
+- get_outstanding — who still owes money and how much, with a grand total.
+- get_earnings — money collected in a period (today/this_week/this_month/last_month/this_year, or fromDate+toDate).
+- run_sql(sql) — read-only SELECT for anything the typed tools don't cover.
 
-SQL rules:
-- Names: ALWAYS use LOWER(name) LIKE LOWER('%term%'), never exact match. If input has both scripts like "Ramesh (રમેશ)", search with OR: WHERE LOWER(name) LIKE '%ramesh%' OR LOWER(name) LIKE '%રમેશ%'. If 0 results, try shorter/phonetic variants (e.g. "Hittu" → also try "Hitu").
-- Earnings by date: SELECT SUM(CAST(json_each.value->>'amount' AS INTEGER)) FROM orders, json_each(orders.payments) WHERE json_each.value->>'date' >= 'YYYY-MM-DD'. Do NOT use total_paid_amount for date-based queries.
-- orders.status: pending/ready/done. orders.value and total_paid_amount are in rupees.
+Tool results come back in TOON format (rows[N]{cols}: val1,val2,...).
 
-Response: JSON with "response_text" (markdown) and "ui_components" (array of {type:customer/order, id:UUID} for entities the user can tap). Use customers.id for customers, orders.id for orders — never measurement or other IDs. Empty [] when not applicable.
+KEY RULES:
+- Money: an order with no price set is "price not set" and is excluded from
+  earnings/outstanding totals. "Paid" and "outstanding" are already computed by
+  the tools — trust their `outstanding` / totals columns.
+- status: pending = in progress, ready = ready for the customer to collect,
+  done = collected/delivered.
+- Amounts are rupees (₹). For name lookups, partial spelling is fine.
+
+For run_sql only, this is the schema and the exact business rules to follow:
+${AiQuerySchema.description}
+
+OUTPUT: JSON with "response_text" (markdown) and "ui_components" (array of
+{type:customer|order, id:UUID} for entities the user can tap — use the id
+columns returned by the tools; customer rows -> type customer, order rows ->
+type order; never measurement ids). Empty [] when not applicable.
 Style: concise, ₹ for currency, readable dates, never fabricate data.
 ''';
 
@@ -56,22 +78,3 @@ const aiResponseSchema = {
   },
   'required': ['response_text', 'ui_components'],
 };
-
-const aiTools = [
-  ToolSpec(
-    name: 'queryDatabase',
-    description:
-        'Execute a read-only SQL SELECT query on the business database. '
-        'Returns rows in TOON format. Use this to answer any question about customers, orders, measurements, or business metrics.',
-    inputJsonSchema: {
-      'type': 'object',
-      'properties': {
-        'sql': {
-          'type': 'string',
-          'description': 'A SQL SELECT query to execute.',
-        },
-      },
-      'required': ['sql'],
-    },
-  ),
-];

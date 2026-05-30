@@ -9,7 +9,7 @@ import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
 import 'ai_gateway/ai_gateway.dart';
 import 'ai_gateway/usage_event.dart';
-import 'ai_tool_service.dart';
+import 'ai_query/ai_query_dispatcher.dart';
 
 /// Result of a single AI exchange (one user message → one final response).
 class AiExecutorResult {
@@ -187,30 +187,18 @@ class AiExecutor {
     AIChatMessageToolCall toolCall,
     List<ToolCallRecord> records,
   ) async {
-    if (toolCall.name == 'queryDatabase') {
-      final toolResult = await AiToolService.queryDatabase(
-        toolCall.arguments['sql'] as String,
-      );
-      final resultToon = toonx.encode(toolResult.toJson());
-      records.add(ToolCallRecord(
-        id: toolCall.id,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-        response: resultToon,
-      ));
-      return resultToon;
-    }
-
-    // Unknown tool — recoverable message so the model can self-correct
-    final observation = '${toolCall.name} is not a valid tool. '
-        'Available tools: queryDatabase. Please try again.';
+    // Every tool (typed query tools + run_sql) routes through the dispatcher.
+    // Unknown names come back as a recoverable error so the model self-corrects.
+    final result =
+        await AiQueryDispatcher.dispatch(toolCall.name, toolCall.arguments);
+    final resultToon = toonx.encode(result.toJson());
     records.add(ToolCallRecord(
       id: toolCall.id,
       name: toolCall.name,
       arguments: toolCall.arguments,
-      response: observation,
+      response: resultToon,
     ));
-    return observation;
+    return resultToon;
   }
 
   // --- Response parsing ---
