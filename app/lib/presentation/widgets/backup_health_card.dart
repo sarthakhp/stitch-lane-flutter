@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../../backend/backend.dart';
 import '../../config/app_config.dart';
 import '../../domain/domain.dart';
+import '../backup_flow.dart';
 
 /// Always-visible "is my data safe in the cloud?" card. Replaces silent
 /// backup failures with a banner that turns red the moment a backup is
@@ -28,20 +28,13 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
 
   Future<void> _backupNow() async {
     setState(() => _isBackingUp = true);
-    final messenger = ScaffoldMessenger.of(context);
     try {
-      await AutoBackupService.performBackup();
-      // performBackup() writes status into the settings DB; reload SettingsState
-      // so the card paints with the new timestamp / status immediately.
-      if (!mounted) return;
-      final state = context.read<SettingsState>();
-      final repo = context.read<SettingsRepository>();
-      await SettingsService.loadSettings(state, repo);
-      if (!mounted) return;
-      messenger.showSnackBar(const SnackBar(content: Text('Backup complete')));
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+      // Use the shared foreground backup flow (same one the Settings backup
+      // button uses): confirmation dialog -> backup -> Drive upload -> sync ->
+      // reload settings -> snackbar. It reloads SettingsState itself, so the
+      // Consumer<SettingsState> wrapping this card repaints with the fresh
+      // timestamp/status automatically.
+      await runManualBackup(context);
     } finally {
       if (mounted) setState(() => _isBackingUp = false);
     }

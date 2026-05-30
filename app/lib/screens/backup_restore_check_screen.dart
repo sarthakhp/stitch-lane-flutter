@@ -46,13 +46,33 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   Future<void> _checkForBackup() async {
     try {
       final backupInfo = await DriveService.getBackupInfo();
-      if (mounted) {
+      if (!mounted) return;
+
+      if (backupInfo == null) {
+        // No backup to restore — there's nothing for the user to decide, so
+        // skip this screen entirely and go straight into the app. We keep
+        // _isChecking == true (don't flip to the "No backup found" view) so
+        // the splash stays up with no flash until onComplete navigates away.
+        if (widget.onComplete != null) {
+          widget.onComplete!.call();
+          return;
+        }
+        // Defensive fallback (callback not wired): show the manual view.
         setState(() {
-          _hasBackup = backupInfo != null;
+          _hasBackup = false;
           _isChecking = false;
         });
+        return;
       }
+
+      setState(() {
+        _hasBackup = true;
+        _isChecking = false;
+      });
     } catch (e) {
+      // On error we do NOT auto-skip: we genuinely don't know whether a
+      // backup exists, and "starting fresh" could orphan a real backup the
+      // user just can't reach right now. Surface the error so they can retry.
       if (mounted) {
         setState(() {
           _errorMessage = e.toString();
@@ -393,7 +413,10 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         ),
         const SizedBox(height: AppConfig.spacing32),
         FilledButton(
-          onPressed: _handleSkip,
+          // No backup exists, so there's nothing to lose — go straight in
+          // without the "Start Fresh?" data-loss confirmation (that warning
+          // only makes sense when a backup is actually present).
+          onPressed: () => widget.onComplete?.call(),
           child: const Text('Continue'),
         ),
       ],
