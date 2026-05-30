@@ -1,16 +1,29 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import '../../domain/services/gemini_service.dart';
+
+import '../../domain/services/audio_backup_recorder.dart';
 import '../../domain/services/streaming_amplitude_tracker.dart';
 import '../../domain/services/streaming_stt_provider.dart';
 import '../../domain/services/streaming_transcription_service.dart';
+import '../../domain/services/transcript_formatter.dart';
 import '../../utils/app_logger.dart';
+import 'voice_input_controller.dart';
 
-enum VoiceInputState { connecting, listening, paused, processing, formatting, done, error }
-
-class StreamingVoiceInputController extends ChangeNotifier {
-  static const maxRecordingSeconds = 300; // 5 minutes
+/// Live-streaming voice input.
+/// Audio chunks go to Sarvam over a WebSocket; partial transcripts arrive
+/// while the user is still speaking. Pause has both soft (mic only) and hard
+/// (mic + WS close) modes so a tailor's 30-second silence between measurements
+/// doesn't keep an idle server connection open and billing.
+class LiveVoiceInputController extends ChangeNotifier
+    implements VoiceInputController {
   static const _hardPauseDelaySeconds = 10;
+
+  @override
+  final bool isLive = true;
+
+  final bool enableFormatting;
+  final String? formattingModelName;
 
   VoiceInputState _state = VoiceInputState.connecting;
   String _finalText = '';
@@ -22,35 +35,61 @@ class StreamingVoiceInputController extends ChangeNotifier {
   Timer? _recordingTimer;
   Timer? _hardPauseTimer;
   bool _hardPaused = false;
-  final bool enableFormatting;
+  bool _isReconnecting = false;
 
   StreamingTranscriptionService _service = StreamingTranscriptionService();
   StreamingAmplitudeTracker? _amplitudeTracker;
   StreamSubscription<StreamingTranscript>? _transcriptSub;
   StreamSubscription<StreamingSttEventData>? _eventSub;
 
-  StreamingVoiceInputController({this.enableFormatting = false});
+  /// One backup recording per controller session. Owned at the controller
+  /// level so service swaps (hard-resume, auto-reconnect) all write into the
+  /// SAME file — the user gets one continuous audio file per measurement.
+  final AudioBackupRecorder _backup = AudioBackupRecorder();
 
+  LiveVoiceInputController({this.enableFormatting = false, this.formattingModelName});
+
+  @override
   VoiceInputState get state => _state;
+  @override
   String get finalText => _finalText;
   String get partialText => _partialText;
+  @override
   String? get formattedText => _formattedText;
+  @override
   bool get formattingFailed => _formattingFailed;
+  @override
   String get displayText {
     if (_finalText.isEmpty && _partialText.isEmpty) return '';
     if (_partialText.isEmpty) return _finalText;
     if (_finalText.isEmpty) return _partialText;
     return '$_finalText $_partialText';
   }
+  @override
   String? get errorMessage => _errorMessage;
+  @override
   int get recordingSeconds => _recordingSeconds;
+  @override
   List<double> get amplitudeLevels => _amplitudeTracker?.levels ?? List.filled(15, 0.0);
 
+  @override
+  String? get backupPcmPath => _backup.pcmPath;
+  @override
+  String? get backupWavPath => _backup.wavPath;
+
+  @override
   Future<void> start() async {
     _state = VoiceInputState.connecting;
     notifyListeners();
 
     try {
+      await _backup.start();
+    } catch (e) {
+      AppLogger.error('LiveVoiceInputController: backup start failed', e);
+    }
+
+    try {
+      _service.onAudioChunk = _backup.write;
       _transcriptSub = _service.transcripts.listen(_onTranscript);
       _eventSub = _service.events.listen(_onEvent);
 
@@ -68,28 +107,24 @@ class StreamingVoiceInputController extends ChangeNotifier {
       _startRecordingTimer();
       notifyListeners();
     } catch (e) {
-      AppLogger.error('VoiceInputController: failed to start', e);
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      _state = VoiceInputState.error;
-      notifyListeners();
+      AppLogger.error('LiveVoiceInputController: failed to start', e);
+      _setErrorState(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
+  @override
   Future<void> pause() async {
     if (_state != VoiceInputState.listening) return;
 
-    // Immediately show paused state
     _stopRecordingTimer();
     _amplitudeTracker?.stop();
     _state = VoiceInputState.paused;
     _hardPaused = false;
     notifyListeners();
 
-    // Soft pause: pause the mic, then tell server to finalize remaining buffer
     await _service.pauseAudio();
     _service.sendFlush();
 
-    // Schedule hard pause after delay
     _hardPauseTimer?.cancel();
     _hardPauseTimer = Timer(
       const Duration(seconds: _hardPauseDelaySeconds),
@@ -100,16 +135,18 @@ class StreamingVoiceInputController extends ChangeNotifier {
   Future<void> _performHardPause() async {
     if (_state != VoiceInputState.paused || _hardPaused) return;
 
-    AppLogger.info('VoiceInputController: hard pause — closing stream');
+    AppLogger.info('LiveVoiceInputController: hard pause — closing stream');
     _hardPaused = true;
 
     _amplitudeTracker?.dispose();
     _amplitudeTracker = null;
 
-    final segmentText = await _service.stop();
-    if (segmentText != null && segmentText.isNotEmpty) {
-      _finalText = segmentText;
-    }
+    // Flush + close the WS for side effects only. Do NOT overwrite _finalText
+    // with service.stop()'s return — that returns only THIS service's
+    // accumulator, which after a previous hard-resume contains only the
+    // latest segment. _onTranscript has already been maintaining _finalText
+    // incrementally over the controller's full lifetime.
+    await _service.stop();
     _partialText = '';
 
     await _transcriptSub?.cancel();
@@ -119,6 +156,7 @@ class StreamingVoiceInputController extends ChangeNotifier {
     await _service.dispose();
   }
 
+  @override
   Future<void> resume() async {
     if (_state != VoiceInputState.paused) return;
 
@@ -126,7 +164,6 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _hardPauseTimer = null;
 
     if (!_hardPaused) {
-      // Soft resume: just unpause the mic, same WebSocket
       await _service.resumeAudio();
       _amplitudeTracker?.start();
       _state = VoiceInputState.listening;
@@ -135,7 +172,6 @@ class StreamingVoiceInputController extends ChangeNotifier {
       return;
     }
 
-    // Hard resume: need full reconnect
     _state = VoiceInputState.connecting;
     notifyListeners();
 
@@ -143,6 +179,7 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _service = StreamingTranscriptionService();
 
     try {
+      _service.onAudioChunk = _backup.write;
       _transcriptSub = _service.transcripts.listen(_onTranscript);
       _eventSub = _service.events.listen(_onEvent);
 
@@ -161,14 +198,63 @@ class StreamingVoiceInputController extends ChangeNotifier {
       _startRecordingTimer();
       notifyListeners();
     } catch (e) {
-      AppLogger.error('VoiceInputController: failed to resume', e);
+      AppLogger.error('LiveVoiceInputController: failed to resume', e);
       _finalText = savedText;
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      _state = VoiceInputState.error;
-      notifyListeners();
+      _setErrorState(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
+  /// Transparently rebuild the service after the WS drops mid-listening.
+  /// Preserves [_finalText] across the swap.
+  Future<void> _reconnectAfterDrop() async {
+    if (_isReconnecting) return;
+    _isReconnecting = true;
+
+    final savedText = _finalText;
+
+    _stopRecordingTimer();
+    _amplitudeTracker?.dispose();
+    _amplitudeTracker = null;
+
+    await _transcriptSub?.cancel();
+    _transcriptSub = null;
+    await _eventSub?.cancel();
+    _eventSub = null;
+    try {
+      await _service.dispose();
+    } catch (_) {}
+
+    _service = StreamingTranscriptionService();
+
+    try {
+      _service.onAudioChunk = _backup.write;
+      _transcriptSub = _service.transcripts.listen(_onTranscript);
+      _eventSub = _service.events.listen(_onEvent);
+      await _service.start();
+
+      if (_service.recorder != null) {
+        _amplitudeTracker = StreamingAmplitudeTracker(
+          recorder: _service.recorder!,
+          onUpdate: notifyListeners,
+        );
+        _amplitudeTracker!.start();
+      }
+
+      _finalText = savedText;
+      _state = VoiceInputState.listening;
+      _startRecordingTimer();
+      notifyListeners();
+      AppLogger.info('LiveVoiceInputController: auto-reconnect succeeded');
+    } catch (e) {
+      AppLogger.error('LiveVoiceInputController: auto-reconnect failed', e);
+      _finalText = savedText;
+      _setErrorState('Connection lost');
+    } finally {
+      _isReconnecting = false;
+    }
+  }
+
+  @override
   Future<String?> stop() async {
     _stopRecordingTimer();
     _hardPauseTimer?.cancel();
@@ -176,21 +262,24 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _amplitudeTracker?.stop();
 
     if (_state == VoiceInputState.paused && _hardPaused) {
-      // Already flushed during hard pause
       return _finalize();
     }
 
     _state = VoiceInputState.processing;
     notifyListeners();
 
-    final result = await _service.stop();
-    _finalText = result ?? _finalText;
+    await _service.stop();
     _partialText = '';
 
     return _finalize();
   }
 
   Future<String?> _finalize() async {
+    final wavPath = await _backup.finalize();
+    if (wavPath != null) {
+      AppLogger.info('LiveVoiceInputController: backup audio available at $wavPath');
+    }
+
     if (_finalText.isEmpty) {
       _state = VoiceInputState.done;
       notifyListeners();
@@ -207,19 +296,12 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _formattingFailed = false;
     notifyListeners();
 
-    try {
-      final formatted = await GeminiService.formatTranscription(_finalText);
-      if (formatted != null && formatted.isNotEmpty) {
-        _formattedText = formatted;
-      } else {
-        _formattedText = null;
-        _formattingFailed = true;
-      }
-    } catch (e) {
-      AppLogger.error('VoiceInputController: formatting failed', e);
-      _formattedText = null;
-      _formattingFailed = true;
-    }
+    final result = await TranscriptFormatter.format(
+      _finalText,
+      modelName: formattingModelName,
+    );
+    _formattedText = result.text;
+    _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
     notifyListeners();
@@ -227,6 +309,7 @@ class StreamingVoiceInputController extends ChangeNotifier {
     return _formattedText ?? _finalText;
   }
 
+  @override
   Future<String?> retryFormatting() async {
     if (_finalText.isEmpty) return null;
 
@@ -234,18 +317,12 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _formattingFailed = false;
     notifyListeners();
 
-    try {
-      final formatted = await GeminiService.formatTranscription(_finalText);
-      if (formatted != null && formatted.isNotEmpty) {
-        _formattedText = formatted;
-        _formattingFailed = false;
-      } else {
-        _formattingFailed = true;
-      }
-    } catch (e) {
-      AppLogger.error('VoiceInputController: retry formatting failed', e);
-      _formattingFailed = true;
-    }
+    final result = await TranscriptFormatter.format(
+      _finalText,
+      modelName: formattingModelName,
+    );
+    _formattedText = result.text;
+    _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
     notifyListeners();
@@ -253,17 +330,20 @@ class StreamingVoiceInputController extends ChangeNotifier {
     return _formattedText ?? _finalText;
   }
 
+  @override
   Future<void> cancel() async {
     _stopRecordingTimer();
     _hardPauseTimer?.cancel();
     _hardPauseTimer = null;
     _amplitudeTracker?.stop();
+    await _backup.abort();
     if (_state == VoiceInputState.paused && _hardPaused) {
       return;
     }
     await _service.cancel();
   }
 
+  @override
   Future<void> retry() async {
     _finalText = '';
     _partialText = '';
@@ -274,9 +354,18 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _hardPaused = false;
     _hardPauseTimer?.cancel();
     _hardPauseTimer = null;
+    await _backup.abort();
     await _service.cancel();
     _service = StreamingTranscriptionService();
     await start();
+  }
+
+  void _setErrorState(String message) {
+    _errorMessage = message;
+    _state = VoiceInputState.error;
+    _stopRecordingTimer();
+    notifyListeners();
+    _backup.finalize();
   }
 
   void _startRecordingTimer() {
@@ -284,7 +373,7 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _recordingSeconds++;
       notifyListeners();
-      if (_recordingSeconds >= maxRecordingSeconds) {
+      if (_recordingSeconds >= VoiceInputController.maxRecordingSeconds) {
         stop();
       }
     });
@@ -313,16 +402,15 @@ class StreamingVoiceInputController extends ChangeNotifier {
   void _onEvent(StreamingSttEventData e) {
     switch (e.event) {
       case StreamingSttEvent.error:
-        _errorMessage = e.message ?? 'Unknown error';
-        _state = VoiceInputState.error;
-        _stopRecordingTimer();
-        notifyListeners();
+        AppLogger.error('LiveVoiceInputController: stt error event: ${e.message}');
+        _setErrorState(e.message ?? 'Unknown error');
       case StreamingSttEvent.disconnected:
-        if (_state == VoiceInputState.listening) {
-          _state = VoiceInputState.error;
-          _errorMessage = 'Connection lost';
-          _stopRecordingTimer();
-          notifyListeners();
+        AppLogger.warning(
+          'LiveVoiceInputController: disconnected while state=$_state, hardPaused=$_hardPaused',
+        );
+        if (_state == VoiceInputState.listening && !_isReconnecting) {
+          AppLogger.warning('LiveVoiceInputController: WS dropped mid-listening — auto-reconnecting');
+          _reconnectAfterDrop();
         }
       default:
         break;
@@ -336,6 +424,7 @@ class StreamingVoiceInputController extends ChangeNotifier {
     _amplitudeTracker?.dispose();
     _transcriptSub?.cancel();
     _eventSub?.cancel();
+    _backup.finalize();
     _service.dispose();
     super.dispose();
   }

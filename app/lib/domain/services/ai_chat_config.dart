@@ -1,8 +1,9 @@
 import 'package:langchain/langchain.dart';
 import 'ai_tool_service.dart';
 
-const String defaultAiChatModel = 'gemini-3.1-flash-lite-preview';
-const String defaultAiVoiceModel = 'gemini-2.5-flash-lite';
+const String defaultAiChatModel = 'gemini-3.1-flash-lite';
+const String defaultAiFormattingModel = 'gemini-2.5-flash-lite';
+const String defaultSttModel = 'sarvam:saaras:v3';
 
 String buildAiSystemPrompt() {
   final now = DateTime.now();

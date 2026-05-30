@@ -88,13 +88,16 @@ class HomeTab extends StatelessWidget {
               userName: context.watch<AuthState>().userName,
             ),
             const SizedBox(height: AppConfig.spacing16),
-            Consumer<OrderState>(
-              builder: (context, orderState, child) {
-                final orders = orderState.orders;
-                final pendingCount = OrderService.getPendingOrdersCount(orders);
+            const BackupHealthCard(),
+            const SizedBox(height: AppConfig.spacing16),
+            Selector<OrderState, HomeStats>(
+              selector: (_, orderState) =>
+                  OrderService.computeHomeStats(orderState.orders),
+              builder: (context, stats, child) {
+                final pendingCount = stats.pendingOrdersCount;
                 final customersWithPendingCount =
-                    OrderService.getCustomersWithPendingOrdersCount(orders);
-                final unpaidAmount = OrderService.getTotalUnpaidAmount(orders);
+                    stats.customersWithPendingOrdersCount;
+                final unpaidAmount = stats.totalUnpaidAmount;
                 final colorScheme = Theme.of(context).colorScheme;
 
                 return Column(
@@ -159,7 +162,7 @@ class HomeTab extends StatelessWidget {
                       containerColor: colorScheme.primaryContainer,
                       contentColor: colorScheme.onPrimaryContainer,
                       onTap: () {
-                        Navigator.pushNamed(context, AppConstants.orderFormRoute);
+                        Navigator.pushNamed(context, AppConstants.orderCreatorRoute);
                       },
                     ),
                     HomeActionTile(

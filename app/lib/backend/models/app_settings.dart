@@ -15,22 +15,25 @@ class AppSettings {
 
   final String? aiChatModelRaw;
 
-  final String? aiVoiceModelRaw;
+  final String? aiFormattingModelRaw;
 
   final String? lastBackupStatus; // 'success', 'partial', 'failed'
 
   final String? lastBackupError;
 
-  final String? sttProviderRaw;
+  final String? sttModelRaw;
+
+  final String? ttsSpeakerRaw;
 
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
   String get autoBackupTime => autoBackupTimeRaw ?? '03:00';
   bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
-  String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite-preview';
-  String get aiVoiceModel => aiVoiceModelRaw ?? 'gemini-2.5-flash-lite';
-  String get sttProvider => sttProviderRaw ?? 'gemini';
+  String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite';
+  String get aiFormattingModel => aiFormattingModelRaw ?? 'gemini-2.5-flash-lite';
+  String get sttModel => sttModelRaw ?? 'sarvam:saaras:v3';
+  String get ttsSpeaker => ttsSpeakerRaw ?? 'shubh';
 
   AppSettings({
     this.dueDateWarningThreshold = 3,
@@ -41,10 +44,11 @@ class AppSettings {
     this.lastBackupTime,
     this.debugLogsEnabledRaw,
     this.aiChatModelRaw,
-    this.aiVoiceModelRaw,
+    this.aiFormattingModelRaw,
     this.lastBackupStatus,
     this.lastBackupError,
-    this.sttProviderRaw,
+    this.sttModelRaw,
+    this.ttsSpeakerRaw,
   });
 
   AppSettings copyWith({
@@ -56,10 +60,11 @@ class AppSettings {
     DateTime? lastBackupTime,
     bool? debugLogsEnabled,
     String? aiChatModel,
-    String? aiVoiceModel,
+    String? aiFormattingModel,
     String? lastBackupStatus,
     String? lastBackupError,
-    String? sttProvider,
+    String? sttModel,
+    String? ttsSpeaker,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -70,10 +75,11 @@ class AppSettings {
       lastBackupTime: lastBackupTime ?? this.lastBackupTime,
       debugLogsEnabledRaw: debugLogsEnabled ?? this.debugLogsEnabled,
       aiChatModelRaw: aiChatModel ?? aiChatModelRaw,
-      aiVoiceModelRaw: aiVoiceModel ?? aiVoiceModelRaw,
+      aiFormattingModelRaw: aiFormattingModel ?? aiFormattingModelRaw,
       lastBackupStatus: lastBackupStatus ?? this.lastBackupStatus,
       lastBackupError: lastBackupError ?? this.lastBackupError,
-      sttProviderRaw: sttProvider ?? sttProviderRaw,
+      sttModelRaw: sttModel ?? sttModelRaw,
+      ttsSpeakerRaw: ttsSpeaker ?? ttsSpeakerRaw,
     );
   }
 
@@ -87,10 +93,11 @@ class AppSettings {
       'lastBackupTime': lastBackupTime?.toIso8601String(),
       'debugLogsEnabled': debugLogsEnabled,
       'aiChatModel': aiChatModelRaw,
-      'aiVoiceModel': aiVoiceModelRaw,
+      'aiFormattingModel': aiFormattingModelRaw,
       'lastBackupStatus': lastBackupStatus,
       'lastBackupError': lastBackupError,
-      'sttProvider': sttProviderRaw,
+      'sttModel': sttModelRaw,
+      'ttsSpeaker': ttsSpeakerRaw,
     };
   }
 
@@ -111,16 +118,17 @@ class AppSettings {
       lastBackupTime: backupTime,
       debugLogsEnabledRaw: json['debugLogsEnabled'] as bool?,
       aiChatModelRaw: json['aiChatModel'] as String?,
-      aiVoiceModelRaw: json['aiVoiceModel'] as String?,
+      aiFormattingModelRaw: json['aiFormattingModel'] as String? ?? json['aiVoiceModel'] as String?,
       lastBackupStatus: json['lastBackupStatus'] as String?,
       lastBackupError: json['lastBackupError'] as String?,
-      sttProviderRaw: json['sttProvider'] as String?,
+      sttModelRaw: json['sttModel'] as String?,
+      ttsSpeakerRaw: json['ttsSpeaker'] as String?,
     );
   }
 
   @override
   String toString() {
-    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime, debugLogsEnabled: $debugLogsEnabled, aiChatModel: $aiChatModel, aiVoiceModel: $aiVoiceModel)';
+    return 'AppSettings(dueDateWarningThreshold: $dueDateWarningThreshold, pendingOrdersReminderEnabled: $pendingOrdersReminderEnabled, pendingOrdersReminderTime: $pendingOrdersReminderTime, autoBackupEnabled: $autoBackupEnabled, autoBackupTime: $autoBackupTime, lastBackupTime: $lastBackupTime, debugLogsEnabled: $debugLogsEnabled, aiChatModel: $aiChatModel, aiFormattingModel: $aiFormattingModel, sttModel: $sttModel, ttsSpeaker: $ttsSpeaker)';
   }
 
   @override
@@ -135,10 +143,11 @@ class AppSettings {
            other.lastBackupTime == lastBackupTime &&
            other.debugLogsEnabled == debugLogsEnabled &&
            other.aiChatModelRaw == aiChatModelRaw &&
-           other.aiVoiceModelRaw == aiVoiceModelRaw &&
+           other.aiFormattingModelRaw == aiFormattingModelRaw &&
            other.lastBackupStatus == lastBackupStatus &&
            other.lastBackupError == lastBackupError &&
-           other.sttProviderRaw == sttProviderRaw;
+           other.sttModelRaw == sttModelRaw &&
+           other.ttsSpeakerRaw == ttsSpeakerRaw;
   }
 
   @override
@@ -151,10 +160,11 @@ class AppSettings {
     lastBackupTime,
     debugLogsEnabled,
     aiChatModelRaw,
-    aiVoiceModelRaw,
+    aiFormattingModelRaw,
     lastBackupStatus,
     lastBackupError,
-    sttProviderRaw,
+    sttModelRaw,
+    ttsSpeakerRaw,
   );
 }
 

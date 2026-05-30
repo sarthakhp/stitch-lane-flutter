@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
 import 'package:toonx/toonx.dart' as toonx;
+import 'package:uuid/uuid.dart';
 import '../../utils/app_logger.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
+import 'ai_gateway/ai_gateway.dart';
+import 'ai_gateway/usage_event.dart';
 import 'ai_tool_service.dart';
 
 /// Result of a single AI exchange (one user message → one final response).
@@ -42,14 +46,25 @@ class AiExecutor {
   static Future<AiExecutorResult> run(
     ChatGoogleGenerativeAI model,
     List<ChatMessage> history, {
+    required String modelName,
     String? systemPrompt,
   }) async {
+    // One runId for this whole exchange. Each model.invoke() emits its own
+    // UsageEvent row that carries this runId, so the dashboard can roll up
+    // "what did one chat turn cost" without storing pre-aggregated data.
+    final runId = const Uuid().v4();
+
     final toolCallRecords = <ToolCallRecord>[];
     var totalUsage = AiTokenUsage.zero;
     final steps = <Map<String, dynamic>>[];
     final stopwatch = Stopwatch()..start();
 
-    var result = await model.invoke(PromptValue.chat(history)).timeout(_perInvokeTimeout);
+    var result = await _invokeWithRecording(
+      model,
+      prompt: PromptValue.chat(history),
+      modelName: modelName,
+      runId: runId,
+    );
     var stepUsage = _usageFrom(result);
     totalUsage = totalUsage + stepUsage;
     var aiMessage = result.output;
@@ -68,14 +83,16 @@ class AiExecutor {
       history.add(ChatMessage.tool(toolCallId: toolCall.id, content: toolResult));
 
       // On last allowed iteration, invoke without tools to force a text response
-      if (!_shouldContinue(iterations, stopwatch.elapsed)) {
-        result = await model.invoke(
-          PromptValue.chat(history),
-          options: const ChatGoogleGenerativeAIOptions(tools: []),
-        ).timeout(_perInvokeTimeout);
-      } else {
-        result = await model.invoke(PromptValue.chat(history)).timeout(_perInvokeTimeout);
-      }
+      final forceTextOnly = !_shouldContinue(iterations, stopwatch.elapsed);
+      result = await _invokeWithRecording(
+        model,
+        prompt: PromptValue.chat(history),
+        modelName: modelName,
+        runId: runId,
+        options: forceTextOnly
+            ? const ChatGoogleGenerativeAIOptions(tools: [])
+            : null,
+      );
       stepUsage = _usageFrom(result);
       totalUsage = totalUsage + stepUsage;
       aiMessage = result.output;
@@ -108,6 +125,54 @@ class AiExecutor {
       toolCalls: toolCallRecords,
       usage: totalUsage,
     );
+  }
+
+  /// Wraps a single `model.invoke()` with a stopwatch and emits a [UsageEvent]
+  /// for both success and failure paths. Rethrows the original exception on
+  /// failure so the caller's higher-level error handling (in
+  /// [AiChatService.sendMessage]) is unchanged.
+  static Future<ChatResult> _invokeWithRecording(
+    ChatGoogleGenerativeAI model, {
+    required PromptValue prompt,
+    required String modelName,
+    required String runId,
+    ChatGoogleGenerativeAIOptions? options,
+  }) async {
+    final sw = Stopwatch()..start();
+    try {
+      final result = options != null
+          ? await model
+              .invoke(prompt, options: options)
+              .timeout(_perInvokeTimeout)
+          : await model.invoke(prompt).timeout(_perInvokeTimeout);
+      sw.stop();
+      final usage = _usageFrom(result);
+      await AiGateway.instance.recorder.recordCall(
+        callerTag: UsageCallerTags.chat,
+        runId: runId,
+        provider: UsageProvider.gemini,
+        model: modelName,
+        kind: UsageKind.chat,
+        inputTokens: usage.promptTokens,
+        outputTokens: usage.responseTokens,
+        totalTokens: usage.totalTokens,
+        durationMs: sw.elapsedMilliseconds,
+      );
+      return result;
+    } catch (e) {
+      sw.stop();
+      final code = e is TimeoutException ? 'timeout' : 'error';
+      await AiGateway.instance.recorder.recordCall(
+        callerTag: UsageCallerTags.chat,
+        runId: runId,
+        provider: UsageProvider.gemini,
+        model: modelName,
+        kind: UsageKind.chat,
+        durationMs: sw.elapsedMilliseconds,
+        errorCode: code,
+      );
+      rethrow;
+    }
   }
 
   // --- Loop control ---

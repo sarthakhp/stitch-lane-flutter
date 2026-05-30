@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_quill/flutter_quill.dart';
 import 'package:workmanager/workmanager.dart';
-import 'firebase_options.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
-import 'config/routes.dart';
-import 'constants/app_constants.dart';
-import 'screens/login_screen.dart';
-import 'screens/main_shell_screen.dart';
-import 'screens/widgets/app_logo.dart';
-import 'screens/backup_restore_check_screen.dart';
+import 'screens/app_root.dart';
 import 'utils/app_logger.dart';
+import 'utils/startup_tracker.dart';
+import 'utils/startup_orchestrator.dart';
 
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -44,16 +36,40 @@ void callbackDispatcher() {
 }
 
 void main() async {
+  StartupTracker.instance.start();
   WidgetsFlutterBinding.ensureInitialized();
+  StartupTracker.instance.mark('binding_ready');
+
   await dotenv.load(fileName: '.env');
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  await AuthService.initializeAuthPersistence();
+  StartupTracker.instance.mark('dotenv_loaded');
+
+  // Snapshot the live DB BEFORE any open/migration. If a migration corrupts
+  // the file, or some other code path wipes it, the pre-launch snapshot at
+  // <databases>/snapshots/<ts>/ is the rollback. Safe to fail — never blocks
+  // boot. Throttled to one snapshot per 30 minutes regardless of restarts.
+  await DbSnapshotService.snapshotBeforeOpen();
+  StartupTracker.instance.mark('db_snapshot_done');
+
+  // Database must be ready before the first widget tree builds.
   await DatabaseService.initialize();
-  await NotificationService.initialize();
+  StartupTracker.instance.mark('database_initialized');
+
+  // Wire the AI gateway's usage recorder to SQLite. Must happen after the DB
+  // is up and before any service that emits LLM calls is constructed.
+  AiGateway.instance.init();
+  StartupTracker.instance.mark('ai_gateway_initialized');
+
+  // WorkManager handler must be registered before runApp so the background
+  // isolate can route tasks correctly. This takes ~16ms and is required.
   await BackgroundTaskDispatcher.initialize(callbackDispatcher);
+  StartupTracker.instance.mark('workmanager_initialized');
+
   runApp(const StitchGenieApp());
+  StartupTracker.instance.mark('runapp_returned');
+
+  // Kick off Firebase + auth + notifications in the background — the UI will
+  // show a splash until firebaseReady completes (usually < 1s on warm network).
+  StartupOrchestrator.instance.kickoff();
 }
 
 class StitchGenieApp extends StatelessWidget {
@@ -83,244 +99,7 @@ class StitchGenieApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(create: (_) => MainShellState()),
       ],
-      child: const AppInitializer(),
+      child: const AppRoot(),
     );
   }
 }
-
-class AppInitializer extends StatefulWidget {
-  const AppInitializer({super.key});
-
-  @override
-  State<AppInitializer> createState() => _AppInitializerState();
-}
-
-class _AppInitializerState extends State<AppInitializer> {
-  bool _isInitializing = true;
-  final AppLifecycleBackupService _lifecycleBackupService = AppLifecycleBackupService();
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-  }
-
-  @override
-  void dispose() {
-    _lifecycleBackupService.dispose();
-    super.dispose();
-  }
-
-  Future<void> _initializeApp() async {
-    final settingsState = context.read<SettingsState>();
-    final settingsRepository = context.read<SettingsRepository>();
-
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    final currentUser = AuthService.getCurrentUser();
-
-    if (currentUser != null) {
-      await AuthService.silentSignIn();
-    }
-
-    await SettingsService.loadSettings(settingsState, settingsRepository);
-
-    await _initializeDebugLogs(settingsState);
-    await _runImageCompressionMigration();
-    await _initializeAutoBackup(settingsState, settingsRepository);
-    await _initializePendingOrdersReminder(settingsState);
-
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-      });
-    }
-  }
-
-  Future<void> _initializeDebugLogs(SettingsState settingsState) async {
-    try {
-      if (settingsState.debugLogsEnabled) {
-        await AppLogger.enableFileLogging().timeout(
-          const Duration(seconds: 5),
-          onTimeout: () {
-            try {
-              AppLogger.warning('Debug logs initialization timed out');
-            } catch (_) {
-              // Silently fail
-            }
-          },
-        );
-      }
-    } catch (e) {
-      // Silently fail - don't let debug logs initialization block app startup
-      try {
-        AppLogger.warning('Failed to initialize debug logs: $e');
-      } catch (_) {
-        // Even if logging the warning fails, continue app startup
-      }
-    }
-  }
-
-  Future<void> _runImageCompressionMigration() async {
-    try {
-      await ImageCompressionMigration.run();
-    } catch (e) {
-      AppLogger.warning('Image compression migration failed: $e');
-    }
-  }
-
-  Future<void> _initializeAutoBackup(
-    SettingsState settingsState,
-    SettingsRepository settingsRepository,
-  ) async {
-    if (settingsState.autoBackupEnabled) {
-      await AutoBackupService.scheduleAutoBackup(settingsState.autoBackupTime);
-    }
-
-    _lifecycleBackupService.initialize(
-      settingsRepository: settingsRepository,
-      onBackupComplete: () {
-        SettingsService.loadSettings(settingsState, settingsRepository);
-      },
-    );
-
-    Future.microtask(() => _lifecycleBackupService.checkOnStartup());
-  }
-
-  Future<void> _initializePendingOrdersReminder(SettingsState settingsState) async {
-    if (settingsState.pendingOrdersReminderEnabled) {
-      await PendingOrdersReminderService.scheduleReminder(
-        settingsState.pendingOrdersReminderTime,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isInitializing) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
-        themeMode: ThemeMode.system,
-        home: const Scaffold(
-          body: Center(
-            child: AppLogo(size: 120),
-          ),
-        ),
-      );
-    }
-
-    return MaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
-      navigatorObservers: [routeObserver],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        FlutterQuillLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en'),
-      ],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-        ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-        ),
-      ),
-      themeMode: ThemeMode.system,
-      home: const AuthGate(),
-      onGenerateRoute: AppRoutes.generateRoute,
-    );
-  }
-}
-
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  int _refreshKey = 0;
-
-  void _onBackupChoiceCompleted() {
-    setState(() {
-      _refreshKey++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        final user = snapshot.data ?? FirebaseAuth.instance.currentUser;
-
-        if (user != null) {
-          return FutureBuilder<bool>(
-            key: ValueKey(_refreshKey),
-            future: OnboardingService.hasCompletedBackupChoice(user.uid),
-            builder: (context, choiceSnapshot) {
-              if (choiceSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              final hasCompleted = choiceSnapshot.data ?? false;
-
-              if (!hasCompleted) {
-                return BackupRestoreCheckScreen(
-                  onComplete: () async {
-                    await OnboardingService.setBackupChoiceCompleted(user.uid);
-                    _onBackupChoiceCompleted();
-                  },
-                );
-              }
-
-              return const MainShellScreen();
-            },
-          );
-        }
-
-        return const LoginScreen();
-      },
-    );
-  }
-}
-
-
-

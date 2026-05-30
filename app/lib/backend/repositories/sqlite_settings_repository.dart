@@ -51,10 +51,11 @@ class SqliteSettingsRepository implements SettingsRepository {
         'last_backup_time': s.lastBackupTime?.toIso8601String(),
         'debug_logs_enabled': s.debugLogsEnabled ? 1 : 0,
         'ai_chat_model': s.aiChatModelRaw,
-        'ai_voice_model': s.aiVoiceModelRaw,
+        'ai_formatting_model': s.aiFormattingModelRaw,
         'last_backup_status': s.lastBackupStatus,
         'last_backup_error': s.lastBackupError,
-        'stt_provider': s.sttProviderRaw,
+        'stt_model': s.sttModelRaw,
+        'tts_speaker': s.ttsSpeakerRaw,
       };
 
   static AppSettings fromMap(Map<String, dynamic> map) => AppSettings(
@@ -70,9 +71,10 @@ class SqliteSettingsRepository implements SettingsRepository {
             : null,
         debugLogsEnabledRaw: (map['debug_logs_enabled'] as int? ?? 0) == 1,
         aiChatModelRaw: map['ai_chat_model'] as String?,
-        aiVoiceModelRaw: map['ai_voice_model'] as String?,
+        aiFormattingModelRaw: map['ai_formatting_model'] as String?,
         lastBackupStatus: map['last_backup_status'] as String?,
         lastBackupError: map['last_backup_error'] as String?,
-        sttProviderRaw: map['stt_provider'] as String?,
+        sttModelRaw: map['stt_model'] as String?,
+        ttsSpeakerRaw: map['tts_speaker'] as String?,
       );
 }

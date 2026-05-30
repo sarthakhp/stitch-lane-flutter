@@ -10,6 +10,8 @@ import '../domain/services/permission_service.dart';
 import '../domain/state/order_state.dart';
 import '../domain/state/customer_state.dart';
 import '../domain/state/main_shell_state.dart';
+import '../utils/startup_orchestrator.dart';
+import '../utils/startup_tracker.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/customers_tab.dart';
@@ -26,14 +28,20 @@ class _MainShellScreenState extends State<MainShellScreen>
   final _ordersTabKey = GlobalKey<OrdersTabState>();
   final _customersTabKey = GlobalKey<CustomersTabState>();
 
+  // Lazily mount Orders/Customers tabs on first navigation.
+  // Home (index 0) is always considered mounted.
+  final Set<int> _mountedTabs = {0};
+
   @override
   void initState() {
     super.initState();
+    StartupTracker.instance.markOnce('main_shell_init_state');
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      StartupTracker.instance.markOnce('main_shell_first_frame');
       _loadInitialData();
       _requestPermissions();
-      NotificationRouter.processPendingNotification(context);
+      _processNotificationsWhenReady();
     });
   }
 
@@ -46,12 +54,20 @@ class _MainShellScreenState extends State<MainShellScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      NotificationRouter.processPendingNotification(context);
+      _processNotificationsWhenReady();
     }
   }
 
   Future<void> _requestPermissions() async {
     await PermissionService.requestAllPermissions();
+  }
+
+  /// Waits for NotificationService to finish initializing (in background since
+  /// startup), then processes any pending notification tap that launched the app.
+  Future<void> _processNotificationsWhenReady() async {
+    await StartupOrchestrator.instance.notificationsReady;
+    if (!mounted) return;
+    NotificationRouter.processPendingNotification(context);
   }
 
   Future<void> _loadInitialData() async {
@@ -66,9 +82,14 @@ class _MainShellScreenState extends State<MainShellScreen>
       if (customerState.customers.isEmpty)
         CustomerService.loadCustomers(customerState, customerRepository),
     ]);
+    StartupTracker.instance.finish();
   }
 
   void _onDestinationSelected(int index) {
+    if (_mountedTabs.add(index)) {
+      // First visit to this tab — trigger a rebuild so the real widget mounts.
+      setState(() {});
+    }
     context.read<MainShellState>().switchToTab(index);
   }
 
@@ -95,7 +116,7 @@ class _MainShellScreenState extends State<MainShellScreen>
       case 1:
         return FloatingActionButton(
           onPressed: () {
-            Navigator.pushNamed(context, AppConstants.orderFormRoute);
+            Navigator.pushNamed(context, AppConstants.orderCreatorRoute);
           },
           child: const Icon(Icons.add),
         );
@@ -118,6 +139,11 @@ class _MainShellScreenState extends State<MainShellScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final useNavigationRail = screenWidth >= 600;
 
+    // Ensure the currently-selected tab is mounted. This covers programmatic
+    // switches via MainShellState.switchToOrdersTab / switchToCustomersTab that
+    // don't go through _onDestinationSelected.
+    _mountedTabs.add(selectedIndex);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyPendingFilters(shellState);
     });
@@ -126,8 +152,12 @@ class _MainShellScreenState extends State<MainShellScreen>
       index: selectedIndex,
       children: [
         const HomeTab(),
-        OrdersTab(key: _ordersTabKey),
-        CustomersTab(key: _customersTabKey),
+        _mountedTabs.contains(1)
+            ? OrdersTab(key: _ordersTabKey)
+            : const SizedBox.shrink(),
+        _mountedTabs.contains(2)
+            ? CustomersTab(key: _customersTabKey)
+            : const SizedBox.shrink(),
       ],
     );
 

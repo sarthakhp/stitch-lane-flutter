@@ -11,10 +11,16 @@ class OrderFormScreen extends StatefulWidget {
   final Order? order;
   final Customer? customer;
 
+  /// Pre-filled description for a fresh order. Ignored when [order] is
+  /// passed (edit mode). Used by the AI order-creator fallback path so the
+  /// raw transcript lands in the description without losing it.
+  final String? initialDescription;
+
   const OrderFormScreen({
     super.key,
     this.order,
     this.customer,
+    this.initialDescription,
   });
 
   @override
@@ -35,6 +41,11 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       existingOrder: widget.order,
       initialCustomer: widget.customer,
     );
+    if (widget.order == null &&
+        widget.initialDescription != null &&
+        widget.initialDescription!.trim().isNotEmpty) {
+      _controller.setDescription(widget.initialDescription!);
+    }
     _initializeTextControllers();
     _controller.addListener(_onControllerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {

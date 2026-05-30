@@ -7,6 +7,7 @@ import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
 import '../screens/orders_list_screen.dart';
 import '../screens/order_detail_screen.dart';
+import '../screens/order_creator_screen.dart';
 import '../screens/order_form_screen.dart';
 import '../screens/measurements_list_screen.dart';
 import '../screens/measurement_detail_screen.dart';
@@ -14,8 +15,10 @@ import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/backup_settings_screen.dart';
+import '../screens/ai_usage_screen.dart';
 import '../screens/developer_screen.dart';
 	import '../screens/business_analysis_screen.dart';
+import '../screens/month_detail_screen.dart';
 import '../screens/ai_assistant_screen.dart';
 import '../backend/backend.dart';
 import '../constants/app_constants.dart';
@@ -103,6 +106,15 @@ class AppRoutes {
           builder: (_) => OrderFormScreen(
             customer: args?['customer'] as Customer?,
             order: args?['order'] as Order?,
+            initialDescription: args?['initialDescription'] as String?,
+          ),
+        );
+
+      case AppConstants.orderCreatorRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => OrderCreatorScreen(
+            initialCustomer: args?['customer'] as Customer?,
           ),
         );
 
@@ -159,10 +171,27 @@ class AppRoutes {
           builder: (_) => const DeveloperScreen(),
         );
 
+      case AppConstants.aiUsageRoute:
+        return MaterialPageRoute(
+          builder: (_) => const AiUsageScreen(),
+        );
+
 	      case AppConstants.businessAnalysisRoute:
 	        return MaterialPageRoute(
 	          builder: (_) => const BusinessAnalysisScreen(),
 	        );
+
+      case AppConstants.monthDetailRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args == null || args['year'] == null || args['month'] == null) {
+          return _errorRoute('Year and month are required');
+        }
+        return MaterialPageRoute(
+          builder: (_) => MonthDetailScreen(
+            year: args['year'] as int,
+            month: args['month'] as int,
+          ),
+        );
 
       case AppConstants.aiAssistantRoute:
         return MaterialPageRoute(

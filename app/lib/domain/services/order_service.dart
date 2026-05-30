@@ -59,6 +59,35 @@ class OrderService {
     }
   }
 
+  /// Persist a batch of orders in one call. Each order is written
+  /// sequentially through [repository.addOrder] so a mid-batch failure
+  /// surfaces immediately while still preserving the orders that succeeded.
+  /// Returns the list of successfully-saved orders.
+  static Future<List<Order>> addOrders(
+    OrderState state,
+    OrderRepository repository,
+    List<Order> orders,
+  ) async {
+    if (orders.isEmpty) return const [];
+    state.setLoading(true);
+    state.clearError();
+
+    final saved = <Order>[];
+    try {
+      for (final order in orders) {
+        await repository.addOrder(order);
+        state.addOrder(order);
+        saved.add(order);
+      }
+      return saved;
+    } catch (e) {
+      state.setError('Failed to add orders: $e');
+      rethrow;
+    } finally {
+      state.setLoading(false);
+    }
+  }
+
   static Future<void> updateOrder(
     OrderState state,
     OrderRepository repository,
@@ -122,6 +151,32 @@ class OrderService {
     });
   }
 
+
+  /// Single-pass O(N) computation of the three home-tab summary stats.
+  /// Replaces 3 separate iterations over the order list.
+  static HomeStats computeHomeStats(List<Order> orders) {
+    int pendingCount = 0;
+    int unpaidAmount = 0;
+    final pendingCustomerIds = <String>{};
+
+    for (final order in orders) {
+      if (order.status == OrderStatus.pending) {
+        pendingCount++;
+        pendingCustomerIds.add(order.customerId);
+      }
+      final unpaid = order.value - order.totalPaidAmount;
+      if (unpaid > 0) {
+        unpaidAmount += unpaid;
+      }
+    }
+
+    return HomeStats(
+      pendingOrdersCount: pendingCount,
+      customersWithPendingOrdersCount: pendingCustomerIds.length,
+      totalUnpaidAmount: unpaidAmount,
+    );
+  }
+
   static int calculateTotalPaidAmount(Order order) {
     return order.payments.fold(0, (sum, payment) => sum + payment.amount);
   }
@@ -165,5 +220,36 @@ class OrderService {
         return 'Order marked as pending';
     }
   }
+}
+
+
+/// Immutable summary of home-tab stats. Implements value equality so Provider's
+/// Selector can skip rebuilds when the underlying numbers haven't changed.
+class HomeStats {
+  final int pendingOrdersCount;
+  final int customersWithPendingOrdersCount;
+  final int totalUnpaidAmount;
+
+  const HomeStats({
+    required this.pendingOrdersCount,
+    required this.customersWithPendingOrdersCount,
+    required this.totalUnpaidAmount,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HomeStats &&
+          pendingOrdersCount == other.pendingOrdersCount &&
+          customersWithPendingOrdersCount ==
+              other.customersWithPendingOrdersCount &&
+          totalUnpaidAmount == other.totalUnpaidAmount;
+
+  @override
+  int get hashCode => Object.hash(
+        pendingOrdersCount,
+        customersWithPendingOrdersCount,
+        totalUnpaidAmount,
+      );
 }
 

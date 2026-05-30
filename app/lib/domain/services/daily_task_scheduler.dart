@@ -44,6 +44,27 @@ class DailyTaskScheduler {
     AppLogger.info('[$taskTag] Next day task scheduled successfully');
   }
 
+
+  /// Schedules the task to run after [delay] from now. Use this when the
+  /// cadence is interval-based ("every 4 hours") rather than clock-based
+  /// ("at 8 AM"). The class name is historical — it's a recurring task
+  /// scheduler, not strictly daily.
+  Future<void> scheduleAfter(Duration delay) async {
+    AppLogger.info(
+      '[$taskTag] Scheduling next task in ${delay.inMinutes} minutes',
+    );
+
+    await Workmanager().registerOneOffTask(
+      taskName,
+      taskName,
+      tag: taskTag,
+      initialDelay: delay,
+      existingWorkPolicy: ExistingWorkPolicy.replace,
+    );
+
+    AppLogger.info('[$taskTag] Next task scheduled successfully');
+  }
+
   Future<void> cancel() async {
     await Workmanager().cancelByTag(taskTag);
     await Workmanager().cancelByUniqueName(taskName);

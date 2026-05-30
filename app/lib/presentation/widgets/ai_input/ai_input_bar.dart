@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import '../../../config/app_config.dart';
 
+/// Text-mode bar with mic + text field + send button. The mic is purely a
+/// trigger — callers wire it however they want (inline voice swap via
+/// [AiInputArea], or a modal bottom sheet, or anything else).
+///
+/// [inline] = false (default) is for chat-style screens where the bar lives
+/// stuck to the bottom of the viewport — adds safe-area bottom padding and a
+/// top divider so the bar reads as the page footer. [inline] = true is for
+/// screens that embed the bar mid-column with their own content below
+/// (e.g. the order-creator refinement section followed by a CTA) — drops the
+/// safe-area padding and the top divider for visual continuity.
 class AiInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool isLoading;
   final void Function(String) onSend;
   final VoidCallback onMicTap;
+  final bool inline;
+
+  /// Placeholder shown when the field is empty.
+  final String hintText;
 
   const AiInputBar({
     super.key,
@@ -13,6 +27,8 @@ class AiInputBar extends StatelessWidget {
     required this.isLoading,
     required this.onSend,
     required this.onMicTap,
+    this.inline = false,
+    this.hintText = 'Ask anything...',
   });
 
   @override
@@ -23,15 +39,18 @@ class AiInputBar extends StatelessWidget {
         left: AppConfig.spacing12,
         right: AppConfig.spacing4,
         top: AppConfig.spacing8,
-        bottom: (MediaQuery.of(context).viewInsets.bottom > 0
-            ? 0.0
-            : MediaQuery.of(context).padding.bottom) + AppConfig.spacing8,
+        bottom: inline
+            ? AppConfig.spacing8
+            : (MediaQuery.of(context).viewInsets.bottom > 0
+                    ? 0.0
+                    : MediaQuery.of(context).padding.bottom) +
+                AppConfig.spacing8,
       ),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant),
-        ),
+        border: inline
+            ? null
+            : Border(top: BorderSide(color: colorScheme.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -44,7 +63,7 @@ class AiInputBar extends StatelessWidget {
             child: TextField(
               controller: controller,
               decoration: InputDecoration(
-                hintText: 'Ask anything...',
+                hintText: hintText,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,

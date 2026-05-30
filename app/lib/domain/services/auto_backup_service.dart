@@ -22,6 +22,21 @@ class AutoBackupService {
     taskTag: autoBackupTaskTag,
   );
 
+  /// Cadence between auto-backups. WAS 24h, moved to 4h because 24h was
+  /// leaving too much in-flight unbacked-up data (we hit a 24h-since-backup
+  /// data loss in production once). 4h on AC + WiFi is light on battery
+  /// and gives a much tighter recovery window.
+  static const Duration _backupInterval = Duration(hours: 4);
+
+  /// Retry backoffs for transient failures (network blip, Drive API throttle)
+  /// during the core upload. Total worst case: ~1m40s, well inside
+  /// WorkManager's 10-minute task budget.
+  static const List<Duration> _retryBackoffs = [
+    Duration(seconds: 10),
+    Duration(seconds: 30),
+    Duration(minutes: 1),
+  ];
+
   static Future<void> scheduleAutoBackup(String timeString) async {
     await _scheduler.schedule(timeString);
   }
@@ -68,14 +83,23 @@ class AutoBackupService {
 
       await NotificationService.showBackupInProgressNotification();
 
-      // Core backup: JSON data upload (if this fails, it's a full failure)
-      final backupJson = await BackupService.createBackup(
-        customerRepository: customerRepository,
-        orderRepository: orderRepository,
-        measurementRepository: measurementRepository,
-        settingsRepository: settingsRepository,
+      // Core backup: JSON data upload. Wrapped in retry-with-backoff so a
+      // transient network blip or Drive API throttle doesn't get reported
+      // as a hard failure on the BackupHealthCard. Up to 3 retries with
+      // 10s/30s/1m delays — total max ~1m40s, well under WorkManager's
+      // 10-minute task budget.
+      await _retryWithBackoff(
+        label: 'Auto-backup core upload',
+        task: () async {
+          final backupJson = await BackupService.createBackup(
+            customerRepository: customerRepository,
+            orderRepository: orderRepository,
+            measurementRepository: measurementRepository,
+            settingsRepository: settingsRepository,
+          );
+          await DriveService.uploadBackup(backupJson);
+        },
       );
-      await DriveService.uploadBackup(backupJson);
 
       // File sync: image + audio (if these fail, it's a partial backup)
       final syncErrors = <String>[];
@@ -128,12 +152,49 @@ class AutoBackupService {
     try {
       final settings = await settingsRepository.getSettings();
       if (settings.autoBackupEnabled) {
-        await _scheduler.scheduleNextDay(settings.autoBackupTime);
-        AppLogger.info('Next auto-backup scheduled for tomorrow');
+        await _scheduler.scheduleAfter(_backupInterval);
+        AppLogger.info(
+          'Next auto-backup scheduled in ${_backupInterval.inHours}h',
+        );
       }
     } catch (e) {
       AppLogger.error('Failed to schedule next backup', e);
     }
+  }
+
+  /// Runs [task] with bounded retries on failure. Used by [performBackup] to
+  /// shrug off transient errors (network blip, Drive throttle) without
+  /// promoting them to a "Backup failed" status that pages the user.
+  ///
+  /// Returns the task's result on success. Rethrows the LAST exception if
+  /// every attempt fails — the caller (performBackup) records that as a
+  /// hard failure.
+  static Future<T> _retryWithBackoff<T>({
+    required String label,
+    required Future<T> Function() task,
+  }) async {
+    final maxAttempts = _retryBackoffs.length + 1;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await task();
+      } catch (e, st) {
+        if (attempt == maxAttempts) {
+          AppLogger.error(
+            '$label: all $maxAttempts attempts failed',
+            e,
+            st,
+          );
+          rethrow;
+        }
+        final delay = _retryBackoffs[attempt - 1];
+        AppLogger.warning(
+          '$label: attempt $attempt/$maxAttempts failed ($e) — retrying in ${delay.inSeconds}s',
+        );
+        await Future.delayed(delay);
+      }
+    }
+    // Unreachable — loop either returns or rethrows. Required for type system.
+    throw StateError('_retryWithBackoff: exited loop without resolving');
   }
 
   static Future<void> _initializeForBackground() async {

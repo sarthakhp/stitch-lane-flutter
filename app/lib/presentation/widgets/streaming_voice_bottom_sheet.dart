@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'streaming_voice_input.dart';
 
 class StreamingVoiceBottomSheet {
-  static Future<String?> show(
+  static Future<VoiceInputResult?> show(
     BuildContext context, {
-    bool enableFormatting = true,
+    // Default off: the typical voice-input consumer is an LLM (chat agent,
+    // order creator) that handles raw STT fine. Only persisted human-readable
+    // fields (order / measurement / customer description) should opt in by
+    // passing `enableFormatting: true`.
+    bool enableFormatting = false,
+    String? formattingModelName,
   }) {
-    return showModalBottomSheet<String?>(
+    return showModalBottomSheet<VoiceInputResult?>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
@@ -17,7 +22,8 @@ class StreamingVoiceBottomSheet {
       ),
       builder: (sheetContext) => StreamingVoiceInput(
         enableFormatting: enableFormatting,
-        onDone: (text) => Navigator.of(sheetContext).pop(text),
+        formattingModelName: formattingModelName,
+        onDone: (result) => Navigator.of(sheetContext).pop(result),
         onCancel: () => Navigator.of(sheetContext).pop(null),
       ),
     );

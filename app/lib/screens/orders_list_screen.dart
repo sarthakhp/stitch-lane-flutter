@@ -288,7 +288,7 @@ class _OrdersListScreenState extends State<OrdersListScreen>
             onPressed: () {
               Navigator.pushNamed(
                 context,
-                AppConstants.orderFormRoute,
+                AppConstants.orderCreatorRoute,
                 arguments: widget.customer != null
                     ? <String, dynamic>{'customer': widget.customer}
                     : <String, dynamic>{},

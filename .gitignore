@@ -27,3 +27,10 @@ app/android/key.properties
 # Serena MCP
 .serena/
 
+# Python venvs
+.venv/
+__pycache__/
+*.pyc
+
+/.localdev/
+scripts/.last-wireless-device

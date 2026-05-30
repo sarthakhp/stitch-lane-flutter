@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Connect an Android device wirelessly via ADB, with optional scrcpy mirroring."""
+
+from __future__ import annotations
+
+import os
+import sys
+
+from adbw.adb import require_tool, run
+from adbw.commands import (
+    cmd_connect,
+    cmd_disconnect,
+    cmd_help,
+    cmd_mirror,
+    cmd_pair,
+    cmd_status,
+)
+from adbw.ui import fail
+
+
+def main() -> int:
+    require_tool("adb", "brew install android-platform-tools")
+    run(["adb", "start-server"])
+
+    args = sys.argv[1:]
+    no_mirror = "--no-mirror" in args
+    args = [a for a in args if a != "--no-mirror"]
+    cmd = args[0] if args else None
+    prog = os.path.basename(sys.argv[0])
+
+    if cmd == "status":
+        return cmd_status()
+    if cmd == "disconnect":
+        return cmd_disconnect()
+    if cmd == "mirror":
+        return cmd_mirror()
+    if cmd == "pair":
+        return cmd_pair(mirror=not no_mirror)
+    if cmd in ("help", "--help", "-h"):
+        return cmd_help(prog)
+    if cmd is None:
+        return cmd_connect(mirror=not no_mirror)
+
+    fail(f"Unknown command: {cmd}")
+    cmd_help(prog)
+    return 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        print()
+        sys.exit(130)

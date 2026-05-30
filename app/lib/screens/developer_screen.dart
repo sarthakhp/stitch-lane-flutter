@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/streaming_stt_test_dialog.dart';
@@ -24,11 +26,20 @@ class DeveloperScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Surfaced first because this is the data-loss safety net —
+                // most important card for anyone debugging or recovering
+                // from a bad state.
+                const _LocalSnapshotsCard(),
+                const SizedBox(height: AppConfig.spacing24),
                 const DebugLogsCard(),
+                const SizedBox(height: AppConfig.spacing24),
+                const _AiUsageNavCard(),
                 const SizedBox(height: AppConfig.spacing24),
                 _AiModelsCard(),
                 const SizedBox(height: AppConfig.spacing24),
                 _StreamingSttTestCard(),
+                const SizedBox(height: AppConfig.spacing24),
+                const _AudioBackupsCard(),
                 const SizedBox(height: AppConfig.spacing24),
                 const _ImageIntegritySection(),
                 const SizedBox(height: AppConfig.spacing24),
@@ -42,19 +53,97 @@ class DeveloperScreen extends StatelessWidget {
   }
 }
 
+
+/// Entry-point card on the Developer screen that opens the full AI Usage &
+/// Cost dashboard. Kept on this screen (rather than in Settings) because the
+/// numbers are meaningful mostly to whoever is maintaining the app.
+class _AiUsageNavCard extends StatelessWidget {
+  const _AiUsageNavCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () =>
+            Navigator.pushNamed(context, AppConstants.aiUsageRoute),
+        child: Padding(
+          padding: const EdgeInsets.all(AppConfig.spacing16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.insights_outlined,
+                    color: cs.onPrimaryContainer),
+              ),
+              const SizedBox(width: AppConfig.spacing16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'AI Usage & Cost',
+                      style: tt.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Tokens, audio seconds, and estimated cost by feature.',
+                      style: tt.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AiModelsCard extends StatelessWidget {
   static const _chatModels = [
-    'gemini-3.1-flash-lite-preview',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
   ];
 
-  static const _voiceModels = [
+  static const _formattingModels = [
     'gemini-2.5-flash-lite',
-    'gemini-3.1-flash-lite-preview',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
+  ];
+
+  static const _sttModels = [
+    'sarvam:saaras:v3',
+    'gemini:gemini-2.5-flash-lite',
+    'gemini:gemini-3.1-flash-lite',
+    'gemini:gemini-2.5-flash',
+    'gemini:gemini-2.0-flash',
+  ];
+
+  static const _ttsSpeakers = [
+    'shubh', 'aditya', 'ritu', 'priya', 'neha', 'rahul', 'pooja',
+    'rohan', 'simran', 'kavya', 'amit', 'dev', 'ishita', 'shreya',
+    'ratan', 'varun', 'manan', 'sumit', 'roopa', 'kabir', 'aayan',
+    'ashutosh', 'advait', 'anand', 'tanya', 'tarun', 'sunny', 'mani',
+    'gokul', 'vijay', 'shruti', 'suhani', 'mohit', 'kavitha', 'rehan',
+    'soham', 'rupali',
   ];
 
   @override
@@ -78,7 +167,7 @@ class _AiModelsCard extends StatelessWidget {
                 const SizedBox(height: AppConfig.spacing16),
                 _buildDropdown(
                   context,
-                  label: 'Chat Model',
+                  label: 'AI Agent LLM',
                   value: settingsState.settings.aiChatModel,
                   items: _chatModels,
                   onChanged: (value) => _updateSetting(
@@ -89,23 +178,34 @@ class _AiModelsCard extends StatelessWidget {
                 const SizedBox(height: AppConfig.spacing12),
                 _buildDropdown(
                   context,
-                  label: 'Voice Model',
-                  value: settingsState.settings.aiVoiceModel,
-                  items: _voiceModels,
+                  label: 'Formatting LLM',
+                  value: settingsState.settings.aiFormattingModel,
+                  items: _formattingModels,
                   onChanged: (value) => _updateSetting(
                     context,
-                    settingsState.settings.copyWith(aiVoiceModel: value),
+                    settingsState.settings.copyWith(aiFormattingModel: value),
                   ),
                 ),
                 const SizedBox(height: AppConfig.spacing12),
                 _buildDropdown(
                   context,
-                  label: 'STT Provider',
-                  value: settingsState.settings.sttProvider,
-                  items: const [sttProviderGemini, sttProviderSarvam],
+                  label: 'Voice Transcription',
+                  value: settingsState.settings.sttModel,
+                  items: _sttModels,
                   onChanged: (value) => _updateSetting(
                     context,
-                    settingsState.settings.copyWith(sttProvider: value),
+                    settingsState.settings.copyWith(sttModel: value),
+                  ),
+                ),
+                const SizedBox(height: AppConfig.spacing12),
+                _buildDropdown(
+                  context,
+                  label: 'TTS Speaker',
+                  value: settingsState.settings.ttsSpeaker,
+                  items: _ttsSpeakers,
+                  onChanged: (value) => _updateSetting(
+                    context,
+                    settingsState.settings.copyWith(ttsSpeaker: value),
                   ),
                 ),
               ],
@@ -189,20 +289,31 @@ class _StreamingSttTestCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppConfig.spacing12),
-            Row(
+            Wrap(
+              spacing: AppConfig.spacing8,
+              runSpacing: AppConfig.spacing8,
               children: [
                 FilledButton.icon(
                   onPressed: () => StreamingSttTestDialog.show(context),
                   icon: const Icon(Icons.mic),
                   label: const Text('Test Streaming'),
                 ),
-                const SizedBox(width: AppConfig.spacing8),
                 FilledButton.tonalIcon(
                   onPressed: () async {
-                    final text = await StreamingVoiceBottomSheet.show(context);
-                    if (context.mounted && text != null) {
+                    final formattingModel = context.read<SettingsState>().settings.aiFormattingModel;
+                    final result = await StreamingVoiceBottomSheet.show(
+                      context,
+                      formattingModelName: formattingModel,
+                    );
+                    if (context.mounted && result != null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Got: $text')),
+                        SnackBar(
+                          content: Text(
+                            result.audioWavPath != null
+                                ? 'Got: ${result.text}\nAudio: ${result.audioWavPath}'
+                                : 'Got: ${result.text}',
+                          ),
+                        ),
                       );
                     }
                   },
@@ -211,6 +322,122 @@ class _StreamingSttTestCard extends StatelessWidget {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AudioBackupsCard extends StatefulWidget {
+  const _AudioBackupsCard();
+
+  @override
+  State<_AudioBackupsCard> createState() => _AudioBackupsCardState();
+}
+
+class _AudioBackupsCardState extends State<_AudioBackupsCard> {
+  bool _isRunning = false;
+  CleanupResult? _lastResult;
+
+  Future<void> _deleteNow() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete orphan audio now?'),
+        content: const Text(
+          'Removes every audio backup file not linked to a measurement, '
+          'ignoring the usual 30-day / 7-day grace periods. Files modified '
+          'in the last 24 hours are still skipped to avoid hitting an '
+          'active recording.\n\n'
+          'Files linked to a saved measurement are never touched.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isRunning = true);
+    final result = await AudioBackupCleanupService.runCleanup(
+      orphanedWavGrace: Duration.zero,
+      stalePcmGrace: Duration.zero,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isRunning = false;
+      _lastResult = result;
+    });
+
+    final freedMb = (result.bytesFreed / 1024 / 1024).toStringAsFixed(2);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.deleted == 0
+              ? 'No orphans to delete (kept ${result.kept})'
+              : 'Deleted ${result.deleted} files, freed ${freedMb}MB '
+                  '(kept ${result.kept})',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConfig.spacing16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.delete_sweep, color: theme.colorScheme.primary),
+                const SizedBox(width: AppConfig.spacing8),
+                Text('Audio Backups', style: theme.textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: AppConfig.spacing8),
+            Text(
+              'Voice recordings are kept on disk as a safety net. Files '
+              'linked to a measurement stay forever; orphans are normally '
+              'swept after 30 days. Use this to delete orphans immediately.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            FilledButton.tonalIcon(
+              onPressed: _isRunning ? null : _deleteNow,
+              icon: _isRunning
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              label: Text(_isRunning ? 'Cleaning…' : 'Delete orphans now'),
+            ),
+            if (_lastResult != null) ...[
+              const SizedBox(height: AppConfig.spacing8),
+              Text(
+                'Last run: kept ${_lastResult!.kept}, '
+                'deleted ${_lastResult!.deleted}, '
+                'freed ${(_lastResult!.bytesFreed / 1024 / 1024).toStringAsFixed(2)}MB',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -683,6 +910,312 @@ class _DriveSyncStatusSectionState extends State<_DriveSyncStatusSection> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Lists rotating local DB snapshots and lets you restore from one. This is
+/// the data-loss safety net — surfaced first on the Developer screen.
+///
+/// Restore flow:
+///   1. User taps Restore → confirmation dialog
+///   2. App closes the live DB handle
+///   3. Files from the snapshot are copied over the live DB position
+///   4. App shows a "Reopen app" prompt and exits
+///   5. On next launch the new files become the live DB (and a snapshot of
+///      THIS state gets taken automatically before any further migration)
+class _LocalSnapshotsCard extends StatefulWidget {
+  const _LocalSnapshotsCard();
+
+  @override
+  State<_LocalSnapshotsCard> createState() => _LocalSnapshotsCardState();
+}
+
+class _LocalSnapshotsCardState extends State<_LocalSnapshotsCard> {
+  Future<List<DbSnapshot>>? _future;
+  bool _isWorking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  void _refresh() {
+    setState(() {
+      _future = DbSnapshotService.listSnapshots();
+    });
+  }
+
+  Future<void> _snapshotNow() async {
+    setState(() => _isWorking = true);
+    final s = await DbSnapshotService.snapshotNow();
+    if (!mounted) return;
+    setState(() => _isWorking = false);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(
+      content: Text(s == null
+          ? 'Snapshot failed — see logs'
+          : 'Snapshot taken'),
+    ));
+    _refresh();
+  }
+
+  Future<void> _restore(DbSnapshot snapshot) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore from snapshot?'),
+        content: Text(
+          'This will REPLACE the current data with the snapshot from\n\n'
+          '${DateFormat('MMM d, yyyy · h:mm a').format(snapshot.takenAt)}\n\n'
+          'The app will close. Reopen it to load the restored data.\n\n'
+          'A fresh snapshot of the current state will be taken automatically '
+          'on next launch — this restore is reversible if you act quickly.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+              foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
+            ),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isWorking = true);
+
+    // Close the open DB handle so the file copy doesn't fight a lock.
+    await SqliteDatabase.close();
+    final ok = await DbSnapshotService.restoreFromSnapshot(snapshot);
+
+    if (!mounted) return;
+    setState(() => _isWorking = false);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Restore failed — see logs')),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restored'),
+        content: const Text(
+          'Files restored successfully.\n\n'
+          'Tap "Close app" and reopen to see the restored data.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => SystemNavigator.pop(),
+            child: const Text('Close app'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _delete(DbSnapshot snapshot) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete this snapshot?'),
+        content: Text(
+          'The snapshot from '
+          '${DateFormat('MMM d, h:mm a').format(snapshot.takenAt)} will be '
+          'permanently removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final ok = await DbSnapshotService.deleteSnapshot(snapshot);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Delete failed — see logs')),
+      );
+    }
+    _refresh();
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppConfig.spacing16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.shield_outlined,
+                    color: theme.colorScheme.primary),
+                const SizedBox(width: AppConfig.spacing8),
+                Expanded(
+                  child: Text('Local DB snapshots',
+                      style: theme.textTheme.titleMedium),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  tooltip: 'Refresh',
+                  onPressed: _isWorking ? null : _refresh,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppConfig.spacing4),
+            Text(
+              'Automatic snapshots of stitch_genie.db taken at app launch '
+              '(throttled to one per ${DbSnapshotService.minInterval.inMinutes} min). '
+              'Restore here if anything ever overwrites the live data.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.camera_alt_outlined, size: 18),
+              label: const Text('Snapshot now'),
+              onPressed: _isWorking ? null : _snapshotNow,
+            ),
+            const SizedBox(height: AppConfig.spacing12),
+            FutureBuilder<List<DbSnapshot>>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppConfig.spacing16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final list = snap.data ?? const <DbSnapshot>[];
+                if (list.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: AppConfig.spacing16),
+                    child: Text(
+                      'No snapshots yet — one will be taken next launch.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppConfig.spacing8),
+                      child: Text(
+                        '${list.length} of ${DbSnapshotService.maxSnapshots} · '
+                        'oldest: ${DateFormat('MMM d').format(list.last.takenAt)}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    for (final s in list)
+                      _SnapshotRow(
+                        snapshot: s,
+                        isWorking: _isWorking,
+                        sizeLabel: _formatSize(s.sizeBytes),
+                        onRestore: () => _restore(s),
+                        onDelete: () => _delete(s),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SnapshotRow extends StatelessWidget {
+  final DbSnapshot snapshot;
+  final bool isWorking;
+  final String sizeLabel;
+  final VoidCallback onRestore;
+  final VoidCallback onDelete;
+
+  const _SnapshotRow({
+    required this.snapshot,
+    required this.isWorking,
+    required this.sizeLabel,
+    required this.onRestore,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppConfig.spacing4),
+      child: Row(
+        children: [
+          Icon(Icons.history,
+              size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: AppConfig.spacing8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DateFormat('MMM d, h:mm a').format(snapshot.takenAt),
+                  style: theme.textTheme.bodyMedium,
+                ),
+                Text(
+                  sizeLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            tooltip: 'Delete snapshot',
+            onPressed: isWorking ? null : onDelete,
+          ),
+          TextButton(
+            onPressed: isWorking ? null : onRestore,
+            child: const Text('Restore'),
           ),
         ],
       ),

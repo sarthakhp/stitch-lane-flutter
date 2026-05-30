@@ -10,7 +10,7 @@ class GeminiSttProvider implements SttProvider {
   GeminiSttProvider({
     this.systemInstruction,
     this.transcriptionPrompt,
-    this.modelName = defaultAiVoiceModel,
+    this.modelName = defaultAiFormattingModel,
   });
 
   @override

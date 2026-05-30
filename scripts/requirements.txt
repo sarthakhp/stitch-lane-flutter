@@ -1,0 +1,4 @@
+# scripts/adb-wireless.py uses stdlib only.
+# Dev tooling below.
+
+ruff==0.8.4

@@ -29,6 +29,9 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
   bool _hasAttemptedSubmit = false;
   bool _hasUnsavedChanges = false;
   String _descriptionValue = '';
+  // Linked audio recording path. Starts from the existing measurement (if
+  // editing) and gets replaced any time the user does a new voice input.
+  String? _audioFilePath;
 
   bool get _isEditing => widget.measurement != null;
 
@@ -37,6 +40,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     super.initState();
     if (_isEditing) {
       _descriptionValue = widget.measurement!.description;
+      _audioFilePath = widget.measurement!.audioFilePath;
     }
   }
 
@@ -93,6 +97,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
         final updatedMeasurement = widget.measurement!.copyWith(
           description: _descriptionValue.trim(),
           modified: now,
+          audioFilePath: _audioFilePath,
         );
         await MeasurementService.updateMeasurement(state, repository, updatedMeasurement);
         if (mounted) {
@@ -110,6 +115,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
           description: _descriptionValue.trim(),
           created: now,
           modified: now,
+          audioFilePath: _audioFilePath,
         );
         await MeasurementService.addMeasurement(state, repository, newMeasurement);
         if (mounted) {
@@ -197,6 +203,14 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
                     hintText: 'Enter measurement details...',
                     onChanged: (value) {
                       _descriptionValue = value;
+                      if (!_hasUnsavedChanges) {
+                        setState(() {
+                          _hasUnsavedChanges = true;
+                        });
+                      }
+                    },
+                    onAudioRecorded: (path) {
+                      _audioFilePath = path;
                       if (!_hasUnsavedChanges) {
                         setState(() {
                           _hasUnsavedChanges = true;

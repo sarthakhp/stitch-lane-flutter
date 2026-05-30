@@ -38,11 +38,13 @@ class UiComponent {
 class AiChatMessage {
   final String text;
   final bool isUser;
+  final bool wasVoiceInput;
   final List<UiComponent> uiComponents;
 
   AiChatMessage({
     required this.text,
     required this.isUser,
+    this.wasVoiceInput = false,
     this.uiComponents = const [],
   });
 }

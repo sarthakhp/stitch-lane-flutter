@@ -27,6 +27,7 @@ dependencies:
   record: ^5.1.2
   permission_handler: ^11.0.0
   audioplayers: ^6.0.0
+  flutter_pcm_sound: ^3.3.3
   flutter_dotenv: ^6.0.0
   flutter_quill: ^11.5.0
   markdown_quill: ^4.3.0

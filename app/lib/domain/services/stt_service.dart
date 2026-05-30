@@ -4,10 +4,6 @@ import 'gemini_stt_provider.dart';
 import 'sarvam_stt_provider.dart';
 import 'stt_provider.dart';
 
-const String sttProviderGemini = 'gemini';
-const String sttProviderSarvam = 'sarvam';
-const String defaultSttProvider = sttProviderGemini;
-
 class SttService {
   static Future<String?> transcribe(
     String audioFilePath, {
@@ -28,16 +24,22 @@ class SttService {
     String? systemInstruction,
     String? transcriptionPrompt,
   }) {
-    switch (settings.sttProvider) {
-      case sttProviderSarvam:
-        return SarvamSttProvider();
-      case sttProviderGemini:
-      default:
+    final sttModel = settings.sttModel;
+    final colonIndex = sttModel.indexOf(':');
+    final providerPrefix = colonIndex > 0 ? sttModel.substring(0, colonIndex) : sttModel;
+    final modelName = colonIndex > 0 ? sttModel.substring(colonIndex + 1) : '';
+
+    switch (providerPrefix) {
+      case 'sarvam':
+        return SarvamSttProvider(model: modelName.isNotEmpty ? modelName : 'saaras:v3');
+      case 'gemini':
         return GeminiSttProvider(
           systemInstruction: systemInstruction ?? GeminiPrompts.systemInstruction,
           transcriptionPrompt: transcriptionPrompt ?? GeminiPrompts.transcriptionPrompt,
-          modelName: settings.aiVoiceModel,
+          modelName: modelName.isNotEmpty ? modelName : 'gemini-2.5-flash-lite',
         );
+      default:
+        return SarvamSttProvider();
     }
   }
 }

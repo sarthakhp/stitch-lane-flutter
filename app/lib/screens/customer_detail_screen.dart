@@ -399,7 +399,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               onPressed: () {
                                 Navigator.pushNamed(
                                   context,
-                                  AppConstants.orderFormRoute,
+                                  AppConstants.orderCreatorRoute,
                                   arguments: {'customer': customer},
                                 );
                               },

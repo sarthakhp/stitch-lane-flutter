@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown_quill/markdown_quill.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../domain/services/transcription_service.dart';
+import '../../domain/state/settings_state.dart';
 import 'streaming_voice_bottom_sheet.dart';
 
 class _DividerEmbedBuilder extends EmbedBuilder {
@@ -34,6 +36,10 @@ class _MarkdownConverter {
 class RichDescriptionInputField extends StatefulWidget {
   final String initialValue;
   final ValueChanged<String>? onChanged;
+  /// Fired whenever a voice recording completes with audio captured. The
+  /// path is to the playable .wav file. Parents that want to link audio
+  /// to a domain object (e.g. measurement) should listen and persist it.
+  final ValueChanged<String>? onAudioRecorded;
   final String labelText;
   final String hintText;
   final bool enabled;
@@ -43,6 +49,7 @@ class RichDescriptionInputField extends StatefulWidget {
     super.key,
     this.initialValue = '',
     this.onChanged,
+    this.onAudioRecorded,
     this.labelText = 'Description',
     this.hintText = 'Enter description...',
     this.enabled = true,
@@ -117,12 +124,29 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
   }
 
   Future<void> _handleVoiceInput() async {
-    final transcription = await StreamingVoiceBottomSheet.show(context);
-    if (transcription == null || transcription.isEmpty || !mounted) return;
+    final formattingModel = context.read<SettingsState>().settings.aiFormattingModel;
+    // Description fields are persisted text shown back to the user later —
+    // running the Gemini formatter is worth the extra round-trip here so
+    // punctuation, capitalization, and proper nouns come out clean. Every
+    // other voice-input path in the app feeds an LLM and skips this step.
+    final result = await StreamingVoiceBottomSheet.show(
+      context,
+      formattingModelName: formattingModel,
+      enableFormatting: true,
+    );
+    if (result == null || result.text.isEmpty || !mounted) return;
+
+    // Surface the audio backup path to any parent that wants to link the
+    // recording to a domain object. Fire BEFORE the post-processing call so
+    // even if the action-result step fails, we don't lose the audio link.
+    final audioPath = result.audioWavPath;
+    if (audioPath != null) {
+      widget.onAudioRecorded?.call(audioPath);
+    }
 
     final newText = await TranscriptionService.getActionResult(
       context: context,
-      transcription: transcription,
+      transcription: result.text,
       currentText: getMarkdown(),
     );
 

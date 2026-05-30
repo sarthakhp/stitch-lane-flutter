@@ -6,6 +6,15 @@ import 'streaming_recording_service.dart';
 import 'streaming_stt_provider.dart';
 
 class StreamingTranscriptionService {
+  // 300ms @ 16kHz, 16-bit mono = 9600 bytes. Used to warm up the server-side
+  // recognizer on connect so the first real syllable doesn't get clipped.
+  static const int _warmupSilenceBytes = 9600;
+
+  /// Optional hook for every real-mic chunk before it goes to the STT
+  /// provider. Used by the controller to write a fail-safe local recording.
+  /// Synthetic chunks (warm-up silence) are NOT passed through this hook.
+  void Function(Uint8List chunk)? onAudioChunk;
+
   StreamingRecordingService? _recorder;
   StreamingSttProvider? _provider;
   StreamSubscription<Uint8List>? _audioSubscription;
@@ -40,6 +49,9 @@ class StreamingTranscriptionService {
     try {
       await _provider!.connect();
 
+      // Warm up the server-side recognizer before real mic audio arrives.
+      _provider!.sendAudio(Uint8List(_warmupSilenceBytes));
+
       _transcriptSubscription = _provider!.transcripts.listen((transcript) {
         if (transcript.text.isNotEmpty) {
           if (transcript.isFinal) {
@@ -58,6 +70,13 @@ class StreamingTranscriptionService {
 
       final audioStream = await _recorder!.startStream();
       _audioSubscription = audioStream.listen((chunk) {
+        // Backup FIRST, before anything that can throw or drop the chunk.
+        // The local recording is our last-resort safety net for the user.
+        try {
+          onAudioChunk?.call(chunk);
+        } catch (e) {
+          AppLogger.error('StreamingTranscription: onAudioChunk hook threw', e);
+        }
         _provider?.sendAudio(chunk);
       });
 

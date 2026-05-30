@@ -5,6 +5,8 @@ import 'package:googleai_dart/googleai_dart.dart' hide File;
 import '../../constants/gemini_prompts.dart';
 import '../../utils/app_logger.dart';
 import 'ai_chat_config.dart';
+import 'ai_gateway/ai_gateway.dart';
+import 'ai_gateway/usage_event.dart';
 
 class GeminiService {
   static GoogleAIClient? _client;
@@ -26,6 +28,20 @@ class GeminiService {
     return _client!;
   }
 
+  /// Pick the right MIME type for the inline audio blob. Gemini's
+  /// generateContent rejects requests whose declared mimeType doesn't match
+  /// the actual bytes — historically this method hardcoded audio/m4a which
+  /// broke the WAV files coming out of the streaming voice input pipeline.
+  static String _mimeForAudioPath(String path) {
+    final lower = path.toLowerCase();
+    if (lower.endsWith('.wav')) return 'audio/wav';
+    if (lower.endsWith('.mp3')) return 'audio/mp3';
+    if (lower.endsWith('.aac')) return 'audio/aac';
+    if (lower.endsWith('.flac')) return 'audio/flac';
+    if (lower.endsWith('.ogg')) return 'audio/ogg';
+    return 'audio/m4a';
+  }
+
   static GenerationConfig _buildGenerationConfig(String modelName) {
     if (modelName.startsWith('gemini-3')) {
       AppLogger.info('GenerationConfig: model=$modelName, thinkingLevel=MINIMAL');
@@ -43,7 +59,7 @@ class GeminiService {
     String audioFilePath, {
     String? systemInstruction,
     String? transcriptionPrompt,
-    String modelName = defaultAiVoiceModel,
+    String modelName = defaultAiFormattingModel,
   }) async {
     try {
       AppLogger.info('Starting audio transcription for: $audioFilePath');
@@ -63,8 +79,10 @@ class GeminiService {
       final system = systemInstruction ?? GeminiPrompts.systemInstruction;
       final prompt = transcriptionPrompt ?? GeminiPrompts.transcriptionPrompt;
 
-      final response = await client.models.generateContent(
-        model: modelName,
+      final mimeType = _mimeForAudioPath(audioFilePath);
+      final response = await _generateContentWithRecording(
+        client: client,
+        modelName: modelName,
         request: GenerateContentRequest(
           systemInstruction: Content(
             parts: [TextPart(system)],
@@ -72,11 +90,13 @@ class GeminiService {
           contents: [
             Content.user([
               TextPart(prompt),
-              InlineDataPart(Blob(mimeType: 'audio/m4a', data: audioBase64)),
+              InlineDataPart(Blob(mimeType: mimeType, data: audioBase64)),
             ]),
           ],
           generationConfig: _buildGenerationConfig(modelName),
         ),
+        callerTag: UsageCallerTags.transcription,
+        kind: UsageKind.multimodal,
       );
 
       final transcription = response.text;
@@ -102,8 +122,9 @@ class GeminiService {
     String rawText, {
     String? systemInstruction,
     String? formattingPrompt,
-    String modelName = defaultAiVoiceModel,
+    String? modelName,
   }) async {
+    modelName ??= defaultAiFormattingModel;
     try {
       AppLogger.info('Formatting transcription (${rawText.length} chars)');
       AppLogger.info('Formatting INPUT:\n$rawText');
@@ -112,8 +133,9 @@ class GeminiService {
       final system = systemInstruction ?? GeminiPrompts.formattingSystemInstruction;
       final prompt = formattingPrompt ?? GeminiPrompts.formattingPrompt;
 
-      final response = await client.models.generateContent(
-        model: modelName,
+      final response = await _generateContentWithRecording(
+        client: client,
+        modelName: modelName,
         request: GenerateContentRequest(
           systemInstruction: Content(
             parts: [TextPart(system)],
@@ -125,6 +147,8 @@ class GeminiService {
           ],
           generationConfig: _buildGenerationConfig(modelName),
         ),
+        callerTag: UsageCallerTags.transcriptFormat,
+        kind: UsageKind.chat,
       );
 
       final formatted = response.text;
@@ -142,6 +166,52 @@ class GeminiService {
     } catch (e) {
       AppLogger.error('Formatting failed', e);
       throw Exception('Formatting failed: $e');
+    }
+  }
+
+  /// Wraps a `client.models.generateContent` call with a stopwatch and emits
+  /// a [UsageEvent] on both success and failure (then rethrows). Token counts
+  /// are extracted from the `usageMetadata` field of [googleai_dart]'s
+  /// `GenerateContentResponse`, normalized to nullable ints — the gateway's
+  /// pricing path handles missing values.
+  static Future<GenerateContentResponse> _generateContentWithRecording({
+    required GoogleAIClient client,
+    required String modelName,
+    required GenerateContentRequest request,
+    required String callerTag,
+    required UsageKind kind,
+  }) async {
+    final sw = Stopwatch()..start();
+    try {
+      final response = await client.models.generateContent(
+        model: modelName,
+        request: request,
+      );
+      sw.stop();
+      final u = response.usageMetadata;
+      await AiGateway.instance.recorder.recordCall(
+        callerTag: callerTag,
+        provider: UsageProvider.gemini,
+        model: modelName,
+        kind: kind,
+        inputTokens: u?.promptTokenCount,
+        outputTokens: u?.candidatesTokenCount,
+        totalTokens: u?.totalTokenCount,
+        durationMs: sw.elapsedMilliseconds,
+      );
+      return response;
+    } catch (e) {
+      sw.stop();
+      final code = e is SocketException ? 'network' : 'error';
+      await AiGateway.instance.recorder.recordCall(
+        callerTag: callerTag,
+        provider: UsageProvider.gemini,
+        model: modelName,
+        kind: kind,
+        durationMs: sw.elapsedMilliseconds,
+        errorCode: code,
+      );
+      rethrow;
     }
   }
 }

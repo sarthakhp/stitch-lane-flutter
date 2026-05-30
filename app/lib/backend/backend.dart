@@ -1,3 +1,4 @@
+export 'database/db_snapshot_service.dart';
 export 'models/index.dart';
 export 'models/app_settings.dart';
 export 'models/measurement.dart';
@@ -10,5 +11,6 @@ export 'repositories/sqlite_measurement_repository.dart';
 export 'repositories/settings_repository.dart';
 export 'repositories/sqlite_settings_repository.dart';
 export 'repositories/repository_factory.dart';
+export 'repositories/ai_usage_repository.dart';
 export 'database/database_service.dart';
 export 'database/sqlite_database.dart';

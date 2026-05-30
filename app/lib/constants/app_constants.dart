@@ -15,6 +15,7 @@ class AppConstants {
   static const String allOrdersListRoute = '/orders';
   static const String orderDetailRoute = '/order/detail';
   static const String orderFormRoute = '/order/form';
+  static const String orderCreatorRoute = '/order/create';
   static const String measurementsListRoute = '/customer/measurements';
   static const String measurementDetailRoute = '/measurement/detail';
   static const String measurementFormRoute = '/measurement/form';
@@ -22,7 +23,9 @@ class AppConstants {
   static const String notificationSettingsRoute = '/settings/notifications';
   static const String backupSettingsRoute = '/backup-settings';
   static const String developerRoute = '/developer';
+  static const String aiUsageRoute = '/ai-usage';
 	  static const String businessAnalysisRoute = '/business-analysis';
+	  static const String monthDetailRoute = '/business-analysis/month';
   static const String aiAssistantRoute = '/ai-assistant';
 }
 

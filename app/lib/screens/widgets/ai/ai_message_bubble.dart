@@ -5,13 +5,16 @@ import '../../../backend/backend.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/services/ai_chat_models.dart';
+import '../../../domain/services/tts_service.dart';
+import '../../../domain/state/settings_state.dart';
 import '../../../utils/app_logger.dart';
 import 'ai_component_card.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final AiChatMessage message;
+  final TtsService? ttsService;
 
-  const AiMessageBubble({super.key, required this.message});
+  const AiMessageBubble({super.key, required this.message, this.ttsService});
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +95,7 @@ class AiMessageBubble extends StatelessWidget {
       children: [
         if (isUser)
           Align(alignment: Alignment.centerRight, child: bubble)
-        else
+        else ...[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -108,6 +111,13 @@ class AiMessageBubble extends StatelessWidget {
               Flexible(child: bubble),
             ],
           ),
+          if (ttsService != null)
+            _TtsPlayButton(
+              text: message.text,
+              ttsService: ttsService!,
+              colorScheme: colorScheme,
+            ),
+        ],
         if (customers.isNotEmpty)
           _buildLabeledCarousel(
             context,
@@ -158,7 +168,7 @@ class AiMessageBubble extends StatelessWidget {
     );
   }
 
-  Future<void> _navigateToComponent(BuildContext context, UiComponent component) async {
+  void _navigateToComponent(BuildContext context, UiComponent component) async {
     try {
       final customerRepo = context.read<CustomerRepository>();
 
@@ -183,5 +193,80 @@ class AiMessageBubble extends StatelessWidget {
     } catch (e) {
       AppLogger.error('Failed to navigate to ${component.type}', e);
     }
+  }
+}
+
+class _TtsPlayButton extends StatelessWidget {
+  final String text;
+  final TtsService ttsService;
+  final ColorScheme colorScheme;
+
+  const _TtsPlayButton({
+    required this.text,
+    required this.ttsService,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: 16.0 + AppConfig.spacing4,
+        top: 2,
+      ),
+      child: StreamBuilder<TtsPlaybackState>(
+        stream: ttsService.stateChanges,
+        builder: (context, snapshot) {
+          final isThisPlaying = ttsService.isActive && ttsService.currentText == text;
+          final isBuffering = isThisPlaying && snapshot.data == TtsPlaybackState.buffering;
+          final isConnecting = isThisPlaying && snapshot.data == TtsPlaybackState.connecting;
+
+          return SizedBox(
+            height: 28,
+            child: InkWell(
+              onTap: () {
+                if (isThisPlaying) {
+                  ttsService.stop();
+                } else {
+                  final speaker = context.read<SettingsState>().settings.ttsSpeaker;
+                  ttsService.speak(text, speaker: speaker);
+                }
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isConnecting || isBuffering)
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: colorScheme.primary,
+                        ),
+                      )
+                    else
+                      Icon(
+                        isThisPlaying ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
+                        size: 16,
+                        color: isThisPlaying ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isThisPlaying ? 'Stop' : 'Play',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: isThisPlaying ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

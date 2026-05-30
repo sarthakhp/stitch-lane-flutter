@@ -95,7 +95,12 @@ class AiChatService {
     ];
 
     try {
-      final result = await AiExecutor.run(_model!, history, systemPrompt: systemPrompt);
+      final result = await AiExecutor.run(
+        _model!,
+        history,
+        modelName: modelName,
+        systemPrompt: systemPrompt,
+      );
 
       final enriched = await _enrichComponents(
         result.uiComponents,

@@ -4,9 +4,9 @@ import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
+import '../domain/services/tts_service.dart';
 import '../domain/state/settings_state.dart';
 import '../presentation/presentation.dart';
-import 'widgets/ai/ai_input_area.dart';
 import 'widgets/ai/ai_message_bubble.dart';
 import 'widgets/ai/ai_typing_indicator.dart';
 import 'widgets/ai/ai_welcome_view.dart';
@@ -20,6 +20,7 @@ class AiAssistantScreen extends StatefulWidget {
 
 class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _chatService = AiChatService();
+  final _ttsService = TtsService();
   final _messages = <AiChatMessage>[];
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
@@ -46,28 +47,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _ttsService.dispose();
     _chatService.dispose();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendMessage(String text) async {
+  Future<void> _sendMessage(String text, {bool wasVoiceInput = false}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isLoading) return;
 
+    if (_ttsService.isActive) _ttsService.stop();
+
     _inputController.clear();
     setState(() {
-      _messages.add(AiChatMessage(text: trimmed, isUser: true));
+      _messages.add(AiChatMessage(text: trimmed, isUser: true, wasVoiceInput: wasVoiceInput));
       _isLoading = true;
     });
     _scrollToBottom();
 
+    final settings = context.read<SettingsState>().settings;
     final response = await _chatService.sendMessage(
       trimmed,
       customerRepo: context.read<CustomerRepository>(),
       orderRepo: context.read<OrderRepository>(),
-      modelName: context.read<SettingsState>().settings.aiChatModel,
+      modelName: settings.aiChatModel,
     );
 
     if (mounted) {
@@ -75,16 +80,22 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _messages.add(AiChatMessage(
           text: response.text,
           isUser: false,
+          wasVoiceInput: wasVoiceInput,
           uiComponents: response.uiComponents,
         ));
         _isLoading = false;
       });
       await _chatService.saveChat();
       _scrollToBottom();
+
+      if (wasVoiceInput && response.text.isNotEmpty) {
+        _ttsService.speak(response.text, speaker: settings.ttsSpeaker);
+      }
     }
   }
 
   Future<void> _startNewChat() async {
+    await _ttsService.stop();
     await _chatService.clearChat();
     if (mounted) {
       setState(() {
@@ -163,7 +174,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         if (index == _messages.length) {
           return const AiTypingIndicator();
         }
-        final bubble = AiMessageBubble(message: _messages[index]);
+        final bubble = AiMessageBubble(message: _messages[index], ttsService: _ttsService);
         final isLastMessage = index == _messages.length - 1;
         if (!isLastMessage) return bubble;
         return TweenAnimationBuilder<double>(

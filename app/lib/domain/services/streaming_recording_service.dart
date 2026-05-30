@@ -20,13 +20,20 @@ class StreamingRecordingService {
       throw Exception('Microphone permission denied');
     }
 
-    AppLogger.info('StreamingRecorder: starting PCM stream at 16kHz');
+    AppLogger.info('StreamingRecorder: starting PCM stream at 16kHz (VOICE_RECOGNITION source)');
 
     final stream = await _recorder.startStream(
       const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        // VOICE_RECOGNITION routes through the device's audio HAL, which on
+        // most modern Androids enables multi-mic beamforming + NS + AGC tuned
+        // for speech. Big WER win vs the default MIC source on far-field /
+        // phone-on-table scenarios.
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceRecognition,
+        ),
       ),
     );
 

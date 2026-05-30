@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
+import '../utils/app_logger.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/confirmation_dialog.dart';
 
@@ -74,6 +75,124 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
     final orderRepository = context.read<OrderRepository>();
     final measurementRepository = context.read<MeasurementRepository>();
     final settingsRepository = context.read<SettingsRepository>();
+
+    // ── SAFETY: confirm + snapshot before any restore ──
+    //
+    // We hit a real production data-loss event from this code path: the user
+    // had ~24h of unbacked-up local data that got silently overwritten when
+    // a sign-in flow ran this restore. So we now:
+    //   1. Read the LIVE local counts and show them in the confirmation
+    //   2. Warn prominently if the local DB has non-zero data
+    //   3. Take a local snapshot (DbSnapshotService) before overwriting so
+    //      the user can always roll back via the Developer screen
+    int localCustomers = 0, localOrders = 0, localMeasurements = 0;
+    try {
+      localCustomers = (await customerRepository.getAllCustomers()).length;
+      localOrders = (await orderRepository.getAllOrders()).length;
+      localMeasurements = (await measurementRepository.getAllMeasurements()).length;
+    } catch (e) {
+      AppLogger.warning('BackupRestoreCheckScreen: failed to read local counts: $e');
+    }
+    if (!mounted) return;
+
+    final hasLocalData =
+        localCustomers + localOrders + localMeasurements > 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: const Text('Restore from Drive backup?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This will replace your current local data with the Drive '
+                'backup. Anything in the local DB that is newer than the '
+                'backup will be overwritten.',
+              ),
+              const SizedBox(height: AppConfig.spacing12),
+              Text(
+                'Current local data on this device:',
+                style: theme.textTheme.labelMedium,
+              ),
+              const SizedBox(height: AppConfig.spacing4),
+              Text('  • Customers: $localCustomers'),
+              Text('  • Orders: $localOrders'),
+              Text('  • Measurements: $localMeasurements'),
+              const SizedBox(height: AppConfig.spacing12),
+              if (hasLocalData)
+                Container(
+                  padding: const EdgeInsets.all(AppConfig.spacing8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_outlined,
+                          size: 18, color: theme.colorScheme.error),
+                      const SizedBox(width: AppConfig.spacing8),
+                      Expanded(
+                        child: Text(
+                          'You already have local data. If it is newer than '
+                          'the backup, restoring will lose it.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppConfig.spacing12),
+              Text(
+                'A local snapshot will be taken before restoring so you can '
+                'roll back from the Developer screen if needed.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: hasLocalData
+                  ? FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.errorContainer,
+                      foregroundColor: theme.colorScheme.onErrorContainer,
+                    )
+                  : null,
+              child: Text(hasLocalData ? 'Overwrite & restore' : 'Restore'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // Take the safety snapshot. Forced (ignores throttle) so it always runs
+    // regardless of when the last automatic snapshot happened.
+    final snapshot = await DbSnapshotService.snapshotNow();
+    if (snapshot == null) {
+      AppLogger.warning(
+        'BackupRestoreCheckScreen: pre-restore snapshot failed — restore continues',
+      );
+    } else {
+      AppLogger.info(
+        'BackupRestoreCheckScreen: pre-restore snapshot saved at ${snapshot.dir.path}',
+      );
+    }
+    if (!mounted) return;
 
     try {
       backupState.setLoading(true);
