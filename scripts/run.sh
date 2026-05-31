@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
 #
-# run.sh — `flutter run` against the phone over WiFi, with zero device fiddling.
+# run.sh — `flutter run` against the phone, with zero device fiddling.
 #
 # Resolution order (first that works wins):
-#   1. A wireless device already in 'device' state            -> use it
-#   2. The cached IP from a previous run (adb connect)         -> use it
-#   3. A USB device: read its WiFi IP, switch to tcpip, connect -> use it, cache IP
+#   1. A healthy USB device                                     -> use it (fast)
+#   2. A wireless device already in 'device' state              -> use it
+#   3. The cached IP from a previous run (adb connect)          -> use it
+#   4. A USB device: read its WiFi IP, switch to tcpip, connect -> use it, cache IP
 #
-# After step 3 happens once, every later run is pure WiFi (step 2) — no cable,
-# no 'authorizing' dance. Any extra args are passed straight to flutter run:
+# USB is preferred when present because installs and hot reload are faster and
+# the link is more stable. To avoid the dual-transport hang (USB + WiFi bound to
+# the same device confusing adb), picking USB disconnects any wireless duplicate.
 #
-#   ./scripts/run.sh                 # debug
+# Some devices (e.g. ColorOS / OPPO) block USB installs behind an "Install via
+# USB" toggle — there, force wireless with WIFI=1, which sidesteps that path.
+#
+# Any extra args are passed straight to flutter run:
+#
+#   ./scripts/run.sh                 # debug, USB-first
+#   WIFI=1 ./scripts/run.sh          # force wireless (skip USB)
 #   ./scripts/run.sh --release       # release
 #   ./scripts/run.sh -t lib/foo.dart # custom entrypoint
 #
 # Env:
 #   PORT       adb tcp port (default 5555)
+#   WIFI=1     skip the USB fast path, resolve a wireless device
 #   SNAPSHOT=1 pull a DB snapshot off the phone before running (data safety)
 
 set -uo pipefail
@@ -53,6 +62,15 @@ first_usb_ready() {
         [[ -z "$serial" ]] && continue
         is_wireless "$serial" && continue
         [[ "$state" == "device" ]] && { echo "$serial"; return; }
+    done < <(_rows)
+}
+
+# Every wireless serial currently attached (any state) — used to drop
+# duplicates when we commit to USB, so adb isn't juggling two transports.
+all_wireless_serials() {
+    while IFS=$'\t' read -r serial state; do
+        [[ -z "$serial" ]] && continue
+        is_wireless "$serial" && echo "$serial"
     done < <(_rows)
 }
 
@@ -95,19 +113,46 @@ is_responsive() {
 }
 
 SERIAL=""
+FORCE_WIFI="${WIFI:-0}"
 
-step "1. Looking for an existing wireless device"
-SERIAL="$(first_wireless_ready)"
-if [[ -n "$SERIAL" ]] && is_responsive "$SERIAL"; then
-    ok "Using wireless device: $SERIAL"
+if [[ "$FORCE_WIFI" != "1" ]]; then
+    step "1. Looking for a USB device (fast path)"
+    usb="$(first_usb_ready)"
+    if [[ -n "$usb" ]] && is_responsive "$usb"; then
+        ok "Using USB device: $usb"
+        # Drop any wireless transport to the same device — having both bound at
+        # once is what makes adb installs hang mid-transfer.
+        dupes="$(all_wireless_serials)"
+        if [[ -n "$dupes" ]]; then
+            warn "Disconnecting wireless duplicate(s) to avoid dual-transport hangs:"
+            while IFS= read -r w; do
+                [[ -z "$w" ]] && continue
+                info "  adb disconnect $w"
+                adb disconnect "$w" &>/dev/null || true
+            done <<< "$dupes"
+        fi
+        SERIAL="$usb"
+    else
+        info "No healthy USB device — falling back to wireless."
+    fi
 else
-    SERIAL=""
+    info "WIFI=1 set — skipping USB, resolving a wireless device."
+fi
+
+if [[ -z "$SERIAL" ]]; then
+    step "2. Looking for an existing wireless device"
+    SERIAL="$(first_wireless_ready)"
+    if [[ -n "$SERIAL" ]] && is_responsive "$SERIAL"; then
+        ok "Using wireless device: $SERIAL"
+    else
+        SERIAL=""
+    fi
 fi
 
 if [[ -z "$SERIAL" && -f "$CACHE_FILE" ]]; then
     cached="$(cat "$CACHE_FILE" 2>/dev/null)"
     if [[ -n "$cached" ]]; then
-        step "2. Reconnecting to cached device ($cached)"
+        step "3. Reconnecting to cached device ($cached)"
         adb connect "$cached" &>/dev/null || true
         sleep 1
         if is_responsive "$cached"; then
@@ -120,7 +165,7 @@ if [[ -z "$SERIAL" && -f "$CACHE_FILE" ]]; then
 fi
 
 if [[ -z "$SERIAL" ]]; then
-    step "3. Bootstrapping wireless from USB"
+    step "4. Bootstrapping wireless from USB"
     usb="$(first_usb_ready)"
     if [[ -z "$usb" ]]; then
         fail "No wireless or USB device available."
