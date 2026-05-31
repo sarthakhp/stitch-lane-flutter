@@ -131,6 +131,7 @@ class HomeTab extends StatelessWidget {
 
   List<Widget> _summaryCards(BuildContext context, HomeStats stats) {
     final colorScheme = Theme.of(context).colorScheme;
+    final vertical = context.isTablet;
     return [
       SummaryCard(
         icon: Icons.pending_actions,
@@ -138,6 +139,7 @@ class HomeTab extends StatelessWidget {
         label: 'Pending Orders',
         containerColor: colorScheme.errorContainer,
         contentColor: colorScheme.onErrorContainer,
+        vertical: vertical,
         onTap: () => context
             .read<MainShellState>()
             .switchToOrdersTab(filter: FilterPreset.allPending()),
@@ -148,6 +150,7 @@ class HomeTab extends StatelessWidget {
         label: 'Customers Pending',
         containerColor: colorScheme.tertiaryContainer,
         contentColor: colorScheme.onTertiaryContainer,
+        vertical: vertical,
         onTap: () => context
             .read<MainShellState>()
             .switchToCustomersTab(filter: CustomerFilterPreset.pending()),
@@ -158,6 +161,7 @@ class HomeTab extends StatelessWidget {
         label: 'Unpaid Amount',
         containerColor: colorScheme.secondaryContainer,
         contentColor: colorScheme.onSecondaryContainer,
+        vertical: vertical,
         onTap: () => context
             .read<MainShellState>()
             .switchToOrdersTab(filter: FilterPreset.unpaid()),

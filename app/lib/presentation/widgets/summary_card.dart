@@ -9,6 +9,10 @@ class SummaryCard extends StatelessWidget {
   final Color contentColor;
   final VoidCallback onTap;
 
+  /// Stack the content vertically (icon → value → label) for narrow KPI tiles
+  /// in a tablet row. Defaults to the horizontal bar used full-width on phones.
+  final bool vertical;
+
   const SummaryCard({
     super.key,
     required this.icon,
@@ -17,9 +21,9 @@ class SummaryCard extends StatelessWidget {
     required this.containerColor,
     required this.contentColor,
     required this.onTap,
+    this.vertical = false,
   });
 
-  @override
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -35,17 +39,7 @@ class SummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
         child: Padding(
           padding: const EdgeInsets.all(AppConfig.spacing16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // Narrow (a KPI tile in a tablet row) -> stack vertically so the
-              // label gets the full card width and wraps on words, not letters.
-              // Wide (a full-width bar on a phone) -> the classic horizontal row.
-              final vertical = constraints.maxWidth < 240;
-              return vertical
-                  ? _buildVertical(theme)
-                  : _buildHorizontal(theme);
-            },
-          ),
+          child: vertical ? _buildVertical(theme) : _buildHorizontal(theme),
         ),
       ),
     );
@@ -126,4 +120,3 @@ class SummaryCard extends StatelessWidget {
     );
   }
 }
-
