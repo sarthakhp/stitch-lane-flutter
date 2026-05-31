@@ -20,6 +20,7 @@ class SummaryCard extends StatelessWidget {
   });
 
   @override
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -34,22 +35,61 @@ class SummaryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
         child: Padding(
           padding: const EdgeInsets.all(AppConfig.spacing16),
-          child: Row(
-            children: [
-              _buildIconContainer(),
-              const SizedBox(width: AppConfig.spacing16),
-              Expanded(
-                child: _buildContent(theme),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: contentColor.withValues(alpha: 0.5),
-                size: 20,
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Narrow (a KPI tile in a tablet row) -> stack vertically so the
+              // label gets the full card width and wraps on words, not letters.
+              // Wide (a full-width bar on a phone) -> the classic horizontal row.
+              final vertical = constraints.maxWidth < 240;
+              return vertical
+                  ? _buildVertical(theme)
+                  : _buildHorizontal(theme);
+            },
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHorizontal(ThemeData theme) {
+    return Row(
+      children: [
+        _buildIconContainer(),
+        const SizedBox(width: AppConfig.spacing16),
+        Expanded(child: _buildContent(theme)),
+        Icon(
+          Icons.chevron_right,
+          color: contentColor.withValues(alpha: 0.5),
+          size: 20,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVertical(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildIconContainer(),
+        const SizedBox(height: AppConfig.spacing12),
+        Text(
+          value,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            color: contentColor,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: AppConfig.spacing4),
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: contentColor.withValues(alpha: 0.85),
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 

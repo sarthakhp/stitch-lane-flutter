@@ -1,4 +1,6 @@
 export 'backup_flow.dart';
+export 'responsive/breakpoints.dart';
+export 'widgets/home/needs_attention_panel.dart';
 export 'widgets/analytics/kpi_card.dart';
 export 'widgets/analytics/kpi_grid.dart';
 export 'widgets/analytics/month_tile.dart';
