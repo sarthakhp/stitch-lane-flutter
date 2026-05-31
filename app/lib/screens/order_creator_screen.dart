@@ -18,7 +18,16 @@ class OrderCreatorScreen extends StatefulWidget {
   /// detail screen) pass this to skip the picker step.
   final Customer? initialCustomer;
 
-  const OrderCreatorScreen({super.key, this.initialCustomer});
+  /// Auto-start the voice dump once a customer is selected. Used by the
+  /// home-screen widget deep link. We wait for a customer (can't record an
+  /// order with no one to attach it to) then pop the mic automatically.
+  final bool autoStartVoice;
+
+  const OrderCreatorScreen({
+    super.key,
+    this.initialCustomer,
+    this.autoStartVoice = false,
+  });
 
   @override
   State<OrderCreatorScreen> createState() => _OrderCreatorScreenState();
@@ -44,6 +53,18 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
       _controller.selectCustomer(widget.initialCustomer!);
     }
     _controller.addListener(_onPhaseChanged);
+    // If we already have a customer (deep link with one, or detail-screen
+    // entry), kick off the mic after first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutoStartVoice());
+  }
+
+  bool _autoVoiceFired = false;
+
+  void _maybeAutoStartVoice() {
+    if (!widget.autoStartVoice || _autoVoiceFired) return;
+    if (_controller.phase != CreatorPhase.ready) return;
+    _autoVoiceFired = true;
+    _recordInitialDump();
   }
 
   @override
@@ -57,6 +78,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
   /// Pops back to the previous screen on a successful commit so the tailor
   /// lands in the orders list with the new entries already visible.
   void _onPhaseChanged() {
+    _maybeAutoStartVoice();
     if (_controller.phase == CreatorPhase.done && mounted) {
       final count = _controller.savedOrders?.length ?? 0;
       Navigator.of(context).pop();

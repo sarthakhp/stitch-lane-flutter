@@ -115,6 +115,7 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => OrderCreatorScreen(
             initialCustomer: args?['customer'] as Customer?,
+            autoStartVoice: args?['autoStartVoice'] as bool? ?? false,
           ),
         );
 
@@ -194,8 +195,11 @@ class AppRoutes {
         );
 
       case AppConstants.aiAssistantRoute:
+        final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
-          builder: (_) => const AiAssistantScreen(),
+          builder: (_) => AiAssistantScreen(
+            autoStartVoice: args?['autoStartVoice'] as bool? ?? false,
+          ),
         );
 
       default:

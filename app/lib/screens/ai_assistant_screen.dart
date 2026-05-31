@@ -12,7 +12,11 @@ import 'widgets/ai/ai_typing_indicator.dart';
 import 'widgets/ai/ai_welcome_view.dart';
 
 class AiAssistantScreen extends StatefulWidget {
-  const AiAssistantScreen({super.key});
+  /// When true the chat opens with the mic already listening. Used by the
+  /// home-screen widget deep link.
+  final bool autoStartVoice;
+
+  const AiAssistantScreen({super.key, this.autoStartVoice = false});
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -155,6 +159,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             controller: _inputController,
             isLoading: _isLoading,
             onSend: _sendMessage,
+            autoStartVoice: widget.autoStartVoice,
           ),
         ],
       ),

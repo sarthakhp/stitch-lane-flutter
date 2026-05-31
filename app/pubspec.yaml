@@ -26,6 +26,7 @@ dependencies:
   http: ^1.2.0
   record: ^5.1.2
   permission_handler: ^11.0.0
+  home_widget: ^0.7.0
   audioplayers: ^6.0.0
   flutter_pcm_sound: ^3.3.3
   flutter_dotenv: ^6.0.0

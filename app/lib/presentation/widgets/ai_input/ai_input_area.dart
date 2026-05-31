@@ -30,6 +30,10 @@ class AiInputArea extends StatefulWidget {
   /// chat-style "Ask anything..." prompt.
   final String? hintText;
 
+  /// Open directly in voice mode (mic listening) on first build. Used by the
+  /// home-screen widget deep link so the mother taps once and starts talking.
+  final bool autoStartVoice;
+
   const AiInputArea({
     super.key,
     required this.controller,
@@ -37,6 +41,7 @@ class AiInputArea extends StatefulWidget {
     required this.onSend,
     this.enableFormatting = false,
     this.hintText,
+    this.autoStartVoice = false,
   });
 
   @override
@@ -45,6 +50,12 @@ class AiInputArea extends StatefulWidget {
 
 class _AiInputAreaState extends State<AiInputArea> {
   bool _isVoiceActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isVoiceActive = widget.autoStartVoice;
+  }
 
   void _handleVoiceDone(VoiceInputResult result) {
     setState(() => _isVoiceActive = false);

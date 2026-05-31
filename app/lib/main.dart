@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:workmanager/workmanager.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
+import 'domain/services/home_widget_service.dart';
 import 'screens/app_root.dart';
 import 'utils/app_logger.dart';
 import 'utils/startup_tracker.dart';
@@ -63,6 +64,11 @@ void main() async {
   // isolate can route tasks correctly. This takes ~16ms and is required.
   await BackgroundTaskDispatcher.initialize(callbackDispatcher);
   StartupTracker.instance.mark('workmanager_initialized');
+
+  // Capture any home-screen widget launch action before the first frame so it
+  // can be dispatched once the authenticated shell mounts.
+  await HomeWidgetService.instance.init();
+  StartupTracker.instance.mark('home_widget_initialized');
 
   runApp(const StitchGenieApp());
   StartupTracker.instance.mark('runapp_returned');
