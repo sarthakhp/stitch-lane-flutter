@@ -42,6 +42,13 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Nothing to lose, nothing to warn about. A brand-new account (no
+    // customers, no orders) shouldn't be nagged to back up empty data — the
+    // nudge appears the moment real data exists.
+    final hasData = context.watch<OrderState>().orders.isNotEmpty ||
+        context.watch<CustomerState>().customers.isNotEmpty;
+    if (!hasData) return const SizedBox.shrink();
+
     return Consumer<SettingsState>(
       builder: (context, state, _) {
         final last = state.lastBackupTime;
