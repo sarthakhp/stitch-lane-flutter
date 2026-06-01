@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../backend/repositories/order_repository.dart';
 import '../backend/repositories/customer_repository.dart';
 import '../constants/app_constants.dart';
-import '../domain/services/home_widget_service.dart';
 import '../domain/services/notification_router.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/customer_service.dart';
@@ -43,15 +42,11 @@ class _MainShellScreenState extends State<MainShellScreen>
       _loadInitialData();
       _requestPermissions();
       _processNotificationsWhenReady();
-      // Shell is on screen and authenticated — safe to dispatch any pending
-      // home-screen widget deep link now.
-      HomeWidgetService.instance.notifyShellReady();
     });
   }
 
   @override
   void dispose() {
-    HomeWidgetService.instance.notifyShellGone();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

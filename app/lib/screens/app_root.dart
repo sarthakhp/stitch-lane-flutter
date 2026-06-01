@@ -8,12 +8,13 @@ import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 import '../config/routes.dart';
 import '../domain/domain.dart';
+import '../domain/services/home_widget/home_widget_service.dart';
 import '../main.dart' show navigatorKey, routeObserver;
 import '../utils/app_logger.dart';
 import '../utils/startup_tracker.dart';
 import '../utils/startup_orchestrator.dart';
+import 'home_shell_host.dart';
 import 'login_screen.dart';
-import 'main_shell_screen.dart';
 import 'backup_restore_check_screen.dart';
 import 'widgets/app_logo.dart';
 
@@ -63,7 +64,16 @@ class AppRoot extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const _AppRootHome(),
+      // No `home:` — it can't coexist with onGenerateInitialRoutes. The
+      // home-screen widget launches us with a `stitchgenie://...` data URI,
+      // which the engine hands over as the platform default route name. Without
+      // overriding initial-route generation, MaterialApp tries to match it as a
+      // named route on cold start and shows "Route not found". We ignore the
+      // initial deep link here — HomeWidgetService captures it separately and
+      // dispatches it once the authenticated shell is mounted — and always boot
+      // into the app root.
+      onGenerateInitialRoutes: (_) =>
+          [MaterialPageRoute(builder: (_) => const _AppRootHome())],
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }
@@ -90,6 +100,10 @@ class _AppRootHomeState extends State<_AppRootHome> {
   void initState() {
     super.initState();
     StartupTracker.instance.markOnce('app_root_home_init');
+    // Read any cold-start widget launch now (during the splash, while the
+    // isolate is idle awaiting Firebase) so the action is known before auth
+    // resolves — that's what lets the shell skip the dashboard build.
+    HomeWidgetService.instance.captureInitialLaunch();
     _boot();
   }
 
@@ -232,6 +246,7 @@ class _AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<_AuthGate> {
   int _refreshKey = 0;
+  bool _widgetDispatchScheduled = false;
 
   void _onBackupChoiceCompleted() {
     setState(() => _refreshKey++);
@@ -293,12 +308,25 @@ class _AuthGateState extends State<_AuthGate> {
               }
 
               StartupTracker.instance.markOnce('auth_gate_to_main_shell');
-              return const MainShellScreen();
+              // Mark the shell ready the instant we're authenticated. If a
+              // widget launch is pending (captured during the splash), this
+              // covers the shell *before* HomeShellHost's first build, so the
+              // dashboard is skipped entirely until the user returns from the
+              // launched destination.
+              if (!_widgetDispatchScheduled) {
+                _widgetDispatchScheduled = true;
+                HomeWidgetService.instance.markShellReady();
+              }
+              return const HomeShellHost();
             },
           );
         }
 
         StartupTracker.instance.markOnce('auth_gate_to_login');
+        // Not authenticated — don't dispatch widget deep links into a login
+        // screen, and allow re-arming if the user signs in later.
+        _widgetDispatchScheduled = false;
+        HomeWidgetService.instance.markShellGone();
         return const LoginScreen();
       },
     );
