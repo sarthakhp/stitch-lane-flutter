@@ -107,6 +107,22 @@ class OrderCreatorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Go back to the customer-picking step, clearing any in-progress draft.
+  /// Used by the "Change customer" action.
+  void changeCustomer() {
+    _customer = null;
+    _audioPath = null;
+    _transcript = null;
+    _draft = OrderProposalDraft.empty;
+    _log.clear();
+    _agentCommentary = null;
+    _errorMessage = null;
+    _savedOrders = null;
+    _savedMeasurement = null;
+    _phase = CreatorPhase.pickingCustomer;
+    notifyListeners();
+  }
+
   // ── voice dump ───────────────────────────────────────────────────────────
 
   /// Tailor finished recording. Stores audio path + transcript, kicks off

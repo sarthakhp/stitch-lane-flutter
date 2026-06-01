@@ -13,9 +13,19 @@ import '../presentation/widgets/rich_description_input_field.dart';
 class CustomerFormScreen extends StatefulWidget {
   final Customer? customer;
 
+  /// Prefill the name field (e.g. when creating from a picker's no-match state).
+  final String? initialName;
+
+  /// When true, saving a new customer pops this screen returning the created
+  /// [Customer] instead of navigating to its detail page. Used by the customer
+  /// picker so the caller can immediately select the new customer.
+  final bool returnCustomerOnCreate;
+
   const CustomerFormScreen({
     super.key,
     this.customer,
+    this.initialName,
+    this.returnCustomerOnCreate = false,
   });
 
   @override
@@ -41,6 +51,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       _nameController.text = widget.customer!.name;
       _phoneController.text = widget.customer!.phoneNumber ?? '';
       _descriptionValue = widget.customer!.description ?? '';
+    } else if (widget.initialName != null && widget.initialName!.isNotEmpty) {
+      _nameController.text = widget.initialName!;
     }
     _nameController.addListener(_onFieldChanged);
     _phoneController.addListener(_onFieldChanged);
@@ -195,6 +207,15 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             const SnackBar(
               duration: Duration(milliseconds: 700),
               content: Text('Customer updated successfully'),
+            ),
+          );
+        } else if (widget.returnCustomerOnCreate) {
+          // Picker flow: hand the new customer back to the caller to select.
+          Navigator.pop(context, customer);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(milliseconds: 700),
+              content: Text('Customer added successfully'),
             ),
           );
         } else {

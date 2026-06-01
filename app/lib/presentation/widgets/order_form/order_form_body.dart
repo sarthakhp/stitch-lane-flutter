@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../backend/models/customer.dart';
 import '../../../config/app_config.dart';
 import '../../../domain/state/order_form_controller.dart';
-import '../customer_autocomplete_field.dart';
+import '../customer/customer_picker_field.dart';
 import '../extracted_values_widget.dart';
 import '../order_images_section.dart';
 import '../rich_description_input_field.dart';
@@ -17,7 +17,7 @@ class OrderFormBody extends StatelessWidget {
   final TextEditingController valueController;
   final GlobalKey<RichDescriptionInputFieldState> descriptionKey;
   final List<Customer> customers;
-  final VoidCallback onCreateNewCustomer;
+  final CreateCustomerCallback onCreateNew;
 
   const OrderFormBody({
     super.key,
@@ -27,7 +27,7 @@ class OrderFormBody extends StatelessWidget {
     required this.valueController,
     required this.descriptionKey,
     required this.customers,
-    required this.onCreateNewCustomer,
+    required this.onCreateNew,
   });
 
   @override
@@ -37,13 +37,12 @@ class OrderFormBody extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(AppConfig.spacing16),
         children: [
-          CustomerAutocompleteField(
+          CustomerPickerField(
             customers: customers,
             selectedCustomer: controller.selectedCustomer,
             enabled: !controller.isEditing && !controller.isLoading,
-            onCustomerSelected: controller.setSelectedCustomer,
-            onCustomerCleared: () => controller.setSelectedCustomer(null),
-            onCreateNewCustomer: onCreateNewCustomer,
+            onChanged: controller.setSelectedCustomer,
+            onCreateNew: onCreateNew,
           ),
           const SizedBox(height: AppConfig.spacing16),
           OrderTitleField(

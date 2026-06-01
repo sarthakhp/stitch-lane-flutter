@@ -6,6 +6,7 @@ import '../constants/app_constants.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/rich_description_input_field.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
+import 'customer_form_screen.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final Order? order;
@@ -163,14 +164,16 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     }
   }
 
-  Future<void> _handleCreateNewCustomer(CustomerState customerState) async {
+  Future<Customer?> _createCustomer(String? prefillName) async {
     FocusScope.of(context).unfocus();
-    final previousCount = customerState.customers.length;
-    await Navigator.pushNamed(context, AppConstants.customerFormRoute);
-    if (mounted && customerState.customers.length > previousCount) {
-      final newCustomer = customerState.customers.last;
-      _controller.setSelectedCustomer(newCustomer);
-    }
+    return Navigator.of(context).push<Customer>(
+      MaterialPageRoute(
+        builder: (_) => CustomerFormScreen(
+          initialName: prefillName,
+          returnCustomerOnCreate: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -203,7 +206,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       valueController: _valueController,
                       descriptionKey: _descriptionKey,
                       customers: customerState.customers,
-                      onCreateNewCustomer: () => _handleCreateNewCustomer(customerState),
+                      onCreateNew: _createCustomer,
                     ),
                   ),
                   StickyBottomActionBar(

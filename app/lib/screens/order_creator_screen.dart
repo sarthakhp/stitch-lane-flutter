@@ -7,6 +7,7 @@ import '../constants/app_constants.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
+import 'customer_form_screen.dart';
 
 /// AI-driven order creator. Tailor picks a customer, voice-dumps everything
 /// about a multi-item visit, the agent proposes structured orders +
@@ -136,34 +137,70 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(AppConfig.spacing16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _CustomerPickerRow(controller: _controller),
-            const SizedBox(height: AppConfig.spacing16),
-            Expanded(child: _buildPhaseBody()),
-          ],
+        child: _controller.phase == CreatorPhase.pickingCustomer
+            ? _buildCustomerPicker()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SelectedCustomerHeader(
+                    customer: _controller.customer,
+                    onChange: _controller.isAgentBusy ? null : _changeCustomer,
+                  ),
+                  const SizedBox(height: AppConfig.spacing16),
+                  Expanded(child: _buildPhaseBody()),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerPicker() {
+    return Consumer<CustomerState>(
+      builder: (context, customerState, _) {
+        return CustomerPicker(
+          customers: customerState.customers,
+          enabled: !_controller.isAgentBusy,
+          onSelected: _onCustomerChosen,
+          onCreateNew: _createCustomer,
+        );
+      },
+    );
+  }
+
+  void _onCustomerChosen(Customer chosen) {
+    _controller.selectCustomer(chosen);
+  }
+
+  Future<void> _createCustomer(String? prefillName) async {
+    final created = await Navigator.of(context).push<Customer>(
+      MaterialPageRoute(
+        builder: (_) => CustomerFormScreen(
+          initialName: prefillName,
+          returnCustomerOnCreate: true,
         ),
       ),
     );
+    if (!mounted || created == null) return;
+    _controller.selectCustomer(created);
+  }
+
+  Future<void> _changeCustomer() async {
+    if (_controller.hasUnsavedWork) {
+      final confirm = await ConfirmationDialog.show(
+        context: context,
+        title: 'Change customer?',
+        content: 'This will clear the current draft. Are you sure?',
+      );
+      if (!confirm) return;
+    }
+    _controller.changeCustomer();
   }
 
   Widget _buildPhaseBody() {
     switch (_controller.phase) {
       case CreatorPhase.pickingCustomer:
-        // When there are no customers yet, the search dropdown (which holds
-        // "Create new customer") never opens, so surface a create button here.
-        return Consumer<CustomerState>(
-          builder: (context, customerState, _) {
-            if (customerState.customers.isEmpty) {
-              return _buildNoCustomersHint();
-            }
-            return _buildHint(
-              icon: Icons.person_outline,
-              text: 'Pick a customer above to start.',
-            );
-          },
-        );
+        // Handled by _buildCustomerPicker in _buildBody.
+        return const SizedBox.shrink();
       case CreatorPhase.ready:
         return _buildReady();
       case CreatorPhase.transcribing:
@@ -433,31 +470,7 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
     );
   }
 
-  Widget _buildNoCustomersHint() {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.person_add_alt_1_outlined,
-              size: 48, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: AppConfig.spacing12),
-          Text(
-            'No customers yet.',
-            style: theme.textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppConfig.spacing16),
-          FilledButton.icon(
-            icon: const Icon(Icons.person_add),
-            label: const Text('Create new customer'),
-            onPressed: () =>
-                Navigator.of(context).pushNamed(AppConstants.customerFormRoute),
-          ),
-        ],
-      ),
-    );
-  }
+  
 
   Widget _buildHint({
     required IconData icon,
@@ -567,49 +580,62 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
 
 // ── helper widgets ──────────────────────────────────────────────────────────
 
-class _CustomerPickerRow extends StatelessWidget {
-  final OrderCreatorController controller;
+class _SelectedCustomerHeader extends StatelessWidget {
+  final Customer? customer;
+  final VoidCallback? onChange;
 
-  const _CustomerPickerRow({required this.controller});
+  const _SelectedCustomerHeader({required this.customer, required this.onChange});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CustomerState>(
-      builder: (context, customerState, _) {
-        return CustomerAutocompleteField(
-          customers: customerState.customers,
-          selectedCustomer: controller.customer,
-          enabled: !controller.isAgentBusy,
-          // Don't pop the keyboard when there are no customers to search —
-          // there's nothing to type; the user must create one first.
-          autofocus: customerState.customers.isNotEmpty,
-          onCustomerSelected: (customer) => _onCustomerChosen(context, customer),
-          onCustomerCleared: () {},
-          onCreateNewCustomer: () =>
-              Navigator.of(context).pushNamed(AppConstants.customerFormRoute),
-        );
-      },
-    );
-  }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final name = customer?.name ?? 'Customer';
 
-  Future<void> _onCustomerChosen(BuildContext context, Customer chosen) async {
-    final previous = controller.customer;
-    if (previous == null || previous.id == chosen.id) {
-      controller.selectCustomer(chosen);
-      return;
-    }
-    if (!controller.hasUnsavedWork) {
-      controller.selectCustomer(chosen);
-      return;
-    }
-    final confirm = await ConfirmationDialog.show(
-      context: context,
-      title: 'Switch customer?',
-      content:
-          'Switching will clear the current draft. Are you sure you want to switch to ${chosen.name}?',
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConfig.spacing16,
+          vertical: AppConfig.spacing8,
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: colorScheme.secondaryContainer,
+              foregroundColor: colorScheme.onSecondaryContainer,
+              child: const Icon(Icons.person),
+            ),
+            const SizedBox(width: AppConfig.spacing12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Customer', style: theme.textTheme.labelMedium),
+                  Text(
+                    name,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (onChange != null)
+              TextButton.icon(
+                onPressed: onChange,
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Change'),
+              ),
+          ],
+        ),
+      ),
     );
-    if (!confirm) return;
-    controller.resetForNewCustomer(chosen);
   }
 }
 
