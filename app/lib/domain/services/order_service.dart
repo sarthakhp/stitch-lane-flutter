@@ -153,7 +153,7 @@ class OrderService {
   /// Replaces 3 separate iterations over the order list.
   static HomeStats computeHomeStats(List<Order> orders) {
     int pendingCount = 0;
-    int unpaidAmount = 0;
+    int doneUnpaidAmount = 0;
     final pendingCustomerIds = <String>{};
 
     for (final order in orders) {
@@ -161,13 +161,16 @@ class OrderService {
         pendingCount++;
         pendingCustomerIds.add(order.customerId);
       }
-      unpaidAmount += order.outstanding;
+      // Money the tailor has earned (work delivered) but not yet collected.
+      if (order.status == OrderStatus.done) {
+        doneUnpaidAmount += order.outstanding;
+      }
     }
 
     return HomeStats(
       pendingOrdersCount: pendingCount,
       customersWithPendingOrdersCount: pendingCustomerIds.length,
-      totalUnpaidAmount: unpaidAmount,
+      doneUnpaidAmount: doneUnpaidAmount,
     );
   }
 
@@ -219,12 +222,15 @@ class OrderService {
 class HomeStats {
   final int pendingOrdersCount;
   final int customersWithPendingOrdersCount;
-  final int totalUnpaidAmount;
+
+  /// Outstanding total across orders that are done (delivered) but not fully
+  /// paid — i.e. money already earned and still to be collected.
+  final int doneUnpaidAmount;
 
   const HomeStats({
     required this.pendingOrdersCount,
     required this.customersWithPendingOrdersCount,
-    required this.totalUnpaidAmount,
+    required this.doneUnpaidAmount,
   });
 
   @override
@@ -234,13 +240,13 @@ class HomeStats {
           pendingOrdersCount == other.pendingOrdersCount &&
           customersWithPendingOrdersCount ==
               other.customersWithPendingOrdersCount &&
-          totalUnpaidAmount == other.totalUnpaidAmount;
+          doneUnpaidAmount == other.doneUnpaidAmount;
 
   @override
   int get hashCode => Object.hash(
         pendingOrdersCount,
         customersWithPendingOrdersCount,
-        totalUnpaidAmount,
+        doneUnpaidAmount,
       );
 }
 

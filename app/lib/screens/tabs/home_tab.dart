@@ -157,14 +157,14 @@ class HomeTab extends StatelessWidget {
       ),
       SummaryCard(
         icon: Icons.currency_rupee,
-        value: '₹${stats.totalUnpaidAmount}',
-        label: 'Unpaid Amount',
+        value: '₹${stats.doneUnpaidAmount}',
+        label: 'Done but Unpaid',
         containerColor: colorScheme.secondaryContainer,
         contentColor: colorScheme.onSecondaryContainer,
         vertical: vertical,
         onTap: () => context
             .read<MainShellState>()
-            .switchToOrdersTab(filter: FilterPreset.unpaid()),
+            .switchToOrdersTab(filter: FilterPreset.doneButNotPaid()),
       ),
     ];
   }
