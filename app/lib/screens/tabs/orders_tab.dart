@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_constants.dart';
 import '../../domain/models/filter_preset.dart';
 import '../../presentation/presentation.dart';
 
 /// The main Orders tab. A thin wrapper over the shared [OrdersBrowser]; the
 /// shell drives external filters (e.g. a home KPI tap) through [applyFilter].
-/// Creation is handled by the shell FAB, so no sticky create button here.
 class OrdersTab extends StatefulWidget {
   const OrdersTab({super.key});
 
@@ -36,6 +36,8 @@ class OrdersTabState extends State<OrdersTab> {
       key: _browserKey,
       title: 'Orders',
       initialPreset: _preset,
+      onCreate: () =>
+          Navigator.pushNamed(context, AppConstants.orderCreatorRoute),
     );
   }
 }

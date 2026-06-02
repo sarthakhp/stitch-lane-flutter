@@ -176,12 +176,6 @@ class CustomersBrowserState extends State<CustomersBrowser>
           ),
         ),
       ),
-      floatingActionButton: widget.onCreate == null
-          ? null
-          : FloatingActionButton(
-              onPressed: widget.onCreate,
-              child: const Icon(Icons.add),
-            ),
       body: Consumer3<CustomerState, OrderState, SettingsState>(
         builder: (context, customerState, orderState, settingsState, _) {
           if (customerState.isLoading && customerState.customers.isEmpty) {
@@ -245,34 +239,44 @@ class CustomersBrowserState extends State<CustomersBrowser>
     required String? selectedId,
     required bool twoPane,
   }) {
-    return Column(
-      children: [
-        FilterPresetChips(
-          selectedPreset: _selectedPreset,
-          onPresetSelected: _applyPreset,
-        ),
-        CustomerSortDropdown(
-          selectedSort: _selectedSort,
-          onSortChanged: (value) => setState(() => _selectedSort = value),
-        ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const EmptySearchState(message: 'No customers found')
-              : CustomersListView(
-                  customers: filtered,
-                  allOrders: orders,
-                  selectedCustomerId: selectedId,
-                  dueDateWarningThreshold: dueThreshold,
-                  statsFor: (id) => (
-                    pending: orderStats.getPendingOrderCount(id),
-                    ready: orderStats.getReadyOrderCount(id),
-                    unpaid: orderStats.getTotalUnpaidAmount(id),
+    // A Scaffold per master pane so the create FAB sits at the bottom-right of
+    // the list (left pane in two-pane mode), not over the detail pane.
+    return Scaffold(
+      body: Column(
+        children: [
+          FilterPresetChips(
+            selectedPreset: _selectedPreset,
+            onPresetSelected: _applyPreset,
+          ),
+          CustomerSortDropdown(
+            selectedSort: _selectedSort,
+            onSortChanged: (value) => setState(() => _selectedSort = value),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? const EmptySearchState(message: 'No customers found')
+                : CustomersListView(
+                    customers: filtered,
+                    allOrders: orders,
+                    selectedCustomerId: selectedId,
+                    dueDateWarningThreshold: dueThreshold,
+                    statsFor: (id) => (
+                      pending: orderStats.getPendingOrderCount(id),
+                      ready: orderStats.getReadyOrderCount(id),
+                      unpaid: orderStats.getTotalUnpaidAmount(id),
+                    ),
+                    onSelect: (customer) => _onCustomerTap(customer, twoPane),
+                    onRefresh: _refreshCustomers,
                   ),
-                  onSelect: (customer) => _onCustomerTap(customer, twoPane),
-                  onRefresh: _refreshCustomers,
-                ),
-        ),
-      ],
+          ),
+        ],
+      ),
+      floatingActionButton: widget.onCreate == null
+          ? null
+          : FloatingActionButton(
+              onPressed: widget.onCreate,
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }

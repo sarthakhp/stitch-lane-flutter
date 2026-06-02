@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/app_constants.dart';
 import '../../domain/models/customer_filter_preset.dart';
 import '../../presentation/presentation.dart';
 
 /// The main Customers tab. A thin wrapper over the shared [CustomersBrowser];
 /// the shell drives external filters (e.g. a home KPI tap) through
-/// [applyFilter]. Creation is handled by the shell FAB.
+/// [applyFilter].
 class CustomersTab extends StatefulWidget {
   const CustomersTab({super.key});
 
@@ -36,6 +37,8 @@ class CustomersTabState extends State<CustomersTab> {
       key: _browserKey,
       title: 'Customers',
       initialPreset: _preset,
+      onCreate: () =>
+          Navigator.pushNamed(context, AppConstants.customerFormRoute),
     );
   }
 }

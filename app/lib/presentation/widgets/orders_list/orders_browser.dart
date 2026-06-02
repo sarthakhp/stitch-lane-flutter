@@ -270,29 +270,33 @@ class OrdersBrowserState extends State<OrdersBrowser>
     required String? selectedId,
     required bool twoPane,
   }) {
-    return Column(
-      children: [
-        OrderFilterPresetChips(
-          selectedPreset: _selectedPreset,
-          onPresetSelected: _applyPreset,
-        ),
-        Expanded(
-          child: _buildListArea(
-            displayOrders: displayOrders,
-            filtered: filtered,
-            customers: customers,
-            dueThreshold: dueThreshold,
-            selectedId: selectedId,
-            twoPane: twoPane,
+    // A Scaffold per master pane so the create FAB sits at the bottom-right of
+    // the list (left pane in two-pane mode), not over the detail pane.
+    return Scaffold(
+      body: Column(
+        children: [
+          OrderFilterPresetChips(
+            selectedPreset: _selectedPreset,
+            onPresetSelected: _applyPreset,
           ),
-        ),
-        if (widget.onCreate != null)
-          StickyActionButton(
-            onPressed: widget.onCreate!,
-            icon: Icons.add,
-            label: 'Create Order',
+          Expanded(
+            child: _buildListArea(
+              displayOrders: displayOrders,
+              filtered: filtered,
+              customers: customers,
+              dueThreshold: dueThreshold,
+              selectedId: selectedId,
+              twoPane: twoPane,
+            ),
           ),
-      ],
+        ],
+      ),
+      floatingActionButton: widget.onCreate == null
+          ? null
+          : FloatingActionButton(
+              onPressed: widget.onCreate,
+              child: const Icon(Icons.add),
+            ),
     );
   }
 

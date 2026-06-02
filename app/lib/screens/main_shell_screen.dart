@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../backend/repositories/order_repository.dart';
 import '../backend/repositories/customer_repository.dart';
-import '../constants/app_constants.dart';
 import '../domain/services/notification_router.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/customer_service.dart';
@@ -112,30 +111,13 @@ class _MainShellScreenState extends State<MainShellScreen>
       }
     }
 
-    // Home-screen widget "Chat" → AI tab with the mic opening.
-    if (shellState.consumeAiVoice()) {
-      _aiTabKey.currentState?.startVoiceInput();
-    }
-  }
-
-  Widget? _buildFloatingActionButton(int selectedIndex) {
-    switch (selectedIndex) {
-      case 1:
-        return FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, AppConstants.orderCreatorRoute);
-          },
-          child: const Icon(Icons.add),
-        );
-      case 2:
-        return FloatingActionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, AppConstants.customerFormRoute);
-          },
-          child: const Icon(Icons.add),
-        );
-      default:
-        return null;
+    // Home-screen widget "Chat" → AI tab with the mic opening. Only consume
+    // the one-shot flag once the AI tab is actually mounted, otherwise an
+    // earlier build (before the tab switch lands) would clear it and the mic
+    // would never open.
+    final aiTabState = _aiTabKey.currentState;
+    if (aiTabState != null && shellState.consumeAiVoice()) {
+      aiTabState.startVoiceInput();
     }
   }
 
@@ -208,7 +190,6 @@ class _MainShellScreenState extends State<MainShellScreen>
             Expanded(child: body),
           ],
         ),
-        floatingActionButton: _buildFloatingActionButton(selectedIndex),
       );
     } else {
       scaffold = Scaffold(
@@ -239,7 +220,6 @@ class _MainShellScreenState extends State<MainShellScreen>
             ),
           ],
         ),
-        floatingActionButton: _buildFloatingActionButton(selectedIndex),
       );
     }
 
