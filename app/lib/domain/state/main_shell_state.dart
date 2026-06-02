@@ -40,7 +40,18 @@ class MainShellState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void switchToAiTab() {
+  bool _pendingAiVoice = false;
+
+  /// One-shot: whether the AI tab should open its mic (set when launched from
+  /// the home-screen widget's "Chat" button).
+  bool consumeAiVoice() {
+    final v = _pendingAiVoice;
+    _pendingAiVoice = false;
+    return v;
+  }
+
+  void switchToAiTab({bool startVoice = false}) {
+    _pendingAiVoice = startVoice;
     _selectedIndex = 3;
     notifyListeners();
   }

@@ -19,10 +19,10 @@ class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key, this.autoStartVoice = false});
 
   @override
-  State<AiAssistantScreen> createState() => _AiAssistantScreenState();
+  State<AiAssistantScreen> createState() => AiAssistantScreenState();
 }
 
-class _AiAssistantScreenState extends State<AiAssistantScreen> {
+class AiAssistantScreenState extends State<AiAssistantScreen> {
   final _chatService = AiChatService();
   final _ttsService = TtsService();
   final _messages = <AiChatMessage>[];
@@ -30,6 +30,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final _scrollController = ScrollController();
   bool _isLoading = false;
   bool _isInitializing = true;
+
+  // Bumping this re-creates the input area in voice mode — lets the shell
+  // (re)start the mic on demand, e.g. when opened from the home-screen widget,
+  // even though this screen lives on as a persistent tab.
+  int _voiceKick = 0;
+
+  /// Open the mic now. Called by the shell when the AI tab is opened with a
+  /// voice request (home-screen widget "Chat").
+  void startVoiceInput() {
+    if (!mounted) return;
+    setState(() => _voiceKick++);
+  }
 
   @override
   void initState() {
@@ -156,10 +168,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           ),
           _buildTokenUsage(context),
           AiInputArea(
+            key: ValueKey('ai_input_$_voiceKick'),
             controller: _inputController,
             isLoading: _isLoading,
             onSend: _sendMessage,
-            autoStartVoice: widget.autoStartVoice,
+            autoStartVoice: widget.autoStartVoice || _voiceKick > 0,
           ),
         ],
       ),

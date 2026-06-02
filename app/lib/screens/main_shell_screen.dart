@@ -28,6 +28,7 @@ class _MainShellScreenState extends State<MainShellScreen>
     with WidgetsBindingObserver {
   final _ordersTabKey = GlobalKey<OrdersTabState>();
   final _customersTabKey = GlobalKey<CustomersTabState>();
+  final _aiTabKey = GlobalKey<AiAssistantScreenState>();
 
   // Lazily mount Orders/Customers tabs on first navigation.
   // Home (index 0) is always considered mounted.
@@ -110,6 +111,11 @@ class _MainShellScreenState extends State<MainShellScreen>
         customersTabState.applyFilter(customersFilter);
       }
     }
+
+    // Home-screen widget "Chat" → AI tab with the mic opening.
+    if (shellState.consumeAiVoice()) {
+      _aiTabKey.currentState?.startVoiceInput();
+    }
   }
 
   Widget? _buildFloatingActionButton(int selectedIndex) {
@@ -160,7 +166,7 @@ class _MainShellScreenState extends State<MainShellScreen>
             ? CustomersTab(key: _customersTabKey)
             : const SizedBox.shrink(),
         _mountedTabs.contains(3)
-            ? const AiAssistantScreen()
+            ? AiAssistantScreen(key: _aiTabKey)
             : const SizedBox.shrink(),
       ],
     );

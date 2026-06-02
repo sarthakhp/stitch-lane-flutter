@@ -1,20 +1,21 @@
 import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 
 import '../../../main.dart' show navigatorKey;
+import '../../state/main_shell_state.dart';
 import 'widget_action.dart';
 
-/// Decides when and how a widget launch becomes navigation, and lets the UI
-/// defer the (expensive) home dashboard build while a launched destination is
-/// on screen.
+/// Decides when and how a widget launch becomes navigation.
 ///
 /// Lifecycle:
 ///   1. [submit] stashes an action (cold launch or a live tap).
 ///   2. [markShellReady] fires once the app is authenticated.
-///   3. When both are present the destination is pushed and [shellCovered]
-///      flips true — so the shell host can show a cheap placeholder instead of
-///      building the dashboard underneath. It flips back when the user returns.
+///   3. When both are present the action is dispatched:
+///      - "Chat" opens the AI assistant **tab** inside the shell, mic on.
+///      - "New order" pushes the full-screen creator and flips [shellCovered]
+///        so the host can skip building the dashboard underneath it.
 class WidgetLaunchCoordinator {
-  /// True while a widget-launched screen covers the home shell.
+  /// True while a widget-launched (pushed) screen covers the home shell.
   final ValueNotifier<bool> shellCovered = ValueNotifier<bool>(false);
 
   WidgetAction? _pending;
@@ -39,20 +40,29 @@ class WidgetLaunchCoordinator {
     if (!_shellReady || _pending == null) return;
     final action = _pending!;
     _pending = null;
-    // Cover the shell before it builds so the dashboard is skipped, then push
-    // the destination once the frame settles.
-    shellCovered.value = true;
     WidgetsBinding.instance.addPostFrameCallback((_) => _navigate(action));
   }
 
   void _navigate(WidgetAction action) {
     final navigator = navigatorKey.currentState;
-    if (navigator == null) {
-      shellCovered.value = false;
-      return;
+    final context = navigatorKey.currentContext;
+    if (navigator == null || context == null) return;
+
+    switch (action) {
+      case WidgetAction.aiChat:
+        // Open the AI assistant tab in the shell (not a separate screen) with
+        // the mic opening. Return to the shell first if something is pushed.
+        navigator.popUntil((route) => route.isFirst);
+        Provider.of<MainShellState>(context, listen: false)
+            .switchToAiTab(startVoice: true);
+        break;
+      case WidgetAction.createOrder:
+        // Full-screen create flow — cover the dashboard while it's open.
+        shellCovered.value = true;
+        navigator
+            .pushNamed(action.route, arguments: action.arguments)
+            .whenComplete(() => shellCovered.value = false);
+        break;
     }
-    navigator
-        .pushNamed(action.route, arguments: action.arguments)
-        .whenComplete(() => shellCovered.value = false);
   }
 }
