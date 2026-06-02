@@ -50,6 +50,9 @@ class AppRoot extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          // Flat app bar — no Material 3 color shift when content scrolls under.
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
       ),
       darkTheme: ThemeData(
@@ -61,6 +64,9 @@ class AppRoot extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           elevation: 0,
+          // Flat app bar — no Material 3 color shift when content scrolls under.
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
       ),
       themeMode: ThemeMode.system,
