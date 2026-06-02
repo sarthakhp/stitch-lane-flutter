@@ -13,6 +13,10 @@ class CustomerListItem extends StatelessWidget {
   final List<Order> allOrders;
   final int dueDateWarningThreshold;
 
+  /// Highlights the row as the active selection in the tablet master–detail
+  /// layout. No effect on phones (where tapping navigates instead).
+  final bool selected;
+
   const CustomerListItem({
     super.key,
     required this.customer,
@@ -22,6 +26,7 @@ class CustomerListItem extends StatelessWidget {
     this.totalUnpaidAmount = 0,
     required this.allOrders,
     required this.dueDateWarningThreshold,
+    this.selected = false,
   });
 
   @override
@@ -37,18 +42,23 @@ class CustomerListItem extends StatelessWidget {
     );
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Selection takes visual priority over the due-soon outline.
+    final BorderSide? side = selected
+        ? BorderSide(color: colorScheme.primary, width: 2.0)
+        : (isDueSoon ? BorderSide(color: colorScheme.error, width: 2.0) : null);
+
     return Card(
       margin: const EdgeInsets.symmetric(
         horizontal: AppConfig.spacing16,
         vertical: AppConfig.spacing8,
       ),
-      shape: isDueSoon
+      color: selected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+          : null,
+      shape: side != null
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-              side: BorderSide(
-                color: colorScheme.error,
-                width: 2.0,
-              ),
+              side: side,
             )
           : null,
       child: InkWell(
@@ -83,22 +93,25 @@ class CustomerListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppConfig.spacing16),
-              Flexible(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '₹$totalUnpaidAmount',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: hasUnpaidAmount
-                            ? colorScheme.error
-                            : colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+              // Sized to its content (no Flexible) so the amount sits flush to
+              // the right edge. A Flexible here reserved half the free width and
+              // left the unused part as a gap on the right — very visible on
+              // wide tablets.
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '₹$totalUnpaidAmount',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: hasUnpaidAmount
+                          ? colorScheme.error
+                          : colorScheme.primary,
+                      fontWeight: FontWeight.bold,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: AppConfig.spacing4),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -121,8 +134,7 @@ class CustomerListItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                  ],
-                ),
+                ],
               ),
             ],
           ),

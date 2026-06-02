@@ -82,12 +82,27 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
     _maybeAutoStartVoice();
     if (_controller.phase == CreatorPhase.done && mounted) {
       final count = _controller.savedOrders?.length ?? 0;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      final customer = _controller.customer;
+      // Capture before navigating — this context unmounts on replacement.
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+
+      // Land on the customer's orders list (replacing the creator) so the
+      // tailor immediately sees what was just created, instead of bouncing
+      // back to wherever they started. Falls back to a plain pop if somehow
+      // there's no customer.
+      if (customer != null) {
+        navigator.pushReplacementNamed(
+          AppConstants.ordersListRoute,
+          arguments: customer,
+        );
+      } else {
+        navigator.pop();
+      }
+
+      messenger.showSnackBar(SnackBar(
         content: Text(
-          count == 1
-              ? 'Created 1 order'
-              : 'Created $count orders',
+          count == 1 ? 'Created 1 order' : 'Created $count orders',
         ),
       ));
     }

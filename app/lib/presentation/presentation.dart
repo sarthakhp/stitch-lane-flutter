@@ -1,5 +1,13 @@
 export 'backup_flow.dart';
+export 'widgets/common/local_image.dart';
 export 'responsive/breakpoints.dart';
+export 'responsive/master_detail_layout.dart';
+export 'widgets/order_detail/order_detail_view.dart';
+export 'widgets/orders_list/orders_list_view.dart';
+export 'widgets/customer_detail/customer_detail_view.dart';
+export 'widgets/customers_list/customers_list_view.dart';
+export 'widgets/customers_list/customers_browser.dart';
+export 'widgets/orders_list/orders_browser.dart';
 export 'widgets/home/needs_attention_panel.dart';
 export 'widgets/analytics/kpi_card.dart';
 export 'widgets/analytics/kpi_grid.dart';

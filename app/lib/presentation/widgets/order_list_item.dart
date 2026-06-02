@@ -13,6 +13,10 @@ class OrderListItem extends StatelessWidget {
   final String? customerName;
   final int dueDateWarningThreshold;
 
+  /// Highlights the row as the active selection in the tablet master–detail
+  /// layout. No effect on phones (where tapping navigates instead).
+  final bool selected;
+
   const OrderListItem({
     super.key,
     required this.order,
@@ -20,6 +24,7 @@ class OrderListItem extends StatelessWidget {
     required this.onStatusToggle,
     this.customerName,
     required this.dueDateWarningThreshold,
+    this.selected = false,
   });
 
   @override
@@ -27,18 +32,23 @@ class OrderListItem extends StatelessWidget {
     final isDueSoon = DateHelper.isDueSoon(order, dueDateWarningThreshold);
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Selection takes visual priority over the due-soon outline.
+    final BorderSide? side = selected
+        ? BorderSide(color: colorScheme.primary, width: 2.0)
+        : (isDueSoon ? BorderSide(color: colorScheme.error, width: 2.0) : null);
+
     return Card(
       margin: const EdgeInsets.symmetric(
         horizontal: AppConfig.spacing16,
         vertical: AppConfig.spacing8,
       ),
-      shape: isDueSoon
+      color: selected
+          ? colorScheme.primaryContainer.withValues(alpha: 0.35)
+          : null,
+      shape: side != null
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
-              side: BorderSide(
-                color: colorScheme.error,
-                width: 2.0,
-              ),
+              side: side,
             )
           : null,
       child: InkWell(
@@ -71,7 +81,11 @@ class OrderListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppConfig.spacing16),
-              Flexible(child: _buildPaymentInfo(context, colorScheme)),
+              // Sized to its content (no Flexible) so the Expanded title above
+              // eats all the slack and the amount sits flush to the right edge.
+              // A Flexible here reserved half the free width and left the unused
+              // part as a gap on the right — very visible on wide tablets.
+              _buildPaymentInfo(context, colorScheme),
             ],
           ),
         ),

@@ -1,4 +1,5 @@
 import '../backend/models/customer.dart';
+import '../backend/models/customer_lookup.dart';
 import '../backend/models/order.dart';
 
 class SearchHelper {
@@ -30,23 +31,10 @@ class SearchHelper {
     }).toList();
   }
 
-  static Customer? _findCustomerById(
-    List<Customer>? customers,
-    String customerId,
-  ) {
-    if (customers == null) return null;
-
-    try {
-      return customers.firstWhere((c) => c.id == customerId);
-    } catch (e) {
-      return null;
-    }
-  }
-
   static List<Order> filterOrders(
     List<Order> orders,
     String query, {
-    List<Customer>? customers,
+    CustomerLookup? customers,
   }) {
     if (query.isEmpty) {
       return orders;
@@ -58,7 +46,7 @@ class SearchHelper {
       final titleLower = order.title?.toLowerCase() ?? '';
       final descriptionLower = order.description?.toLowerCase() ?? '';
 
-      final customer = _findCustomerById(customers, order.customerId);
+      final customer = customers?.byId(order.customerId);
       final customerNameLower = customer?.name.toLowerCase() ?? '';
       final customerPhoneLower = customer?.phoneNumber?.toLowerCase() ?? '';
 
