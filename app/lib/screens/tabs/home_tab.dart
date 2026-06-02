@@ -228,27 +228,18 @@ class HomeTab extends StatelessWidget {
         onTap: () =>
             Navigator.pushNamed(context, AppConstants.businessAnalysisRoute),
       ),
-      HomeActionTile(
-        icon: Icons.auto_awesome,
-        title: 'AI Assistant',
-        containerColor: colorScheme.primaryContainer,
-        contentColor: colorScheme.onPrimaryContainer,
-        onTap: () =>
-            Navigator.pushNamed(context, AppConstants.aiAssistantRoute),
-      ),
     ];
   }
 
   Widget _buildNeedsAttention(BuildContext context) {
     final orders = context.watch<OrderState>().orders;
-    final customers = context.watch<CustomerState>().customers;
-    final byId = {for (final c in customers) c.id: c};
+    final lookup = context.watch<CustomerState>().lookup;
 
     return NeedsAttentionPanel(
       orders: orders,
-      customerName: (id) => byId[id]?.name ?? 'Customer',
+      customerName: (id) => lookup.nameOf(id) ?? 'Customer',
       onTapOrder: (order) {
-        final customer = byId[order.customerId];
+        final customer = lookup.byId(order.customerId);
         if (customer == null) return;
         Navigator.pushNamed(
           context,

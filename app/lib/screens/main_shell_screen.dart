@@ -15,6 +15,7 @@ import '../utils/startup_tracker.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/customers_tab.dart';
+import 'ai_assistant_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key});
@@ -158,6 +159,9 @@ class _MainShellScreenState extends State<MainShellScreen>
         _mountedTabs.contains(2)
             ? CustomersTab(key: _customersTabKey)
             : const SizedBox.shrink(),
+        _mountedTabs.contains(3)
+            ? const AiAssistantScreen()
+            : const SizedBox.shrink(),
       ],
     );
 
@@ -186,6 +190,11 @@ class _MainShellScreenState extends State<MainShellScreen>
                   icon: Icon(Icons.people_outlined),
                   selectedIcon: Icon(Icons.people),
                   label: Text('Customers'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.auto_awesome_outlined),
+                  selectedIcon: Icon(Icons.auto_awesome),
+                  label: Text('Assistant'),
                 ),
               ],
             ),
@@ -216,6 +225,11 @@ class _MainShellScreenState extends State<MainShellScreen>
               icon: Icon(Icons.people_outlined),
               selectedIcon: Icon(Icons.people),
               label: 'Customers',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.auto_awesome_outlined),
+              selectedIcon: Icon(Icons.auto_awesome),
+              label: 'Assistant',
             ),
           ],
         ),

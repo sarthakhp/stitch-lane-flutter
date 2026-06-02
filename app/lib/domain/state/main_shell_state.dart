@@ -40,6 +40,11 @@ class MainShellState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void switchToAiTab() {
+    _selectedIndex = 3;
+    notifyListeners();
+  }
+
   void switchToHomeTab() {
     _selectedIndex = 0;
     notifyListeners();
