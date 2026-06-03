@@ -1,12 +1,9 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../config/app_config.dart';
 import '../../domain/domain.dart';
+import 'common/full_image_viewer.dart';
 import 'common/local_image.dart';
 
 /// Logical width to decode grid thumbnails at; scaled by DPR inside [LocalImage].
@@ -205,19 +202,10 @@ class OrderImagesSection extends StatelessWidget {
   }
 
   void _showFullImage(BuildContext context, int initialIndex) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => _FullImageViewer(
-          imagePaths: imagePaths,
-          initialIndex: initialIndex,
-          onDelete: (index) async {
-            await _deleteImage(context, index);
-            if (context.mounted) {
-              Navigator.pop(context);
-            }
-          },
-        ),
-      ),
+    FullImageViewer.show(
+      context,
+      imagePaths: imagePaths,
+      initialIndex: initialIndex,
     );
   }
 }
@@ -289,84 +277,3 @@ class _DeleteButton extends StatelessWidget {
   }
 }
 
-class _FullImageViewer extends StatefulWidget {
-  final List<String> imagePaths;
-  final int initialIndex;
-  final Function(int) onDelete;
-
-  const _FullImageViewer({
-    required this.imagePaths,
-    required this.initialIndex,
-    required this.onDelete,
-  });
-
-  @override
-  State<_FullImageViewer> createState() => _FullImageViewerState();
-}
-
-class _FullImageViewerState extends State<_FullImageViewer> {
-  late PageController _pageController;
-  late int _currentIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  ImageProvider _getImageProvider(String imagePath) {
-    if (kIsWeb) {
-      return NetworkImage(imagePath);
-    }
-    return FileImage(File(imagePath));
-  }
-
-  Future<void> _shareImage() async {
-    if (kIsWeb) return;
-    final imagePath = widget.imagePaths[_currentIndex];
-    await SharePlus.instance.share(ShareParams(files: [XFile(imagePath)]));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text('${_currentIndex + 1} / ${widget.imagePaths.length}'),
-        actions: [
-          if (!kIsWeb)
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: _shareImage,
-            ),
-        ],
-      ),
-      body: PhotoViewGallery.builder(
-        pageController: _pageController,
-        itemCount: widget.imagePaths.length,
-        onPageChanged: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        builder: (context, index) {
-          return PhotoViewGalleryPageOptions(
-            imageProvider: _getImageProvider(widget.imagePaths[index]),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 4,
-          );
-        },
-        backgroundDecoration: const BoxDecoration(color: Colors.black),
-      ),
-    );
-  }
-}
