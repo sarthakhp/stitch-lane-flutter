@@ -938,6 +938,7 @@ class _LocalSnapshotsCard extends StatefulWidget {
 class _LocalSnapshotsCardState extends State<_LocalSnapshotsCard> {
   Future<List<DbSnapshot>>? _future;
   bool _isWorking = false;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -1113,8 +1114,30 @@ class _LocalSnapshotsCardState extends State<_LocalSnapshotsCard> {
               onPressed: _isWorking ? null : _snapshotNow,
             ),
             const SizedBox(height: AppConfig.spacing12),
-            FutureBuilder<List<DbSnapshot>>(
-              future: _future,
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(AppConfig.cardBorderRadius),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: AppConfig.spacing8),
+                child: Row(
+                  children: [
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: AppConfig.spacing8),
+                    Text(
+                      _expanded ? 'Hide snapshots' : 'Show snapshots',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expanded)
+              FutureBuilder<List<DbSnapshot>>(
+                future: _future,
               builder: (context, snap) {
                 if (snap.connectionState != ConnectionState.done) {
                   return const Padding(

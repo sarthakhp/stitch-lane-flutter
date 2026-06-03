@@ -13,6 +13,7 @@ import '../screens/measurements_list_screen.dart';
 import '../screens/measurement_detail_screen.dart';
 import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/profile_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/backup_settings_screen.dart';
 import '../screens/ai_usage_screen.dart';
@@ -155,6 +156,11 @@ class AppRoutes {
       case AppConstants.settingsRoute:
         return MaterialPageRoute(
           builder: (_) => const SettingsScreen(),
+        );
+
+      case AppConstants.profileRoute:
+        return MaterialPageRoute(
+          builder: (_) => const ProfileScreen(),
         );
 
       case AppConstants.notificationSettingsRoute:

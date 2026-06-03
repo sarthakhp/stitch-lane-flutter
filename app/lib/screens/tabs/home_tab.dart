@@ -254,7 +254,9 @@ class HomeTab extends StatelessWidget {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
       onSelected: (value) {
-        if (value == 'settings') {
+        if (value == 'profile') {
+          Navigator.pushNamed(context, AppConstants.profileRoute);
+        } else if (value == 'settings') {
           Navigator.pushNamed(context, AppConstants.settingsRoute);
         } else if (value == 'backup') {
           Navigator.pushNamed(context, AppConstants.backupSettingsRoute);
@@ -263,6 +265,15 @@ class HomeTab extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
+        const PopupMenuItem<String>(
+          value: 'profile',
+          child: ListTile(
+            leading: Icon(Icons.account_circle_outlined),
+            title: Text('Profile'),
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
         const PopupMenuItem<String>(
           value: 'settings',
           child: ListTile(

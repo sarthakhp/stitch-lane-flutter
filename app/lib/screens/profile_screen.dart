@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+
 import '../config/app_config.dart';
 import '../presentation/presentation.dart';
-import 'widgets/settings/due_date_warning_card.dart';
-import 'widgets/settings/notification_settings_card.dart';
+import 'widgets/settings/account_card.dart';
 
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+/// Profile screen — the signed-in account (email, name) and sign-out. Moved
+/// out of Settings so account management has its own home.
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const CustomAppBar(
-        title: Text('Settings'),
+        title: Text('Profile'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppConfig.spacing16),
@@ -21,9 +23,7 @@ class SettingsScreen extends StatelessWidget {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DueDateWarningCard(),
-                SizedBox(height: AppConfig.spacing24),
-                NotificationSettingsCard(),
+                AccountCard(),
               ],
             ),
           ),
