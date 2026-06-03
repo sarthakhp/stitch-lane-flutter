@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'ai_action/action_labels.dart';
+import 'ai_action/proposed_action.dart';
 import 'ai_chat_models.dart';
 
 /// Max exchanges to include in history text sent to the model.
@@ -59,19 +61,32 @@ class ChatExchange {
   final String assistantText;
   final List<ToolCallRecord> toolCalls;
   final List<UiComponent> uiComponents;
+  final List<ProposedAction> proposedActions;
 
   ChatExchange({
     required this.userText,
     required this.assistantText,
     this.toolCalls = const [],
     this.uiComponents = const [],
+    this.proposedActions = const [],
   });
+
+  ChatExchange copyWith({List<ProposedAction>? proposedActions}) {
+    return ChatExchange(
+      userText: userText,
+      assistantText: assistantText,
+      toolCalls: toolCalls,
+      uiComponents: uiComponents,
+      proposedActions: proposedActions ?? this.proposedActions,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'userText': userText,
         'assistantText': assistantText,
         'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
         'uiComponents': uiComponents.map((c) => c.toJson()).toList(),
+        'proposedActions': proposedActions.map((a) => a.toJson()).toList(),
       };
 
   factory ChatExchange.fromJson(Map<String, dynamic> json) => ChatExchange(
@@ -83,6 +98,10 @@ class ChatExchange {
             [],
         uiComponents: (json['uiComponents'] as List?)
                 ?.map((c) => UiComponent.fromJson(c as Map<String, dynamic>))
+                .toList() ??
+            [],
+        proposedActions: (json['proposedActions'] as List?)
+                ?.map((a) => ProposedAction.fromJson(a as Map<String, dynamic>))
                 .toList() ??
             [],
       );
@@ -162,6 +181,22 @@ class AiChatHistory {
         buf.writeln('Assistant: ${e.assistantText}');
         if (e.uiComponents.isNotEmpty) {
           buf.writeln('Shown to user: ${e.uiComponents.map((c) => c.historyLabel).join('; ')}');
+        }
+        for (final a in e.proposedActions) {
+          buf.writeln(
+              'Action: ${ActionLabels.changeSummary(a)} [${a.status.name}]');
+          if (a.candidates.isNotEmpty) {
+            final opts = a.candidates
+                .map((c) => '${c.title} (order ${c.orderId})')
+                .join('; ');
+            buf.writeln('  options shown: $opts');
+          }
+          if (a.executedOrderIds.isNotEmpty) {
+            buf.writeln('  applied to order(s) ${a.executedOrderIds.join(', ')}');
+          }
+          if (a.resultMessage != null) {
+            buf.writeln('  result: ${a.resultMessage}');
+          }
         }
       } else {
         // Older: truncate assistant response

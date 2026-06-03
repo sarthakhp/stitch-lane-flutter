@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../backend/backend.dart';
 import '../config/app_config.dart';
+import '../constants/app_constants.dart';
+import '../domain/services/ai_action/ai_action_runner.dart';
+import '../domain/services/ai_action/proposed_action.dart';
+import '../domain/services/ai_gateway/pricing.dart';
+import '../domain/services/ai_gateway/usage_event.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
 import '../domain/services/tts_service.dart';
+import '../domain/state/order_state.dart';
 import '../domain/state/settings_state.dart';
 import '../presentation/presentation.dart';
+import 'widgets/ai/action/ai_proposed_action_card.dart';
 import 'widgets/ai/ai_message_bubble.dart';
 import 'widgets/ai/ai_typing_indicator.dart';
 import 'widgets/ai/ai_welcome_view.dart';
@@ -98,6 +105,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
           isUser: false,
           wasVoiceInput: wasVoiceInput,
           uiComponents: response.uiComponents,
+          proposedActions: response.proposedActions,
         ));
         _isLoading = false;
       });
@@ -108,6 +116,81 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
         _ttsService.speak(response.text, speaker: settings.ttsSpeaker);
       }
     }
+  }
+
+  Future<void> _confirmAction(
+    int messageIndex,
+    ProposedAction action,
+    List<String> orderIds,
+  ) async {
+    // Read context-bound deps up front — the rest is async.
+    final orderState = context.read<OrderState>();
+    final orderRepo = context.read<OrderRepository>();
+    final wasVoice = _messages[messageIndex].wasVoiceInput;
+    final ttsSpeaker = context.read<SettingsState>().settings.ttsSpeaker;
+
+    final result = await AiActionRunner.run(
+      action,
+      orderIds: orderIds,
+      orderState: orderState,
+      orderRepo: orderRepo,
+    );
+    final status = result.ok ? ActionStatus.done : ActionStatus.failed;
+
+    _applyActionOutcome(messageIndex, action.id, status, result.message,
+        executedOrderIds: result.executedOrderIds);
+    await _chatService.updateActionOutcome(action.id, status,
+        resultMessage: result.message,
+        executedOrderIds: result.executedOrderIds);
+
+    if (mounted && wasVoice && result.ok) {
+      _ttsService.speak(result.message, speaker: ttsSpeaker);
+    }
+  }
+
+  Future<void> _openOrder(String orderId) async {
+    final orderRepo = context.read<OrderRepository>();
+    final customerRepo = context.read<CustomerRepository>();
+    final order = await orderRepo.getOrderById(orderId);
+    if (order == null || !mounted) return;
+    final customer = await customerRepo.getCustomerById(order.customerId);
+    if (customer == null || !mounted) return;
+    Navigator.pushNamed(
+      context,
+      AppConstants.orderDetailRoute,
+      arguments: {'order': order, 'customer': customer},
+    );
+  }
+
+  void _cancelAction(int messageIndex, ProposedAction action) {
+    _applyActionOutcome(messageIndex, action.id, ActionStatus.cancelled, null);
+    _chatService.updateActionOutcome(action.id, ActionStatus.cancelled);
+  }
+
+  /// Replaces a single action on a message with its new status (immutable
+  /// update) so the card re-renders.
+  void _applyActionOutcome(
+    int messageIndex,
+    String actionId,
+    ActionStatus status,
+    String? message, {
+    List<String> executedOrderIds = const [],
+  }) {
+    if (!mounted || messageIndex >= _messages.length) return;
+    final message0 = _messages[messageIndex];
+    final updatedActions = message0.proposedActions
+        .map((a) => a.id == actionId
+            ? a.copyWith(
+                status: status,
+                resultMessage: message,
+                executedOrderIds: executedOrderIds,
+              )
+            : a)
+        .toList();
+    setState(() {
+      _messages[messageIndex] =
+          message0.copyWith(proposedActions: updatedActions);
+    });
   }
 
   Future<void> _startNewChat() async {
@@ -192,9 +275,27 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
         if (index == _messages.length) {
           return const AiTypingIndicator();
         }
-        final bubble = AiMessageBubble(message: _messages[index], ttsService: _ttsService);
+        final message = _messages[index];
+        final bubble = AiMessageBubble(message: message, ttsService: _ttsService);
+        final Widget content = message.proposedActions.isEmpty
+            ? bubble
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  bubble,
+                  for (final action in message.proposedActions)
+                    AiProposedActionCard(
+                      key: ValueKey(action.id),
+                      action: action,
+                      onConfirm: (a, orderIds) =>
+                          _confirmAction(index, a, orderIds),
+                      onCancel: (a) => _cancelAction(index, a),
+                      onOpen: _openOrder,
+                    ),
+                ],
+              );
         final isLastMessage = index == _messages.length - 1;
-        if (!isLastMessage) return bubble;
+        if (!isLastMessage) return content;
         return TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.0, end: 1.0),
           duration: const Duration(milliseconds: 300),
@@ -208,7 +309,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
               ),
             );
           },
-          child: bubble,
+          child: content,
         );
       },
     );
@@ -221,10 +322,20 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    const inputRatePerToken = 0.25 / 1000000 * 93;
-    const outputRatePerToken = 1.50 / 1000000 * 93;
-    final costInr = (usage.promptTokens * inputRatePerToken) +
-        (usage.responseTokens * outputRatePerToken);
+    // Price against the actually-selected chat model (rates live in [Pricing]),
+    // so the estimate stays correct when the model is changed in settings.
+    final model = context.read<SettingsState>().settings.aiChatModel;
+    final usd = Pricing.estimate(
+      provider: UsageProvider.gemini,
+      model: model,
+      kind: UsageKind.chat,
+      inputTokens: usage.promptTokens,
+      outputTokens: usage.responseTokens,
+    );
+    final costInr = usd == null ? null : Pricing.toInr(usd);
+    final costLabel = costInr == null
+        ? '${usage.totalTokens} tokens'
+        : '~\u20B9${costInr.toStringAsFixed(3)}';
 
     return GestureDetector(
       onTap: () {
@@ -233,10 +344,11 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
           builder: (ctx) => AlertDialog(
             title: const Text('Token Usage'),
             content: Text(
+              'Model: $model\n'
               'Input tokens: ${usage.promptTokens}\n'
               'Output tokens: ${usage.responseTokens}\n'
               'Total tokens: ${usage.totalTokens}\n'
-              'Estimated cost: ~\u20B9${costInr.toStringAsFixed(3)}',
+              '${costInr == null ? 'Estimated cost: rate unavailable for this model' : 'Estimated cost: ~\u20B9${costInr.toStringAsFixed(3)}'}',
             ),
             actions: [
               TextButton(
@@ -258,7 +370,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
             Icon(Icons.bolt, size: 14, color: colorScheme.onSurfaceVariant),
             const SizedBox(width: AppConfig.spacing4),
             Text(
-              '~\u20B9${costInr.toStringAsFixed(3)}',
+              costLabel,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

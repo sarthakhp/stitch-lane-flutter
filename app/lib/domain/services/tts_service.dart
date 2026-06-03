@@ -9,6 +9,14 @@ import 'streaming_tts_provider.dart';
 enum TtsPlaybackState { idle, connecting, buffering, playing, stopped, error }
 
 class TtsService {
+  /// Master switch for text-to-speech. Sarvam TTS is the only provider wired in
+  /// (no Gemini TTS adapter yet) and we're not incurring its cost yet, so this
+  /// is off: [speak] is a no-op and the UI hides Play buttons. Flip to true to
+  /// re-enable everywhere. (Non-const so it doesn't statically dead-code the
+  /// real implementation below.)
+  // ignore: prefer_const_declarations
+  static final bool ttsEnabled = false;
+
   static const _sampleRate = 22050;
   static const _channels = 1;
 
@@ -33,18 +41,10 @@ class TtsService {
   Stream<TtsPlaybackState> get stateChanges => _stateController.stream;
 
   Future<void> speak(String text, {String speaker = 'shubh'}) async {
-    // ─── TTS DISABLED ─────────────────────────────────────────────────────
-    // Sarvam TTS is the only provider wired in (no Gemini TTS adapter yet),
-    // and we want to stop incurring cost while we evaluate. Early-return so
-    // both call sites (auto-speak in [AiAssistantScreen] and manual speak in
-    // [AiMessageBubble]) become no-ops. The UI buttons still render but
-    // don't do anything. Flip this back on by removing the early return.
-    AppLogger.info(
-      'TtsService.speak: skipped (TTS disabled in tts_service.dart)',
-    );
-    return;
-    // ──────────────────────────────────────────────────────────────────────
-    // ignore: dead_code
+    if (!ttsEnabled) {
+      AppLogger.info('TtsService.speak: skipped (TTS disabled)');
+      return;
+    }
     if (text.isEmpty) return;
 
     await stop();

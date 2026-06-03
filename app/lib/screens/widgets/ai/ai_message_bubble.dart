@@ -111,7 +111,7 @@ class AiMessageBubble extends StatelessWidget {
               Flexible(child: bubble),
             ],
           ),
-          if (ttsService != null)
+          if (ttsService != null && TtsService.ttsEnabled)
             _TtsPlayButton(
               text: message.text,
               ttsService: ttsService!,
@@ -137,7 +137,11 @@ class AiMessageBubble extends StatelessWidget {
   Widget _buildLabeledCarousel(BuildContext context, String label, List<UiComponent> components) {
     final theme = Theme.of(context);
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
-    final carouselHeight = (110.0 * textScale).clamp(100.0, 180.0);
+    // Order cards carry a cover photo on top, so they need extra height; the
+    // text-only customer cards stay compact.
+    final hasCover = components.any((c) => c.type == 'order');
+    final base = hasCover ? 176.0 : 132.0;
+    final carouselHeight = (base * textScale).clamp(124.0, 280.0);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppConfig.spacing4),

@@ -5,6 +5,8 @@ import 'package:langchain_google/langchain_google.dart';
 import 'package:toonx/toonx.dart' as toonx;
 import 'package:uuid/uuid.dart';
 import '../../utils/app_logger.dart';
+import 'ai_action/proposed_action.dart';
+import 'ai_action/proposed_action_factory.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
 import 'ai_gateway/ai_gateway.dart';
@@ -16,6 +18,7 @@ class AiExecutorResult {
   final String rawResponse;
   final String responseText;
   final List<UiComponent> uiComponents;
+  final List<ProposedAction> proposedActions;
   final List<ToolCallRecord> toolCalls;
   final AiTokenUsage usage;
 
@@ -23,6 +26,7 @@ class AiExecutorResult {
     required this.rawResponse,
     required this.responseText,
     required this.uiComponents,
+    required this.proposedActions,
     required this.toolCalls,
     required this.usage,
   });
@@ -37,7 +41,7 @@ class AiExecutorResult {
 /// - Unknown tool recovery
 /// - Structured JSON response parsing
 class AiExecutor {
-  static const _maxIterations = 5;
+  static const _maxIterations = 6;
   static const _maxExecutionTime = Duration(seconds: 60);
   static const _perInvokeTimeout = Duration(seconds: 30);
 
@@ -55,6 +59,7 @@ class AiExecutor {
     final runId = const Uuid().v4();
 
     final toolCallRecords = <ToolCallRecord>[];
+    final proposedActions = <ProposedAction>[];
     var totalUsage = AiTokenUsage.zero;
     final steps = <Map<String, dynamic>>[];
     final stopwatch = Stopwatch()..start();
@@ -76,7 +81,30 @@ class AiExecutor {
     while (aiMessage.toolCalls.isNotEmpty && _shouldContinue(iterations, stopwatch.elapsed)) {
       iterations++;
       final toolCall = aiMessage.toolCalls.first;
-      final toolResult = await _executeTool(toolCall, toolCallRecords);
+      // Write tools (propose_*) only stage a change — they never hit the
+      // read-only dispatcher. Everything else routes to the query handlers.
+      final String toolResult;
+      if (ProposedActionFactory.isActionTool(toolCall.name)) {
+        // A chatty model may split one change across several propose calls
+        // (e.g. "mark all done"). Merge same-change proposals into one card by
+        // unioning their order ids, so the user sees a single multi-select.
+        final action =
+            ProposedActionFactory.build(toolCall.name, toolCall.arguments);
+        final existing = proposedActions.indexWhere((a) => a.sameChange(action));
+        if (existing >= 0) {
+          final union = <String>{
+            ...proposedActions[existing].candidateOrderIds,
+            ...action.candidateOrderIds,
+          }.toList();
+          proposedActions[existing] =
+              proposedActions[existing].copyWith(candidateOrderIds: union);
+        } else {
+          proposedActions.add(action);
+        }
+        toolResult = ProposedActionFactory.stagedToolResult;
+      } else {
+        toolResult = await _executeTool(toolCall, toolCallRecords);
+      }
       steps.last['tool_sql'] = toolCall.arguments['sql'];
       steps.last['tool_result'] = toolResult;
 
@@ -122,6 +150,7 @@ class AiExecutor {
       rawResponse: rawContent,
       responseText: parsed.text,
       uiComponents: parsed.uiComponents,
+      proposedActions: proposedActions,
       toolCalls: toolCallRecords,
       usage: totalUsage,
     );

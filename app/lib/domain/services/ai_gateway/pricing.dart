@@ -76,6 +76,18 @@ class Pricing {
       outputPerMillion: 1.50,
     ),
 
+    // Other chat models the user can pick (Developer settings). Text rates
+    // (USD / 1M tokens) per Google's published pricing; approximate, see header.
+    //   gemini-2.5-flash       in 0.30 / out 2.50
+    //   gemini-2.5-flash-lite  in 0.10 / out 0.40
+    //   gemini-2.0-flash       in 0.10 / out 0.40
+    _key(UsageProvider.gemini, 'gemini-2.5-flash', UsageKind.chat):
+        const PricingEntry(inputPerMillion: 0.30, outputPerMillion: 2.50),
+    _key(UsageProvider.gemini, 'gemini-2.5-flash-lite', UsageKind.chat):
+        const PricingEntry(inputPerMillion: 0.10, outputPerMillion: 0.40),
+    _key(UsageProvider.gemini, 'gemini-2.0-flash', UsageKind.chat):
+        const PricingEntry(inputPerMillion: 0.10, outputPerMillion: 0.40),
+
     // ────────────────────────── Sarvam ──────────────────────────
     // STT: ₹30 per hour of audio → ₹30 / 3600 sec / 83 ≈ $0.0001004 / sec
     // TTS: ₹30 per 10,000 chars  → ₹30 / 10000 / 83 ≈ $0.0000361 / char

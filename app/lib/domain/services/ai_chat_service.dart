@@ -3,6 +3,7 @@ import 'package:langchain/langchain.dart';
 import 'package:langchain_google/langchain_google.dart';
 import '../../backend/backend.dart';
 import '../../utils/app_logger.dart';
+import 'ai_action/proposed_action.dart';
 import 'ai_chat_config.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
@@ -56,6 +57,7 @@ class AiChatService {
                 text: e.assistantText,
                 isUser: false,
                 uiComponents: e.uiComponents,
+                proposedActions: e.proposedActions,
               ),
             ])
         .toList();
@@ -107,19 +109,34 @@ class AiChatService {
         customerRepo,
         orderRepo,
       );
+      final enrichedActions = await _enrichActions(
+        result.proposedActions,
+        customerRepo,
+        orderRepo,
+      );
+
+      // Drop navigation cards for orders that are already action candidates, so
+      // a proposed change never shows a duplicate (action card + nav card).
+      final actionOrderIds =
+          enrichedActions.expand((a) => a.candidateOrderIds).toSet();
+      final components = enriched
+          .where((c) => !(c.type == 'order' && actionOrderIds.contains(c.id)))
+          .toList();
 
       _exchanges.add(ChatExchange(
         userText: userMessage,
         assistantText: result.responseText,
         toolCalls: result.toolCalls,
-        uiComponents: enriched,
+        uiComponents: components,
+        proposedActions: enrichedActions,
       ));
       _sessionUsage = _sessionUsage + result.usage;
 
       return AiChatResponse(
         text: result.responseText,
         usage: result.usage,
-        uiComponents: enriched,
+        uiComponents: components,
+        proposedActions: enrichedActions,
       );
     } catch (e) {
       AppLogger.error('AI chat error', e);
@@ -129,6 +146,20 @@ class AiChatService {
         usage: AiTokenUsage.zero,
       );
     }
+  }
+
+  /// Display lines shared by order nav cards and action candidates:
+  /// [optional phone], [optional title], price, due date.
+  List<String> _orderSummaryLines(Order order, {String? phone}) {
+    final lines = <String>[];
+    if (phone != null && phone.trim().isNotEmpty) lines.add(phone);
+    if (order.title != null && order.title!.trim().isNotEmpty) {
+      lines.add(order.title!);
+    }
+    lines.add(order.value == null ? 'Price not set' : '₹${order.value}');
+    final d = order.dueDate;
+    lines.add('Due ${d.day}/${d.month}/${d.year}');
+    return lines;
   }
 
   Future<List<UiComponent>> _enrichComponents(
@@ -165,17 +196,12 @@ class AiChatService {
           if (order == null) { enriched.add(c); continue; }
 
           final customer = await customerRepo.getCustomerById(order.customerId);
-          final dueDateStr = '${order.dueDate.day}/${order.dueDate.month}/${order.dueDate.year}';
-
-          final details = <String>[];
-          if (order.title != null && order.title!.trim().isNotEmpty) details.add(order.title!);
-          details.add(order.value == null ? 'Price not set' : '₹${order.value}');
-          details.add('Due $dueDateStr');
 
           enriched.add(UiComponent(
             type: c.type, id: c.id,
             title: customer?.name ?? 'Order',
-            details: details,
+            details: _orderSummaryLines(order),
+            imagePaths: order.imagePaths,
           ));
         } else {
           enriched.add(c);
@@ -185,6 +211,67 @@ class AiChatService {
       }
     }
     return enriched;
+  }
+
+  /// Fills each proposed action's candidate order ids with display info
+  /// (customer name, phone, order title, price, due date) so the confirm card
+  /// can tell same-name customers apart. Drops ids that no longer exist.
+  Future<List<ProposedAction>> _enrichActions(
+    List<ProposedAction> actions,
+    CustomerRepository customerRepo,
+    OrderRepository orderRepo,
+  ) async {
+    final enriched = <ProposedAction>[];
+    for (final action in actions) {
+      final candidates = <ActionCandidate>[];
+      for (final orderId in action.candidateOrderIds) {
+        try {
+          final order = await orderRepo.getOrderById(orderId);
+          if (order == null) continue;
+          final customer = await customerRepo.getCustomerById(order.customerId);
+
+          candidates.add(ActionCandidate(
+            orderId: orderId,
+            title: customer?.name ?? 'Order',
+            lines: _orderSummaryLines(order, phone: customer?.phoneNumber),
+            imagePaths: order.imagePaths,
+          ));
+        } catch (_) {
+          // Skip unreadable candidates rather than failing the whole turn.
+        }
+      }
+      // Drop a proposal whose orders can't be resolved — no empty cards.
+      if (candidates.isEmpty) continue;
+      enriched.add(action.copyWith(candidates: candidates));
+    }
+    return enriched;
+  }
+
+  /// Records the outcome of a confirmed/cancelled action in the stored history
+  /// (so a reloaded chat shows ✓ and follow-up turns know it happened) and
+  /// persists. No-op if the action id isn't found.
+  Future<void> updateActionOutcome(
+    String actionId,
+    ActionStatus status, {
+    String? resultMessage,
+    List<String> executedOrderIds = const [],
+  }) async {
+    for (var i = 0; i < _exchanges.length; i++) {
+      final exchange = _exchanges[i];
+      final idx =
+          exchange.proposedActions.indexWhere((a) => a.id == actionId);
+      if (idx < 0) continue;
+
+      final updated = [...exchange.proposedActions];
+      updated[idx] = updated[idx].copyWith(
+        status: status,
+        resultMessage: resultMessage,
+        executedOrderIds: executedOrderIds,
+      );
+      _exchanges[i] = exchange.copyWith(proposedActions: updated);
+      await saveChat();
+      return;
+    }
   }
 
   void dispose() {

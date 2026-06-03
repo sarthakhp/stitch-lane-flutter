@@ -32,7 +32,7 @@ class AppSettings {
   bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
   String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite';
   String get aiFormattingModel => aiFormattingModelRaw ?? 'gemini-2.5-flash-lite';
-  String get sttModel => sttModelRaw ?? 'sarvam:saaras:v3';
+  String get sttModel => sttModelRaw ?? 'gemini:gemini-3.1-flash-lite';
   String get ttsSpeaker => ttsSpeakerRaw ?? 'shubh';
 
   AppSettings({

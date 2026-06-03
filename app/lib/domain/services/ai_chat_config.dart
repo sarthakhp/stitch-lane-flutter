@@ -1,13 +1,14 @@
+import 'ai_action/ai_action_tools.dart';
 import 'ai_query/ai_query_schema.dart';
 import 'ai_query/ai_query_tools.dart';
 
 const String defaultAiChatModel = 'gemini-3.1-flash-lite';
 const String defaultAiFormattingModel = 'gemini-2.5-flash-lite';
-const String defaultSttModel = 'sarvam:saaras:v3';
+const String defaultSttModel = 'gemini:gemini-3.1-flash-lite';
 
-/// Tools exposed to the chat model — the typed query tools plus the run_sql
-/// escape hatch. Defined in [ai_query/ai_query_tools.dart].
-const aiTools = aiQueryToolSpecs;
+/// Tools exposed to the chat model: read tools (typed queries + run_sql) plus
+/// the write `propose_*` tools that stage changes for user confirmation.
+const aiTools = [...aiQueryToolSpecs, ...aiActionToolSpecs];
 
 String buildAiSystemPrompt() {
   final now = DateTime.now();
@@ -22,16 +23,9 @@ You are a tailoring business assistant for "Stitch Genie". Today: {{TODAY}}.
 Answer questions about customers, orders, payments, and measurements using the
 tools below. For greetings or general chat, reply directly without tools.
 
-TOOLS (pick the specific one that fits; use run_sql only when none do):
-- find_customers — look up customers by name, or list those with dues / pending orders.
-- get_customer_summary(customerId) — one customer's orders, totals, measurement count.
-- get_orders — filter orders by customerName, status, dueBefore/dueAfter, paidState.
-- get_due_orders(withinDays) — orders due soon and overdue (e.g. "due in next 3 days").
-- get_outstanding — who still owes money and how much, with a grand total.
-- get_earnings — money collected in a period (today/this_week/this_month/last_month/this_year, or fromDate+toDate).
-- run_sql(sql) — read-only SELECT for anything the typed tools don't cover.
-
-Tool results come back in TOON format (rows[N]{cols}: val1,val2,...).
+Use the most specific tool that fits (each tool's purpose is in its own
+description); use run_sql only when no typed tool covers it. Tool results come
+back in TOON format (rows[N]{cols}: val1,val2,...).
 
 KEY RULES:
 - Money: an order with no price set is "price not set" and is excluded from
@@ -40,6 +34,23 @@ KEY RULES:
 - status: pending = in progress, ready = ready for the customer to collect,
   done = collected/delivered.
 - Amounts are rupees (₹). For name lookups, partial spelling is fine.
+
+MAKING CHANGES (status, payments, price, due date):
+A change happens only when you call a propose_* tool — describing it in text
+does nothing. To change an order: find it with a read tool to get its id, then
+call the matching propose_* tool; the user confirms with a tap. Reply with one
+short sentence (e.g. "Tap confirm to mark it as done") and empty ui_components —
+the card already shows the order's details, so don't look up its title.
+- propose_set_status(orderIds, status): pending | ready | done.
+- propose_record_payment(orderIds, amount?): omit amount to pay the full
+  remaining; needs a price set.
+- propose_set_price(orderIds, value): rupees.
+- propose_set_due_date(orderIds, dueDate): resolve relative dates to YYYY-MM-DD;
+  ask if a date is ambiguous.
+orderIds is the set of orders the change may apply to; the user ticks which to
+confirm. Pass one id for a single order; pass every relevant id when the request
+covers several ("mark all her orders done") or when you're unsure which is meant.
+Make ONE propose_* call per change — list all ids in it, don't repeat the call.
 
 For run_sql only, this is the schema and the exact business rules to follow:
 ${AiQuerySchema.description}
