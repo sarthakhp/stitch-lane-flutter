@@ -183,6 +183,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
             ),
             OrderDetailActionBar(
               order: order,
+              customerName: customer.name,
               onToggleStatus: () => _toggleStatus(order),
               onViewCustomer:
                   widget.showViewCustomer ? () => _viewCustomer(customer) : null,

@@ -11,6 +11,10 @@ class OrderDetailActionBar extends StatelessWidget {
   final Order order;
   final VoidCallback onToggleStatus;
 
+  /// Customer name, used to personalise the view-profile button label. Falls
+  /// back to a generic label when null/empty.
+  final String? customerName;
+
   /// When null the "View customer" button is hidden (e.g. already inside that
   /// customer's orders list on tablet).
   final VoidCallback? onViewCustomer;
@@ -19,8 +23,15 @@ class OrderDetailActionBar extends StatelessWidget {
     super.key,
     required this.order,
     required this.onToggleStatus,
+    this.customerName,
     this.onViewCustomer,
   });
+
+  /// "View <name>'s Profile" when a name is known, else a generic fallback.
+  String get _viewLabel {
+    final name = customerName?.trim() ?? '';
+    return name.isEmpty ? 'View Customer' : "View $name's Profile";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,10 +76,24 @@ class OrderDetailActionBar extends StatelessWidget {
               const SizedBox(height: AppConfig.spacing8),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
+                child: FilledButton(
                   onPressed: onViewCustomer,
-                  icon: const Icon(Icons.person),
-                  label: const Text('View Customer'),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person),
+                      const SizedBox(width: AppConfig.spacing8),
+                      // Flexible so long customer names ellipsize instead of
+                      // overflowing the full-width button.
+                      Flexible(
+                        child: Text(
+                          _viewLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
