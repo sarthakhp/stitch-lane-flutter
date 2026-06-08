@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
@@ -117,33 +116,35 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
 
     final hasLocalData =
         localCustomers + localOrders + localMeasurements > 0;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return AlertDialog(
-          title: const Text('Restore from Drive backup?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'This will replace your current local data with the Drive '
-                'backup. Anything in the local DB that is newer than the '
-                'backup will be overwritten.',
-              ),
-              const SizedBox(height: AppConfig.spacing12),
-              Text(
-                'Current local data on this device:',
-                style: theme.textTheme.labelMedium,
-              ),
-              const SizedBox(height: AppConfig.spacing4),
-              Text('  • Customers: $localCustomers'),
-              Text('  • Orders: $localOrders'),
-              Text('  • Measurements: $localMeasurements'),
-              const SizedBox(height: AppConfig.spacing12),
-              if (hasLocalData)
+    // Nothing local to lose → restore straight away, no warning. Only prompt
+    // when there's local data that could be overwritten.
+    if (hasLocalData) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          final theme = Theme.of(ctx);
+          return AlertDialog(
+            title: const Text('Restore from Drive backup?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This will replace your current local data with the Drive '
+                  'backup. Anything in the local DB that is newer than the '
+                  'backup will be overwritten.',
+                ),
+                const SizedBox(height: AppConfig.spacing12),
+                Text(
+                  'Current local data on this device:',
+                  style: theme.textTheme.labelMedium,
+                ),
+                const SizedBox(height: AppConfig.spacing4),
+                Text('  • Customers: $localCustomers'),
+                Text('  • Orders: $localOrders'),
+                Text('  • Measurements: $localMeasurements'),
+                const SizedBox(height: AppConfig.spacing12),
                 Container(
                   padding: const EdgeInsets.all(AppConfig.spacing8),
                   decoration: BoxDecoration(
@@ -168,37 +169,36 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
                     ],
                   ),
                 ),
-              const SizedBox(height: AppConfig.spacing12),
-              Text(
-                'A local snapshot will be taken before restoring so you can '
-                'roll back from the Developer screen if needed.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: AppConfig.spacing12),
+                Text(
+                  'A local snapshot will be taken before restoring so you can '
+                  'roll back from the Developer screen if needed.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.tonal(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.errorContainer,
+                  foregroundColor: theme.colorScheme.onErrorContainer,
+                ),
+                child: const Text('Overwrite & restore'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.tonal(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: hasLocalData
-                  ? FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.errorContainer,
-                      foregroundColor: theme.colorScheme.onErrorContainer,
-                    )
-                  : null,
-              child: Text(hasLocalData ? 'Overwrite & restore' : 'Restore'),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
 
-    if (confirmed != true || !mounted) return;
+      if (confirmed != true || !mounted) return;
+    }
 
     // Take the safety snapshot. Forced (ignores throttle) so it always runs
     // regardless of when the last automatic snapshot happened.
@@ -288,6 +288,8 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   Future<void> _handleSkip() async {
+    // Starting fresh can permanently discard the existing backup, so confirm
+    // twice to be sure it isn't an accidental tap.
     final confirmed = await ConfirmationDialog.show(
       context: context,
       title: 'Start Fresh?',
@@ -296,10 +298,19 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
       confirmText: 'Start Fresh',
       cancelText: 'Go Back',
     );
+    if (!confirmed || !mounted) return;
 
-    if (confirmed && mounted) {
-      widget.onComplete?.call();
-    }
+    final confirmedAgain = await ConfirmationDialog.show(
+      context: context,
+      title: 'Are you absolutely sure?',
+      content:
+          'This is your last chance. Your previous backup will not be restored and may be lost forever.\n\nTap "Start Fresh" only if you are certain.',
+      confirmText: 'Start Fresh',
+      cancelText: 'Go Back',
+    );
+    if (!confirmedAgain || !mounted) return;
+
+    widget.onComplete?.call();
   }
 
   @override
@@ -424,9 +435,9 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   Widget _buildBackupFoundView() {
-    final user = FirebaseAuth.instance.currentUser;
-    final displayName = user?.displayName;
-    final email = user?.email;
+    final auth = context.read<AuthController>();
+    final displayName = auth.name;
+    final email = auth.email;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -506,17 +517,32 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
   }
 
   Future<void> _handleSignOut() async {
-    final customerRepository = context.read<CustomerRepository>();
-    final orderRepository = context.read<OrderRepository>();
-    final measurementRepository = context.read<MeasurementRepository>();
-    final settingsRepository = context.read<SettingsRepository>();
-
-    await AuthService.signOut(
-      customerRepository: customerRepository,
-      orderRepository: orderRepository,
-      measurementRepository: measurementRepository,
-      settingsRepository: settingsRepository,
+    // Confirm twice — signing out clears local data.
+    final confirmed = await ConfirmationDialog.show(
+      context: context,
+      title: 'Sign Out',
+      content: 'Are you sure you want to sign out? All local data will be cleared.',
+      confirmText: 'Sign Out',
     );
+    if (!confirmed || !mounted) return;
+
+    final confirmedAgain = await ConfirmationDialog.show(
+      context: context,
+      title: 'Are you absolutely sure?',
+      content:
+          'This is your last chance. All local data on this device will be cleared. Make sure you have a backup before signing out.',
+      confirmText: 'Sign Out',
+    );
+    if (!confirmedAgain || !mounted) return;
+
+    // Gate-rendered screen: signing out flips status to unauthenticated and the
+    // gate routes to LoginScreen — no manual navigation here.
+    await context.read<AuthController>().signOut(
+          customerRepository: context.read<CustomerRepository>(),
+          orderRepository: context.read<OrderRepository>(),
+          measurementRepository: context.read<MeasurementRepository>(),
+          settingsRepository: context.read<SettingsRepository>(),
+        );
   }
 
   Widget _buildRestoringView(BackupState backupState) {

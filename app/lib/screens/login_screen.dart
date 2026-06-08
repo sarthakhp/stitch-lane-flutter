@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
 import '../config/app_config.dart';
-import 'backup_restore_check_screen.dart';
-import 'main_shell_screen.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/error_message_card.dart';
 
+/// Sign-in screen. It only triggers [AuthController.signIn]; navigation into the
+/// app is driven entirely by the auth gate reacting to the auth status — there
+/// is no manual routing here (single entry into the shell).
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -17,8 +18,8 @@ class LoginScreen extends StatelessWidget {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppConfig.spacing32),
-            child: Consumer<AuthState>(
-              builder: (context, authState, child) {
+            child: Consumer<AuthController>(
+              builder: (context, auth, child) {
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -40,13 +41,13 @@ class LoginScreen extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: AppConfig.spacing32),
-                    if (authState.errorMessage != null) ...[
-                      ErrorMessageCard(message: authState.errorMessage!),
+                    if (auth.errorMessage != null) ...[
+                      ErrorMessageCard(message: auth.errorMessage!),
                       const SizedBox(height: AppConfig.spacing24),
                     ],
                     _GoogleSignInButton(
-                      isLoading: authState.isLoading,
-                      onPressed: () => _handleGoogleSignIn(context),
+                      isLoading: auth.isLoading,
+                      onPressed: () => context.read<AuthController>().signIn(),
                     ),
                   ],
                 );
@@ -56,36 +57,6 @@ class LoginScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _handleGoogleSignIn(BuildContext context) async {
-    final authState = context.read<AuthState>();
-    authState.setLoading(true);
-
-    final result = await AuthService.signInWithGoogle();
-
-    if (!context.mounted) {
-      return;
-    }
-
-    if (result) {
-      authState.setLoading(false);
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (builderContext) => BackupRestoreCheckScreen(
-            onComplete: () {
-              Navigator.of(builderContext).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const MainShellScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ),
-        (route) => false,
-      );
-    } else {
-      authState.setLoading(false);
-    }
   }
 }
 
@@ -123,4 +94,3 @@ class _GoogleSignInButton extends StatelessWidget {
     );
   }
 }
-

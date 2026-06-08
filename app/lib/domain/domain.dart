@@ -1,4 +1,4 @@
-export 'state/auth_state.dart';
+export 'state/auth_controller.dart';
 export 'state/backup_state.dart';
 export 'state/customer_state.dart';
 export 'state/main_shell_state.dart';

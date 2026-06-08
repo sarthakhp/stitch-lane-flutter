@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -528,7 +527,7 @@ class _BackupStatusSection extends StatelessWidget {
                 context,
                 Icons.account_circle,
                 'Account',
-                FirebaseAuth.instance.currentUser?.email ?? '—',
+                context.read<AuthController>().email ?? '—',
               ),
               const SizedBox(height: AppConfig.spacing8),
               _buildInfoRow(

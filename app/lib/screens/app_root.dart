@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -124,6 +123,8 @@ class _AppRootHomeState extends State<_AppRootHome> {
     try {
       await StartupOrchestrator.instance.firebaseReady;
       if (!mounted) return;
+      // Firebase is up — start the single auth source of truth listening.
+      context.read<AuthController>().init();
       setState(() => _firebaseReady = true);
       StartupTracker.instance.markOnce('firebase_ready_in_ui');
     } catch (e) {
@@ -260,81 +261,67 @@ class _AuthGateState extends State<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        // CRITICAL: don't decide auth state until the stream has emitted its
-        // first value. On mobile, Firebase restores the cached user
-        // asynchronously AFTER initializeApp returns — there's a window where
-        // currentUser is null and the stream hasn't emitted yet. Without this
-        // guard we briefly render LoginScreen for users who are actually
-        // signed in. They would then either tap through Login (forcing a
-        // fresh sign-in that may not match the original UID) or worse, hit
-        // BackupRestoreCheckScreen which can overwrite newer local data with
-        // an older Drive backup. This is exactly the regression that lost
-        // data in production once.
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          StartupTracker.instance.markOnce('auth_gate_waiting_for_stream');
-          return const Scaffold(
-            body: Center(child: AppLogo(size: 120)),
-          );
-        }
+    // Single source of truth. Tri-state means we NEVER mistake "auth not
+    // resolved yet" (unknown) for "signed out" — that transient-null confusion
+    // is what flashed LoginScreen for signed-in users (and lost data once).
+    final auth = context.watch<AuthController>();
 
-        final user = snapshot.data ?? FirebaseAuth.instance.currentUser;
+    switch (auth.status) {
+      case AuthStatus.unknown:
+        StartupTracker.instance.markOnce('auth_gate_waiting_for_stream');
+        return const Scaffold(body: Center(child: AppLogo(size: 120)));
 
-        if (user != null) {
-          // Fire-and-forget: silent sign-in keeps Drive token fresh.
-          // DriveService.getDriveApi also calls signInSilently inline, so
-          // nothing breaks if this completes after first Drive use.
-          AuthService.silentSignIn().catchError((e) {
-            AppLogger.warning('Silent sign-in failed: $e');
-          });
-
-          return FutureBuilder<bool>(
-            key: ValueKey(_refreshKey),
-            future: OnboardingService.hasCompletedBackupChoice(user.uid),
-            builder: (context, choiceSnapshot) {
-              if (choiceSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              final hasCompleted = choiceSnapshot.data ?? false;
-
-              if (!hasCompleted) {
-                StartupTracker.instance
-                    .markOnce('auth_gate_backup_restore_check');
-                return BackupRestoreCheckScreen(
-                  onComplete: () async {
-                    await OnboardingService.setBackupChoiceCompleted(user.uid);
-                    _onBackupChoiceCompleted();
-                  },
-                );
-              }
-
-              StartupTracker.instance.markOnce('auth_gate_to_main_shell');
-              // Mark the shell ready the instant we're authenticated. If a
-              // widget launch is pending (captured during the splash), this
-              // covers the shell *before* HomeShellHost's first build, so the
-              // dashboard is skipped entirely until the user returns from the
-              // launched destination.
-              if (!_widgetDispatchScheduled) {
-                _widgetDispatchScheduled = true;
-                HomeWidgetService.instance.markShellReady();
-              }
-              return const HomeShellHost();
-            },
-          );
-        }
-
+      case AuthStatus.unauthenticated:
         StartupTracker.instance.markOnce('auth_gate_to_login');
-        // Not authenticated — don't dispatch widget deep links into a login
-        // screen, and allow re-arming if the user signs in later.
+        // Don't dispatch widget deep links into a login screen; re-arm on
+        // next sign-in.
         _widgetDispatchScheduled = false;
         HomeWidgetService.instance.markShellGone();
         return const LoginScreen();
-      },
-    );
+
+      case AuthStatus.authenticated:
+        final user = auth.user!;
+        // Fire-and-forget: silent sign-in keeps the Drive token fresh.
+        AuthService.silentSignIn().catchError((e) {
+          AppLogger.warning('Silent sign-in failed: $e');
+        });
+
+        return FutureBuilder<bool>(
+          key: ValueKey(_refreshKey),
+          future: OnboardingService.hasCompletedBackupChoice(user.uid),
+          builder: (context, choiceSnapshot) {
+            if (choiceSnapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final hasCompleted = choiceSnapshot.data ?? false;
+
+            if (!hasCompleted) {
+              StartupTracker.instance
+                  .markOnce('auth_gate_backup_restore_check');
+              return BackupRestoreCheckScreen(
+                onComplete: () async {
+                  await OnboardingService.setBackupChoiceCompleted(user.uid);
+                  _onBackupChoiceCompleted();
+                },
+              );
+            }
+
+            StartupTracker.instance.markOnce('auth_gate_to_main_shell');
+            // Mark the shell ready the instant we're authenticated. If a
+            // widget launch is pending (captured during the splash), this
+            // covers the shell *before* HomeShellHost's first build, so the
+            // dashboard is skipped entirely until the user returns from the
+            // launched destination.
+            if (!_widgetDispatchScheduled) {
+              _widgetDispatchScheduled = true;
+              HomeWidgetService.instance.markShellReady();
+            }
+            return const HomeShellHost();
+          },
+        );
+    }
   }
 }

@@ -85,7 +85,9 @@ class StitchGenieApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthState()),
+        // Single source of truth for auth (lazy: first read by the gate, which
+        // runs after Firebase is initialized).
+        ChangeNotifierProvider(create: (_) => AuthController()),
         ChangeNotifierProvider(create: (_) => BackupState()),
         ChangeNotifierProvider(create: (_) => CustomerState()),
         Provider<CustomerRepository>(

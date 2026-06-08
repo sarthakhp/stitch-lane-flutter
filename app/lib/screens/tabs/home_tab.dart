@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../constants/app_constants.dart';
 import '../../domain/services/order_service.dart';
-import '../../domain/state/auth_state.dart';
+import '../../domain/state/auth_controller.dart';
 import '../../domain/state/order_state.dart';
 import '../../domain/state/customer_state.dart';
 import '../../domain/state/main_shell_state.dart';
@@ -38,10 +38,12 @@ class HomeTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  WelcomeHero(userName: context.watch<AuthState>().userName),
+                  WelcomeHero(userName: context.watch<AuthController>().name),
                   const SizedBox(height: AppConfig.spacing16),
+                  // BackupHealthCard owns its own bottom gap when shown; when
+                  // hidden it shrinks to zero, so only the single gap above
+                  // remains (no dead space on a fresh/healthy account).
                   const BackupHealthCard(),
-                  const SizedBox(height: AppConfig.spacing16),
                   if (context.isExpanded)
                     _buildExpandedLayout(context)
                   else
@@ -62,7 +64,7 @@ class HomeTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildKpiSection(context),
-        const SizedBox(height: AppConfig.spacing24),
+        const SizedBox(height: AppConfig.spacing16),
         _buildActionSection(context),
         const SizedBox(height: AppConfig.spacing24),
         _buildNeedsAttention(context),
@@ -108,7 +110,7 @@ class HomeTab extends StatelessWidget {
           return Column(
             children: [
               for (int i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppConfig.spacing8),
+                if (i > 0) const SizedBox(height: AppConfig.spacing16),
                 cards[i],
               ],
             ],

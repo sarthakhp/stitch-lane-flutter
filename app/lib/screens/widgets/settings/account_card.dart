@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../backend/backend.dart';
 import '../../../config/app_config.dart';
-import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
 import '../../../presentation/widgets/confirmation_dialog.dart';
 
@@ -11,7 +10,7 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthState>(
+    return Consumer<AuthController>(
       builder: (context, authState, child) {
         return Card(
           child: Padding(
@@ -24,20 +23,20 @@ class AccountCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: AppConfig.spacing16),
-                if (authState.userEmail != null) ...[
+                if (authState.email != null) ...[
                   ListTile(
                     leading: const Icon(Icons.email),
                     title: const Text('Email'),
-                    subtitle: Text(authState.userEmail!),
+                    subtitle: Text(authState.email!),
                     contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: AppConfig.spacing8),
                 ],
-                if (authState.userName != null) ...[
+                if (authState.name != null) ...[
                   ListTile(
                     leading: const Icon(Icons.person),
                     title: const Text('Name'),
-                    subtitle: Text(authState.userName!),
+                    subtitle: Text(authState.name!),
                     contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: AppConfig.spacing16),
@@ -64,14 +63,25 @@ class AccountCard extends StatelessWidget {
   }
 
   Future<void> _handleSignOut(BuildContext context) async {
+    // Signing out clears all local data, so confirm twice to be sure it isn't
+    // an accidental tap.
     final confirmed = await ConfirmationDialog.show(
       context: context,
       title: 'Sign Out',
       content: 'Are you sure you want to sign out? All local data will be cleared.',
       confirmText: 'Sign Out',
     );
+    if (!confirmed || !context.mounted) return;
 
-    if (confirmed && context.mounted) {
+    final confirmedAgain = await ConfirmationDialog.show(
+      context: context,
+      title: 'Are you absolutely sure?',
+      content:
+          'This is your last chance. All local data on this device will be cleared. Make sure you have a backup before signing out.',
+      confirmText: 'Sign Out',
+    );
+
+    if (confirmedAgain && context.mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -95,6 +105,7 @@ class AccountCard extends StatelessWidget {
         ),
       );
 
+      final authController = context.read<AuthController>();
       final customerState = context.read<CustomerState>();
       final orderState = context.read<OrderState>();
       final settingsState = context.read<SettingsState>();
@@ -105,14 +116,15 @@ class AccountCard extends StatelessWidget {
       final settingsRepository = context.read<SettingsRepository>();
 
       try {
-        await AuthService.signOut(
+        await authController.signOut(
           customerRepository: customerRepository,
           orderRepository: orderRepository,
           measurementRepository: measurementRepository,
           settingsRepository: settingsRepository,
         );
       } catch (_) {
-        // Auth already signed out; local cleanup failed but we still proceed to login
+        // Auth already signed out; local cleanup failed but the auth gate will
+        // still route to login once the status flips.
       }
 
       customerState.clearCustomers();
@@ -120,12 +132,11 @@ class AccountCard extends StatelessWidget {
       settingsState.reset();
       backupState.reset();
 
+      // Pop the loading dialog + this pushed Profile/Settings route back to the
+      // gate (root), which now shows LoginScreen because status flipped to
+      // unauthenticated. No manual navigation to login — single source.
       if (context.mounted) {
-        Navigator.of(context).pop(); // dismiss loading dialog
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppConstants.loginRoute,
-          (route) => false,
-        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     }
   }
