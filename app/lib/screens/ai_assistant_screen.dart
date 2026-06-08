@@ -23,7 +23,15 @@ class AiAssistantScreen extends StatefulWidget {
   /// home-screen widget deep link.
   final bool autoStartVoice;
 
-  const AiAssistantScreen({super.key, this.autoStartVoice = false});
+  /// Whether this tab is currently the visible one. When it goes false, an
+  /// in-progress voice recording is paused (no background recording).
+  final bool active;
+
+  const AiAssistantScreen({
+    super.key,
+    this.autoStartVoice = false,
+    this.active = true,
+  });
 
   @override
   State<AiAssistantScreen> createState() => AiAssistantScreenState();
@@ -256,6 +264,7 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
             isLoading: _isLoading,
             onSend: _sendMessage,
             autoStartVoice: widget.autoStartVoice || _voiceKick > 0,
+            active: widget.active,
           ),
         ],
       ),

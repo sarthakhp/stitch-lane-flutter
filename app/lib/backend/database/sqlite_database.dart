@@ -84,7 +84,7 @@ class SqliteDatabase {
         auto_backup_enabled INTEGER NOT NULL DEFAULT 0,
         auto_backup_time TEXT NOT NULL DEFAULT '03:00',
         last_backup_time TEXT,
-        debug_logs_enabled INTEGER NOT NULL DEFAULT 0,
+        debug_logs_enabled INTEGER NOT NULL DEFAULT 1,
         ai_chat_model TEXT,
         ai_formatting_model TEXT,
         last_backup_status TEXT,

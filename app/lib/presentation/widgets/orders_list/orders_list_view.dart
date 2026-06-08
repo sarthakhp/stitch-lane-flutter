@@ -19,7 +19,6 @@ class OrdersListView extends StatelessWidget {
   final int dueDateWarningThreshold;
 
   final void Function(Order order, Customer customer) onSelect;
-  final void Function(Order order) onToggleStatus;
   final Future<void> Function() onRefresh;
 
   const OrdersListView({
@@ -30,7 +29,6 @@ class OrdersListView extends StatelessWidget {
     required this.showCustomerName,
     required this.dueDateWarningThreshold,
     required this.onSelect,
-    required this.onToggleStatus,
     required this.onRefresh,
   });
 
@@ -55,7 +53,6 @@ class OrdersListView extends StatelessWidget {
               selected: order.id == selectedOrderId,
               dueDateWarningThreshold: dueDateWarningThreshold,
               onTap: () => onSelect(order, customer),
-              onStatusToggle: () => onToggleStatus(order),
             );
           },
         ),

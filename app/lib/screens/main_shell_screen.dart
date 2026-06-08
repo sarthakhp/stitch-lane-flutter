@@ -148,7 +148,7 @@ class _MainShellScreenState extends State<MainShellScreen>
             ? CustomersTab(key: _customersTabKey)
             : const SizedBox.shrink(),
         _mountedTabs.contains(3)
-            ? AiAssistantScreen(key: _aiTabKey)
+            ? AiAssistantScreen(key: _aiTabKey, active: selectedIndex == 3)
             : const SizedBox.shrink(),
       ],
     );

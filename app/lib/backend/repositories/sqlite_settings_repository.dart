@@ -69,7 +69,7 @@ class SqliteSettingsRepository implements SettingsRepository {
         lastBackupTime: map['last_backup_time'] != null
             ? DateTime.parse(map['last_backup_time'] as String)
             : null,
-        debugLogsEnabledRaw: (map['debug_logs_enabled'] as int? ?? 0) == 1,
+        debugLogsEnabledRaw: (map['debug_logs_enabled'] as int? ?? 1) == 1,
         aiChatModelRaw: map['ai_chat_model'] as String?,
         aiFormattingModelRaw: map['ai_formatting_model'] as String?,
         lastBackupStatus: map['last_backup_status'] as String?,

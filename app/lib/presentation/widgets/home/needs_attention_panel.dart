@@ -68,7 +68,7 @@ class NeedsAttentionPanel extends StatelessWidget {
             ),
             const SizedBox(height: AppConfig.spacing12),
             if (items.isEmpty)
-              _EmptyState(theme: theme)
+              SizedBox(width: double.infinity, child: _EmptyState(theme: theme))
             else
               ...items.map((order) => _DueOrderRow(
                     order: order,
@@ -90,7 +90,11 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppConfig.spacing24),
+      // Full width so the centered content sits in the middle of the panel
+      // (the parent Column is crossAxisAlignment.start).
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.check_circle_outline,
               size: 40, color: theme.colorScheme.primary),

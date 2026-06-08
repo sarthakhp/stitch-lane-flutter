@@ -87,7 +87,9 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
 
         return Card(
           color: bg,
-          margin: EdgeInsets.zero,
+          // Own the trailing gap so home doesn't reserve space when this card
+          // is hidden (new account / healthy backup → SizedBox.shrink above).
+          margin: const EdgeInsets.only(bottom: AppConfig.spacing16),
           elevation: 0,
           child: Padding(
             padding: const EdgeInsets.all(AppConfig.spacing12),

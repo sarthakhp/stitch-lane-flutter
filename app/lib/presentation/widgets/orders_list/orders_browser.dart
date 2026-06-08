@@ -131,28 +131,6 @@ class OrdersBrowserState extends State<OrdersBrowser>
     return result;
   }
 
-  Future<void> _toggleOrderStatus(Order order) async {
-    try {
-      final updated = await OrderService.toggleOrderStatus(
-        context.read<OrderState>(),
-        context.read<OrderRepository>(),
-        order,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          duration: const Duration(milliseconds: 800),
-          content: Text(OrderService.getStatusToggleMessage(updated.status)),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update order status: $e')),
-        );
-      }
-    }
-  }
-
   Order? _selectedFrom(List<Order> filtered) {
     for (final o in filtered) {
       if (o.id == _selectedOrderId) return o;
@@ -319,7 +297,6 @@ class OrdersBrowserState extends State<OrdersBrowser>
       showCustomerName: widget.customer == null,
       dueDateWarningThreshold: dueThreshold,
       onSelect: (order, customer) => _onOrderTap(order, customer, twoPane),
-      onToggleStatus: _toggleOrderStatus,
       onRefresh: _refreshOrders,
     );
   }

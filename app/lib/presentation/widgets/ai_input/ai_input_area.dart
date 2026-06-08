@@ -34,6 +34,10 @@ class AiInputArea extends StatefulWidget {
   /// home-screen widget deep link so the mother taps once and starts talking.
   final bool autoStartVoice;
 
+  /// Whether the host screen is currently visible. Forwarded to the voice UI so
+  /// an in-progress recording pauses when the host is hidden (e.g. tab switch).
+  final bool active;
+
   const AiInputArea({
     super.key,
     required this.controller,
@@ -42,6 +46,7 @@ class AiInputArea extends StatefulWidget {
     this.enableFormatting = false,
     this.hintText,
     this.autoStartVoice = false,
+    this.active = true,
   });
 
   @override
@@ -97,6 +102,7 @@ class _AiInputAreaState extends State<AiInputArea> {
       child: _isVoiceActive
           ? StreamingVoiceInput(
               key: const ValueKey('voice'),
+              active: widget.active,
               existingText: widget.controller.text.trim(),
               // Only consult the formatting model setting if the caller has
               // opted into formatting. When disabled we leave it null so the

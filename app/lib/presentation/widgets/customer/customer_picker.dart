@@ -263,29 +263,41 @@ class _EmptyState extends StatelessWidget {
         ? 'No customer named "$query"'
         : (hasAnyCustomers ? 'No matches' : 'No customers yet');
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConfig.spacing24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.person_search_outlined,
-                size: 48, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: AppConfig.spacing12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium,
-              textAlign: TextAlign.center,
+    // Center when there's room, but stay scrollable so it never overflows when
+    // the keyboard shrinks the available height.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppConfig.spacing24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.person_search_outlined,
+                        size: 48, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(height: AppConfig.spacing12),
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppConfig.spacing16),
+                    FilledButton.icon(
+                      onPressed: onCreate,
+                      icon: const Icon(Icons.person_add),
+                      label: Text(
+                          hasQuery ? 'Create "$query"' : 'Create new customer'),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: AppConfig.spacing16),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.person_add),
-              label: Text(hasQuery ? 'Create "$query"' : 'Create new customer'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

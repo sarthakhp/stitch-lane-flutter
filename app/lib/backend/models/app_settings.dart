@@ -29,7 +29,8 @@ class AppSettings {
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
   String get autoBackupTime => autoBackupTimeRaw ?? '03:00';
-  bool get debugLogsEnabled => debugLogsEnabledRaw ?? false;
+  // On by default so we always have logs to debug from; users can turn it off.
+  bool get debugLogsEnabled => debugLogsEnabledRaw ?? true;
   String get aiChatModel => aiChatModelRaw ?? 'gemini-3.1-flash-lite';
   String get aiFormattingModel => aiFormattingModelRaw ?? 'gemini-2.5-flash-lite';
   String get sttModel => sttModelRaw ?? 'gemini:gemini-3.1-flash-lite';

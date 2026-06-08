@@ -30,6 +30,11 @@ class StreamingVoiceInput extends StatefulWidget {
   final bool enableFormatting;
   final String? formattingModelName;
 
+  /// Whether the host is currently visible. When this goes false (e.g. the user
+  /// switches away from the Assistant tab) an in-progress recording is paused
+  /// so the mic never keeps capturing in the background.
+  final bool active;
+
   const StreamingVoiceInput({
     super.key,
     required this.onDone,
@@ -38,6 +43,7 @@ class StreamingVoiceInput extends StatefulWidget {
     this.existingText,
     this.enableFormatting = false,
     this.formattingModelName,
+    this.active = true,
   });
 
   @override
@@ -59,6 +65,19 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
     );
     _controller.addListener(_onControllerUpdate);
     _controller.start();
+  }
+
+  @override
+  void didUpdateWidget(StreamingVoiceInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Host went from visible → hidden (e.g. left the Assistant tab) while the
+    // mic was live: pause so we don't record in the background. The user
+    // resumes manually when they return.
+    if (oldWidget.active &&
+        !widget.active &&
+        _controller.state == VoiceInputState.listening) {
+      _controller.pause();
+    }
   }
 
   void _onControllerUpdate() {
