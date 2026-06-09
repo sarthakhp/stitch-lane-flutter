@@ -274,6 +274,10 @@ class CustomersBrowserState extends State<CustomersBrowser>
       floatingActionButton: widget.onCreate == null
           ? null
           : FloatingActionButton(
+              // Unique tag: every tab stays mounted in the shell's
+              // IndexedStack, so this must not share the default FAB hero tag
+              // with the Orders tab's FAB.
+              heroTag: 'customersFab',
               onPressed: widget.onCreate,
               child: const Icon(Icons.add),
             ),

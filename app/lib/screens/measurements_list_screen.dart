@@ -95,6 +95,7 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'measurementsFab',
         onPressed: () {
           Navigator.pushNamed(
             context,
