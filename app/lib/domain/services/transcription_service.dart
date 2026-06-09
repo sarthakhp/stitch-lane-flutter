@@ -67,7 +67,8 @@ class TranscriptionService {
     return TranscriptionResult.success(transcription);
   }
 
-  /// Shows the action dialog (Replace/Append/Cancel) and returns the final text.
+  /// Shows the append/cancel dialog and returns the final text — the
+  /// transcription appended to any existing text (no destructive replace).
   static Future<String?> getActionResult({
     required BuildContext context,
     required String transcription,
@@ -85,15 +86,10 @@ class TranscriptionService {
       return null;
     }
 
-    if (action == TranscriptionAction.replace) {
-      return transcription;
-    } else if (action == TranscriptionAction.append) {
-      final trimmedCurrent = currentText.trim();
-      return trimmedCurrent.isEmpty
-          ? transcription
-          : '$trimmedCurrent\n\n$transcription';
-    }
-
-    return null;
+    // Append — empty current text just becomes the transcription.
+    final trimmedCurrent = currentText.trim();
+    return trimmedCurrent.isEmpty
+        ? transcription
+        : '$trimmedCurrent\n\n$transcription';
   }
 }

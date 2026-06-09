@@ -64,9 +64,9 @@ class HomeTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildKpiSection(context),
-        const SizedBox(height: AppConfig.spacing16),
+        const SizedBox(height: AppConfig.spacing12),
         _buildActionSection(context),
-        const SizedBox(height: AppConfig.spacing24),
+        const SizedBox(height: AppConfig.spacing16),
         _buildNeedsAttention(context),
       ],
     );
@@ -110,7 +110,7 @@ class HomeTab extends StatelessWidget {
           return Column(
             children: [
               for (int i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppConfig.spacing16),
+                if (i > 0) const SizedBox(height: AppConfig.spacing12),
                 cards[i],
               ],
             ],
@@ -196,8 +196,8 @@ class HomeTab extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AppConfig.spacing16,
-      crossAxisSpacing: AppConfig.spacing16,
+      mainAxisSpacing: AppConfig.spacing12,
+      crossAxisSpacing: AppConfig.spacing12,
       childAspectRatio: context.isExpanded ? 1.6 : 1.0,
       children: tiles,
     );

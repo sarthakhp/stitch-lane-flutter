@@ -4,7 +4,6 @@ import 'markdown_description_text.dart';
 
 enum TranscriptionAction {
   append,
-  replace,
   cancel,
 }
 
@@ -48,13 +47,6 @@ class TranscriptionActionDialog extends StatelessWidget {
                 selectable: false,
               ),
             ),
-            if (hasExistingDescription) ...[
-              const SizedBox(height: AppConfig.spacing16),
-              Text(
-                'How would you like to add this to the description?',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
           ],
         ),
       ),
@@ -63,17 +55,11 @@ class TranscriptionActionDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(TranscriptionAction.cancel),
           child: const Text('Cancel'),
         ),
-        if (hasExistingDescription)
-          FilledButton.tonal(
-            onPressed: () => Navigator.of(context).pop(TranscriptionAction.replace),
-            child: const Text('Replace'),
-          ),
+        // Append-only: when there's existing text we add to it; when empty it
+        // just becomes the text ("Add"). No destructive replace option.
         FilledButton(
-          onPressed: () => Navigator.of(context).pop(
-                hasExistingDescription
-                    ? TranscriptionAction.append
-                    : TranscriptionAction.replace,
-              ),
+          onPressed: () =>
+              Navigator.of(context).pop(TranscriptionAction.append),
           child: Text(hasExistingDescription ? 'Append' : 'Add'),
         ),
       ],

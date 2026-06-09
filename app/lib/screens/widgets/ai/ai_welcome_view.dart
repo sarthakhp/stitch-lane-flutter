@@ -30,8 +30,10 @@ class AiWelcomeView extends StatelessWidget {
               color: colorScheme.primary,
             ),
             const SizedBox(height: AppConfig.spacing16),
+            // Single sparkle only \u2014 the themed blue icon above. (Dropped the
+            // \u2728 emoji here; it rendered as a second, off-theme yellow star.)
             Text(
-              'Hi! I\'m Genie \u2728',
+              'Hi! I\'m Genie',
               style: theme.textTheme.titleLarge?.copyWith(
                 color: colorScheme.onSurface,
               ),
