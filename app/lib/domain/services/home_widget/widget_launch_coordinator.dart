@@ -57,7 +57,10 @@ class WidgetLaunchCoordinator {
             .switchToAiTab(startVoice: true);
         break;
       case WidgetAction.createOrder:
-        // Full-screen create flow — cover the dashboard while it's open.
+        // Return to the root shell first (same as the chat path) so the creator
+        // is pushed onto the shell, never stacked on top of some other screen
+        // the user had left open. Then cover the dashboard while it's open.
+        navigator.popUntil((route) => route.isFirst);
         shellCovered.value = true;
         navigator
             .pushNamed(action.route, arguments: action.arguments)

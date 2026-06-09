@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../screens/login_screen.dart';
 import '../screens/backup_restore_check_screen.dart';
-import '../screens/main_shell_screen.dart';
 import '../screens/customers_list_screen.dart';
 import '../screens/customer_detail_screen.dart';
 import '../screens/customer_form_screen.dart';
@@ -42,10 +41,12 @@ class AppRoutes {
           ),
         );
 
-      case AppConstants.homeRoute:
-        return MaterialPageRoute(
-          builder: (_) => const MainShellScreen(),
-        );
+      // NOTE: there is intentionally no pushable route for the home shell.
+      // The shell lives as the auth gate's body (AppRoot), so it is always the
+      // single root route. Pushing a second MainShellScreen here would stack a
+      // duplicate shell and leave the home tab with a stray back arrow — to
+      // return home, pop to the first route instead (see WidgetLaunchCoordinator
+      // / sign-out flows).
 
       case AppConstants.customersListRoute:
         final args = settings.arguments as Map<String, dynamic>?;

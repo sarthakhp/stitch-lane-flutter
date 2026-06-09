@@ -19,6 +19,9 @@ class HomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBar(
+        // Home is a root tab — never show a back arrow, even if some edge case
+        // briefly leaves a route beneath the shell.
+        automaticallyImplyLeading: false,
         title: const Text(AppConstants.appName),
         actions: [_buildOverflowMenu(context)],
       ),
