@@ -101,8 +101,14 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
   Future<void> _handleDone() async {
     final text = await _controller.stop();
     if (!mounted) return;
-    // If formatting failed, stay on screen so user sees the error UI
-    if (_controller.formattingFailed) return;
+    // Stay on the sheet when something went wrong so the user actually sees
+    // the error UI (message + Retry + play-backup + Dismiss) instead of the
+    // sheet popping instantly. Covers transcription errors (state == error)
+    // and formatting failures.
+    if (_controller.state == VoiceInputState.error ||
+        _controller.formattingFailed) {
+      return;
+    }
     if (text != null && text.isNotEmpty) {
       widget.onDone(VoiceInputResult(
         text: text,
@@ -116,7 +122,10 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
   Future<void> _handleSend() async {
     final text = await _controller.stop();
     if (!mounted) return;
-    if (_controller.formattingFailed) return;
+    if (_controller.state == VoiceInputState.error ||
+        _controller.formattingFailed) {
+      return;
+    }
     if (text != null && text.isNotEmpty) {
       widget.onSend?.call(VoiceInputResult(
         text: text,

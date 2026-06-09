@@ -4,6 +4,7 @@ import 'package:langchain_google/langchain_google.dart';
 import '../../backend/backend.dart';
 import '../../utils/app_logger.dart';
 import 'ai_action/proposed_action.dart';
+import 'ai_gateway/ai_error.dart';
 import 'ai_chat_config.dart';
 import 'ai_chat_history.dart';
 import 'ai_chat_models.dart';
@@ -141,8 +142,10 @@ class AiChatService {
     } catch (e) {
       AppLogger.error('AI chat error', e);
       clearThoughtSignatureCache();
+      // Surface the real reason (out of credits, rate-limited, offline, …)
+      // instead of a generic message, so the tailor knows what to do.
       return AiChatResponse(
-        text: 'Something went wrong. Please try again.',
+        text: describeAiError(e),
         usage: AiTokenUsage.zero,
       );
     }

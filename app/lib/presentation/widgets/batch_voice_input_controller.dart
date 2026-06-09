@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../backend/models/app_settings.dart';
+import '../../domain/services/ai_gateway/ai_error.dart';
 import '../../domain/services/audio_backup_recorder.dart';
 import '../../domain/services/streaming_amplitude_tracker.dart';
 import '../../domain/services/streaming_recording_service.dart';
@@ -161,7 +162,7 @@ class BatchVoiceInputController extends ChangeNotifier
       _finalText = (transcript ?? '').trim();
     } catch (e) {
       AppLogger.error('BatchVoiceInputController: transcription failed', e);
-      _setErrorState(e.toString().replaceFirst('Exception: ', ''));
+      _setErrorState(describeAiError(e));
       return null;
     }
 
