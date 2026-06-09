@@ -224,11 +224,13 @@ class _MainShellScreenState extends State<MainShellScreen>
     }
 
     return PopScope(
-      canPop: selectedIndex == 0,
+      // Walk back through visited tabs first (Customers → Orders → Home);
+      // once there's no tab history the shell is the root route, so let the OS
+      // pop it and exit the app.
+      canPop: !shellState.canPopTab,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && selectedIndex != 0) {
-          shellState.switchToHomeTab();
-        }
+        if (didPop) return;
+        shellState.popTab();
       },
       child: scaffold,
     );
