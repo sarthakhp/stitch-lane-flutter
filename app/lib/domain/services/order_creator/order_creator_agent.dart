@@ -11,10 +11,23 @@ import '../../models/order_proposal.dart';
 import '../../../utils/app_logger.dart';
 import '../ai_chat_config.dart';
 import '../ai_chat_models.dart';
+import '../ai_gateway/ai_error.dart';
 import '../ai_gateway/ai_gateway.dart';
 import '../ai_gateway/usage_event.dart';
 import 'order_creator_prompts.dart';
 import 'order_creator_tools.dart';
+
+/// One thing the tailor said during a session, in order. Fed back to the agent
+/// as a reference log so a refinement turn can resolve references to earlier
+/// turns ("the lining I mentioned", "make the first one red too") even though
+/// the prior wording isn't in the model's chat history (each turn is stateless;
+/// the draft is the source of truth, this is reference context).
+class CreatorUtterance {
+  /// false = the initial voice dump; true = a later refinement instruction.
+  final bool isFeedback;
+  final String text;
+  const CreatorUtterance({required this.isFeedback, required this.text});
+}
 
 /// One outcome of [OrderCreatorAgent.run].
 class OrderCreatorAgentResult {
@@ -63,6 +76,7 @@ class OrderCreatorAgent {
     required OrderProposalDraft draft,
     String transcript = '',
     String feedback = '',
+    List<CreatorUtterance> conversation = const [],
     void Function(AgentLogEntry)? onLog,
   }) async {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
@@ -92,6 +106,7 @@ class OrderCreatorAgent {
     final systemPrompt = OrderCreatorPrompts.build(
       customerName: customer.name,
       draftJson: jsonEncode(tools.draft.toJson()),
+      conversation: _conversationBlock(conversation),
     );
 
     final userMessage = _buildUserMessage(transcript: transcript, feedback: feedback);
@@ -213,7 +228,9 @@ class OrderCreatorAgent {
         iterations: iterations,
         stoppedEarly: true,
         usage: totalUsage,
-        errorMessage: e.toString(),
+        // User-facing reason (out of credits, offline, …); the raw error is in
+        // the activity log above and the debug log for developers.
+        errorMessage: describeAiError(e),
       );
     }
   }
@@ -265,6 +282,18 @@ class OrderCreatorAgent {
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
+
+  /// Numbered reference log of everything said this session. Returns null on
+  /// the very first turn (nothing prior to reference yet — saves tokens).
+  String? _conversationBlock(List<CreatorUtterance> conversation) {
+    if (conversation.length <= 1) return null;
+    final lines = <String>[];
+    for (var i = 0; i < conversation.length; i++) {
+      final u = conversation[i];
+      lines.add('${i + 1}. (${u.isFeedback ? 'feedback' : 'dump'}) ${u.text}');
+    }
+    return lines.join('\n');
+  }
 
   String _buildUserMessage({required String transcript, required String feedback}) {
     final t = transcript.trim();

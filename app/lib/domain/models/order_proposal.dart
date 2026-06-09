@@ -10,7 +10,11 @@ class ProposedOrder {
 
   /// Price in rupees. Null means "price not decided yet" (distinct from 0).
   final int? value;
-  final DateTime dueDate;
+
+  /// Null means "no due date set yet". The agent leaves this empty unless the
+  /// tailor actually stated a date; the commit is blocked until every order
+  /// has one (the persisted [Order.dueDate] is always non-null).
+  final DateTime? dueDate;
   final String? description;
   final List<String> imagePaths;
 
@@ -47,7 +51,7 @@ class ProposedOrder {
         'id': id,
         'title': title,
         'value': value,
-        'due_date': dueDate.toIso8601String(),
+        'due_date': dueDate?.toIso8601String(),
         'description': description,
         'image_paths': imagePaths,
       };

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../config/app_config.dart';
 import '../../../domain/models/order_proposal.dart';
 import '../order_images_section.dart';
+import 'editable_markdown_field.dart';
 
 /// Inline-editable card for one [ProposedOrder]. All edits flow up through
 /// the `onEdit` / `onRemove` callbacks — the widget itself is stateless w.r.t.
@@ -39,14 +40,12 @@ class ProposedOrderCard extends StatefulWidget {
 class _ProposedOrderCardState extends State<ProposedOrderCard> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _valueCtrl;
-  late final TextEditingController _descCtrl;
 
   @override
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.order.title ?? '');
     _valueCtrl = TextEditingController(text: widget.order.value?.toString() ?? '');
-    _descCtrl = TextEditingController(text: widget.order.description ?? '');
   }
 
   @override
@@ -64,24 +63,24 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
     if (_valueCtrl.text != incomingValue && old.order.value != widget.order.value) {
       _valueCtrl.text = incomingValue;
     }
-    final incomingDesc = widget.order.description ?? '';
-    if (_descCtrl.text != incomingDesc && old.order.description != widget.order.description) {
-      _descCtrl.text = incomingDesc;
-    }
+    // Notes sync is handled inside EditableMarkdownField (it owns its own
+    // controller), so nothing to do here for the description.
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _valueCtrl.dispose();
-    _descCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _pickDueDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: widget.order.dueDate,
+      // No date yet → open the picker a week out as a convenient starting
+      // point, but nothing is stored until the tailor actually picks.
+      initialDate: widget.order.dueDate ??
+          DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now().subtract(const Duration(days: 30)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
@@ -93,7 +92,10 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final dueLabel = DateFormat('MMM d, y').format(widget.order.dueDate);
+    final hasDue = widget.order.dueDate != null;
+    final dueLabel = hasDue
+        ? DateFormat('MMM d, y').format(widget.order.dueDate!)
+        : 'Set due date';
     final isValueTbd = widget.order.value == null;
 
     return Card(
@@ -126,7 +128,10 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
             ),
             const SizedBox(height: AppConfig.spacing12),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              // Top-align: when the Due field shows its "Required" error text
+              // it grows taller than the Price field, and centering would
+              // shove the Price label/value down out of line with "Due".
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
                   width: 120,
@@ -158,22 +163,29 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
                     borderRadius:
                         BorderRadius.circular(AppConfig.buttonBorderRadius),
                     child: InputDecorator(
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Due',
                         isDense: true,
+                        // Flag the empty state so the tailor knows a date is
+                        // needed before she can create the order.
+                        errorText: hasDue ? null : 'Required',
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.calendar_today,
                             size: 16,
-                            color: colorScheme.onSurfaceVariant,
+                            color: hasDue
+                                ? colorScheme.onSurfaceVariant
+                                : colorScheme.error,
                           ),
                           const SizedBox(width: AppConfig.spacing8),
                           Expanded(
                             child: Text(
                               dueLabel,
-                              style: textTheme.bodyMedium,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: hasDue ? null : colorScheme.error,
+                              ),
                             ),
                           ),
                         ],
@@ -184,16 +196,13 @@ class _ProposedOrderCardState extends State<ProposedOrderCard> {
               ],
             ),
             const SizedBox(height: AppConfig.spacing12),
-            TextField(
-              controller: _descCtrl,
+            EditableMarkdownField(
+              value: widget.order.description ?? '',
               enabled: widget.enabled,
-              maxLines: 3,
+              labelText: 'Notes',
+              hintText: 'Fabric, style, customization (optional)',
               minLines: 1,
-              decoration: const InputDecoration(
-                labelText: 'Notes',
-                hintText: 'Fabric, style, customization (optional)',
-                isDense: true,
-              ),
+              maxLines: 6,
               onChanged: (v) {
                 if (v.trim().isEmpty) {
                   widget.onEdit(clearDescription: true);

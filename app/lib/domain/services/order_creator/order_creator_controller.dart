@@ -12,6 +12,8 @@ import '../../state/measurement_state.dart';
 import '../../state/order_state.dart';
 import '../measurement_service.dart';
 import '../order_service.dart';
+import '../recordings/recording_metadata.dart';
+import '../recordings/recording_store.dart';
 import 'order_creator_agent.dart';
 
 /// Phase of the order-creator session, drives the screen body.
@@ -52,6 +54,11 @@ class OrderCreatorController extends ChangeNotifier {
   String? _audioPath;
   String? _transcript;
   OrderProposalDraft _draft = OrderProposalDraft.empty;
+  // Ordered record of everything the tailor has said this session (initial
+  // dump + each feedback turn). Passed to the agent as reference so a refine
+  // turn can resolve references to earlier turns, even though each agent call
+  // is otherwise stateless.
+  final List<CreatorUtterance> _utterances = [];
   final List<AgentLogEntry> _log = [];
   String? _agentCommentary;
   String? _errorMessage;
@@ -74,8 +81,17 @@ class OrderCreatorController extends ChangeNotifier {
       _phase == CreatorPhase.agentRunning ||
       _phase == CreatorPhase.committing;
 
+  /// Commit is allowed only when every order has a due date. The tailor sets
+  /// it herself (or asks the AI to) — we never auto-fill one, so this guards
+  /// against saving an order with no due date (the persisted Order requires
+  /// one). [ordersMissingDueDate] surfaces the count for the CTA hint.
   bool get canCommit =>
-      _phase == CreatorPhase.reviewing && _draft.orders.isNotEmpty;
+      _phase == CreatorPhase.reviewing &&
+      _draft.orders.isNotEmpty &&
+      ordersMissingDueDate == 0;
+
+  int get ordersMissingDueDate =>
+      _draft.orders.where((o) => o.dueDate == null).length;
 
   bool get hasUnsavedWork =>
       _draft.orders.isNotEmpty || _draft.measurements.isNotEmpty;
@@ -98,6 +114,7 @@ class OrderCreatorController extends ChangeNotifier {
     _audioPath = null;
     _transcript = null;
     _draft = OrderProposalDraft.empty;
+    _utterances.clear();
     _log.clear();
     _agentCommentary = null;
     _errorMessage = null;
@@ -114,6 +131,7 @@ class OrderCreatorController extends ChangeNotifier {
     _audioPath = null;
     _transcript = null;
     _draft = OrderProposalDraft.empty;
+    _utterances.clear();
     _log.clear();
     _agentCommentary = null;
     _errorMessage = null;
@@ -143,6 +161,7 @@ class OrderCreatorController extends ChangeNotifier {
     _audioPath = audioPath;
     _transcript = cleaned;
     _errorMessage = null;
+    _utterances.add(CreatorUtterance(isFeedback: false, text: cleaned));
     await _runAgent(transcript: cleaned, feedback: '');
   }
 
@@ -152,6 +171,7 @@ class OrderCreatorController extends ChangeNotifier {
     if (_customer == null) return;
     final cleaned = feedback.trim();
     if (cleaned.isEmpty) return;
+    _utterances.add(CreatorUtterance(isFeedback: true, text: cleaned));
     await _runAgent(transcript: '', feedback: cleaned);
   }
 
@@ -173,6 +193,7 @@ class OrderCreatorController extends ChangeNotifier {
       draft: _draft,
       transcript: transcript,
       feedback: feedback,
+      conversation: List.unmodifiable(_utterances),
       onLog: _appendLog,
     );
 
@@ -237,12 +258,11 @@ class OrderCreatorController extends ChangeNotifier {
   }
 
   void addBlankOrder() {
-    final defaultDue = DateTime.now().add(const Duration(days: 7));
     final order = ProposedOrder(
       id: ProposedOrder.generateId(),
       title: null,
       value: null, // price not decided until the tailor sets it
-      dueDate: DateTime(defaultDue.year, defaultDue.month, defaultDue.day),
+      dueDate: null, // no due date until the tailor picks one
       description: null,
     );
     _draft = _draft.copyWith(orders: [..._draft.orders, order]);
@@ -287,6 +307,9 @@ class OrderCreatorController extends ChangeNotifier {
     final customer = _customer;
     if (customer == null) return false;
     if (_draft.orders.isEmpty) return false;
+    // Safety net behind the disabled CTA: never persist an order without a
+    // due date (the saved Order requires one).
+    if (ordersMissingDueDate > 0) return false;
 
     _phase = CreatorPhase.committing;
     _errorMessage = null;
@@ -300,7 +323,7 @@ class OrderCreatorController extends ChangeNotifier {
           customerId: customer.id,
           title: p.title?.trim().isNotEmpty == true ? p.title : null,
           description: p.description?.trim().isNotEmpty == true ? p.description : null,
-          dueDate: p.dueDate,
+          dueDate: p.dueDate!,
           created: now,
           value: (p.value != null && p.value! < 0) ? 0 : p.value,
           imagePaths: p.imagePaths,
@@ -338,6 +361,24 @@ class OrderCreatorController extends ChangeNotifier {
           );
         }
       }
+
+      // Best-effort: drop a sidecar next to the dump recording so the
+      // Recordings debugger shows the transcript + what was actually created.
+      await RecordingStore.writeSidecar(
+        _audioPath,
+        RecordingMetadata(
+          source: RecordingSource.orderCreator,
+          title: customer.name,
+          transcript: _transcript,
+          actions: [
+            for (final o in savedOrders)
+              '${o.title ?? 'Order'} — '
+                  '${o.value == null ? 'price not set' : '₹${o.value}'} — '
+                  'due ${o.dueDate.day}/${o.dueDate.month}/${o.dueDate.year}',
+            if (savedMeasurement != null) 'Measurement saved',
+          ],
+        ),
+      );
 
       _savedOrders = savedOrders;
       _savedMeasurement = savedMeasurement;

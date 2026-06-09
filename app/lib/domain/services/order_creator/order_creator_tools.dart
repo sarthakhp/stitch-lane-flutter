@@ -40,16 +40,21 @@ class OrderCreatorTools {
           },
           'due_date': {
             'type': 'string',
-            'description': 'ISO date "YYYY-MM-DD". Required.',
+            'description': 'ISO date "YYYY-MM-DD". OMIT this field entirely '
+                'unless the tailor actually stated a due date. Never guess or '
+                'default a date — an empty due date is expected and fine.',
           },
           'description': {
             'type': 'string',
             'description':
-                'Garment-specific notes (fabric, style, customization). '
-                'MUST NOT contain body measurements.',
+                'Garment-specific notes (fabric, style, customization, special '
+                'instructions) as a markdown bullet list — one "- " bullet per '
+                'distinct detail, with the leading label in **bold**. Keep ALL '
+                'such details the tailor mentioned. MUST NOT contain body '
+                'measurements.',
           },
         },
-        'required': ['title', 'due_date'],
+        'required': ['title'],
       },
     ),
     ToolSpec(
@@ -89,9 +94,13 @@ class OrderCreatorTools {
           'description': {
             'type': 'string',
             'description':
-                'Markdown body consolidating all body measurements mentioned '
-                'in the dump. Use headings (e.g. "### Blouse") to separate '
-                'per-garment measurements within this single record.',
+                'Markdown body consolidating ALL body measurements mentioned '
+                'in the dump. Format: a "### Garment" heading per garment, then '
+                'a "- " bullet per measurement with the label in **bold** '
+                '(e.g. "- **Bust:** 39"). Keep every measurement; write words '
+                'exactly as spoken (do not translate or transliterate — keep '
+                'Gujarati script as-is). Only normalise spoken math: '
+                '"X into Y" -> "X x Y", "and half" -> ".5", "quarter" -> ".25".',
           },
         },
         'required': ['description'],
@@ -167,7 +176,7 @@ class OrderCreatorTools {
   Map<String, dynamic> _handleAddOrder(Map<String, dynamic> args) {
     final title = _requireString(args, 'title');
     final value = args.containsKey('value') ? _requireInt(args, 'value') : null;
-    final dueDate = _requireDate(args, 'due_date');
+    final dueDate = _optionalDate(args, 'due_date');
     final description = _optionalString(args, 'description');
 
     final order = ProposedOrder(
@@ -295,5 +304,16 @@ class OrderCreatorTools {
           '"$key" must be a valid ISO date (got: "$raw").');
     }
     return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  /// Like [_requireDate] but returns null when the key is absent or blank —
+  /// used for the now-optional due date (the agent omits it unless the tailor
+  /// stated one). A present-but-malformed value still throws so the model can
+  /// self-correct.
+  DateTime? _optionalDate(Map<String, dynamic> args, String key) {
+    final raw = args[key];
+    if (raw == null) return null;
+    if (raw is String && raw.trim().isEmpty) return null;
+    return _requireDate(args, key);
   }
 }

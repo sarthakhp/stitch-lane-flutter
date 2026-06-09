@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../config/app_config.dart';
 import '../../../domain/models/order_proposal.dart';
+import 'editable_markdown_field.dart';
 
-/// Inline-editable card for the customer's [ProposedMeasurement]. Body is
-/// markdown — we render it as plain multi-line text input; the existing
-/// rich-description workflow can be wired in later if needed.
-class ProposedMeasurementCard extends StatefulWidget {
+/// Inline-editable card for the customer's [ProposedMeasurement]. The body is
+/// markdown — shown rendered (real headings/bold/bullets) with a pencil to
+/// edit, via [EditableMarkdownField], so the draft matches the saved record.
+class ProposedMeasurementCard extends StatelessWidget {
   final ProposedMeasurement measurement;
   final bool enabled;
   final ValueChanged<String> onEdit;
@@ -19,35 +20,6 @@ class ProposedMeasurementCard extends StatefulWidget {
     required this.onEdit,
     required this.onRemove,
   });
-
-  @override
-  State<ProposedMeasurementCard> createState() =>
-      _ProposedMeasurementCardState();
-}
-
-class _ProposedMeasurementCardState extends State<ProposedMeasurementCard> {
-  late final TextEditingController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = TextEditingController(text: widget.measurement.description);
-  }
-
-  @override
-  void didUpdateWidget(covariant ProposedMeasurementCard old) {
-    super.didUpdateWidget(old);
-    if (_ctrl.text != widget.measurement.description &&
-        old.measurement.description != widget.measurement.description) {
-      _ctrl.text = widget.measurement.description;
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,22 +46,19 @@ class _ProposedMeasurementCardState extends State<ProposedMeasurementCard> {
                 ),
                 IconButton(
                   icon: Icon(Icons.delete_outline, color: colorScheme.error),
-                  onPressed: widget.enabled ? widget.onRemove : null,
+                  onPressed: enabled ? onRemove : null,
                   tooltip: 'Remove measurement',
                 ),
               ],
             ),
             const SizedBox(height: AppConfig.spacing8),
-            TextField(
-              controller: _ctrl,
-              enabled: widget.enabled,
-              maxLines: 8,
+            EditableMarkdownField(
+              value: measurement.description,
+              enabled: enabled,
+              hintText: 'Body measurements — markdown allowed.',
               minLines: 4,
-              decoration: const InputDecoration(
-                hintText: 'Body measurements — markdown allowed.',
-                isDense: true,
-              ),
-              onChanged: widget.onEdit,
+              maxLines: 10,
+              onChanged: onEdit,
             ),
           ],
         ),

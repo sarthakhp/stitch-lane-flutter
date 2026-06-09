@@ -151,7 +151,15 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
   Widget _buildBody() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(AppConfig.spacing16),
+        // Less padding at the bottom: the refine bar sits here and the
+        // "Create N orders" bar follows right below, so a full spacing16 gap
+        // between them reads as dead space.
+        padding: const EdgeInsets.fromLTRB(
+          AppConfig.spacing16,
+          AppConfig.spacing16,
+          AppConfig.spacing16,
+          AppConfig.spacing8,
+        ),
         child: _controller.phase == CreatorPhase.pickingCustomer
             ? _buildCustomerPicker()
             : Column(
@@ -517,17 +525,56 @@ class _OrderCreatorScreenState extends State<OrderCreatorScreen> {
 
   Widget? _buildBottomBar() {
     if (_controller.phase != CreatorPhase.reviewing) return null;
+    final theme = Theme.of(context);
     final count = _controller.draft.orders.length;
+    final missingDue = _controller.ordersMissingDueDate;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(AppConfig.spacing12),
-        child: FilledButton.icon(
-          icon: const Icon(Icons.check),
-          label: Text(count == 1 ? 'Create 1 order' : 'Create $count orders'),
-          onPressed: _controller.canCommit ? _commit : null,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-          ),
+        // No top padding — the refine bar above already provides separation;
+        // an extra top inset here just widens the gap to the red hint.
+        padding: const EdgeInsets.fromLTRB(
+          AppConfig.spacing12,
+          0,
+          AppConfig.spacing12,
+          AppConfig.spacing12,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Why is the button disabled? Tell the tailor she still needs a
+            // due date — orders never auto-fill one.
+            if (missingDue > 0) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_busy,
+                      size: 16, color: theme.colorScheme.error),
+                  const SizedBox(width: AppConfig.spacing8),
+                  Flexible(
+                    child: Text(
+                      missingDue == 1
+                          ? 'Set a due date on 1 order to create'
+                          : 'Set a due date on $missingDue orders to create',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConfig.spacing8),
+            ],
+            FilledButton.icon(
+              icon: const Icon(Icons.check),
+              label: Text(
+                  count == 1 ? 'Create 1 order' : 'Create $count orders'),
+              onPressed: _controller.canCommit ? _commit : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+            ),
+          ],
         ),
       ),
     );
