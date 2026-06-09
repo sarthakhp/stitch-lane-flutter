@@ -8,6 +8,7 @@ import sys
 import time
 
 from adbw.adb import (
+    device_models,
     get_device_ips,
     get_mac_gateway,
     mdns_connect_targets,
@@ -78,8 +79,9 @@ def cmd_help(prog: str) -> int:
     print(f"{BOLD}Usage:{NC} {prog} [command] [--no-mirror]")
     print()
     print("Commands:")
-    print("  (none)       Auto-connect (mDNS lookup for paired device, USB fallback),")
-    print("               then start screen mirror")
+    print("  (none)       Detect connected devices (USB + wireless); if more than")
+    print("               one, ask which to use; set up wireless if it's USB; mirror.")
+    print("               Falls back to mDNS lookup when nothing is connected.")
     print("  pair         One-time pairing via Android 11+ Wireless debugging")
     print("               (after this, the default command works fully cable-free)")
     print("  status       Show connected USB and wireless devices")
@@ -161,15 +163,44 @@ def cmd_pair(mirror: bool = True) -> int:
     return _start_mirror(connect_addr, mirror)
 
 
-def cmd_connect(mirror: bool = True) -> int:
-    step("1. Checking for existing wireless connections")
-    existing = wireless_devices()
-    if existing:
-        target = existing[0] if len(existing) == 1 else (pick_from_list(existing, "Pick a device") or existing[0])
-        ok(f"Already connected: {target}")
-        return _start_mirror(target, mirror)
+def _device_label(kind: str, serial: str, models: dict[str, str]) -> str:
+    tag = "USB" if kind == "usb" else "Wireless"
+    model = models.get(serial, "")
+    return f"{tag}: {model or serial}  [{serial}]"
 
-    step("2. Looking for paired devices on the network (mDNS)")
+
+def cmd_connect(mirror: bool = True) -> int:
+    step("1. Detecting connected devices (USB + wireless)")
+    usb = usb_devices()
+    wifi = wireless_devices()
+    models = device_models()
+
+    # Unified candidate list so a freshly-plugged USB phone and a stale
+    # wireless connection to a different phone both show up — and you pick.
+    # (Previously the script grabbed any live wireless connection first, so it
+    # kept reconnecting to the old phone after you swapped the USB cable.)
+    candidates: list[tuple[str, str]] = (
+        [("usb", s) for s in usb] + [("wifi", w) for w in wifi]
+    )
+
+    if candidates:
+        if len(candidates) == 1:
+            kind, serial = candidates[0]
+            ok(f"One device connected — {_device_label(kind, serial, models)}")
+        else:
+            ok(f"Found {len(candidates)} connected devices:")
+            labels = [_device_label(k, s, models) for k, s in candidates]
+            chosen = pick_from_list(labels, "Pick the device to connect")
+            if chosen is None:
+                return 1
+            kind, serial = candidates[labels.index(chosen)]
+
+        if kind == "wifi":
+            ok(f"Mirroring wireless device: {serial}")
+            return _start_mirror(serial, mirror)
+        return _connect_usb_device(serial, mirror)
+
+    step("2. No devices connected — looking for paired devices (mDNS)")
     info("This finds devices you've previously paired via Wireless debugging.")
     targets = mdns_connect_targets()
     if targets:
@@ -179,43 +210,55 @@ def cmd_connect(mirror: bool = True) -> int:
         target = targets[0] if len(targets) == 1 else pick_from_list(targets, "Pick a device")
         if target is None:
             return 1
-        step(f"3. Connecting to {target}")
+        step(f"Connecting to {target}")
         res = run(["adb", "connect", target], timeout=15)
         output = (res.stdout + res.stderr).strip()
         if "connected" in output.lower() and "failed" not in output.lower():
             ok(output)
             return _start_mirror(target, mirror)
         warn(f"mDNS connect failed: {output}")
-        warn("Falling back to USB setup...")
     else:
         info("No paired devices found via mDNS.")
-        info("If this is your first time, run: " + sys.argv[0] + " pair")
-        info("Otherwise: make sure Wireless debugging is ON on the phone.")
 
-    step("4. Looking for USB devices (fallback)")
-    usb = usb_devices()
-    if not usb:
-        fail("No USB device found.")
-        print()
-        print("   Checklist:")
-        print("   1. Is the phone plugged in via USB?")
-        print("   2. Is USB debugging ON? (Settings > Developer Options)")
-        print("   3. Did you tap 'Allow' on the phone's USB debugging prompt?")
-        print("   4. Try: unplug, replug, then run this script again.")
-        return 1
+    fail("No device found (no USB, no live wireless, no paired device).")
+    print()
+    print("   Checklist:")
+    print("   1. Plug the phone in via USB, OR turn on Wireless debugging.")
+    print("   2. Is USB debugging ON? (Settings > Developer Options)")
+    print("   3. Did you tap 'Allow' on the phone's USB debugging prompt?")
+    print(f"   4. First time wireless? Run: {sys.argv[0]} pair")
+    return 1
 
-    if len(usb) > 1:
-        warn("Multiple USB devices found:")
-        choice = pick_from_list(usb, "Pick a device")
-        if choice is None:
-            return 1
-        serial = choice
-    else:
-        serial = usb[0]
 
-    ok(f"Using device: {serial}")
+def _wireless_connect(target: str, attempts: int = 5, delay: float = 1.5) -> bool:
+    """Connect to `ip:port`, clearing any stale connection first and retrying.
 
-    step("5. Getting device IP")
+    `adb tcpip` restarts adbd on the device, so the first connect usually
+    races the new listener coming up ("Connection refused"), and an old
+    wireless entry to the same address goes offline. We `adb disconnect` the
+    target before each attempt and retry a few times — no manual steps needed.
+    """
+    for attempt in range(1, attempts + 1):
+        run(["adb", "disconnect", target])  # drop any stale/offline entry
+        res = run(["adb", "connect", target], timeout=15)
+        output = (res.stdout + res.stderr).strip()
+        low = output.lower()
+        if "connected" in low and "failed" not in low and "refused" not in low:
+            ok(output)
+            return True
+        if attempt < attempts:
+            warn(f"connect attempt {attempt}/{attempts}: {output} — retrying in {delay:g}s…")
+            time.sleep(delay)
+        else:
+            fail(f"Connection failed after {attempts} attempts: {output}")
+    return False
+
+
+def _connect_usb_device(serial: str, mirror: bool) -> int:
+    """Switch a USB-connected device to wireless ADB (tcpip), then mirror it."""
+    ok(f"Setting up wireless for USB device: {serial}")
+
+    step("Getting device IP")
     all_ips = get_device_ips(serial)
     gateway = get_mac_gateway()
 
@@ -267,7 +310,7 @@ def cmd_connect(mirror: bool = True) -> int:
     if gateway:
         info(f"Mac's gateway: {gateway} (same subnet = good)")
 
-    step(f"6. Switching device to TCP/IP mode (port {PORT})")
+    step(f"Switching device to TCP/IP mode (port {PORT})")
     res = run(["adb", "-s", serial, "tcpip", str(PORT)])
     if res.returncode != 0:
         fail("Failed to switch to TCP/IP mode.")
@@ -276,21 +319,16 @@ def cmd_connect(mirror: bool = True) -> int:
     ok("TCP/IP mode enabled.")
     time.sleep(1)
 
-    step(f"7. Connecting wirelessly to {ip}:{PORT}")
-    res = run(["adb", "connect", f"{ip}:{PORT}"])
-    output = (res.stdout + res.stderr).strip()
-    if "connected" in output.lower():
-        ok(output)
-    else:
-        fail(f"Connection failed: {output}")
+    step(f"Connecting wirelessly to {ip}:{PORT}")
+    if not _wireless_connect(f"{ip}:{PORT}"):
         print()
         print("   Checklist:")
         print("   1. Are phone and computer on the SAME WiFi network?")
         print(f"   2. Is a firewall blocking port {PORT}?")
-        print(f"   3. Try: adb disconnect && adb connect {ip}:{PORT}")
+        print("   3. Make sure Wireless debugging is allowed for this network.")
         return 1
 
-    step("8. Verifying wireless connection")
+    step("Verifying wireless connection")
     time.sleep(1)
     verify = wireless_devices()
     if any(ip in v for v in verify):

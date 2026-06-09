@@ -60,6 +60,32 @@ def usb_devices() -> list[str]:
     return out
 
 
+def device_models() -> dict[str, str]:
+    """Map device serial -> human model name from `adb devices -l`.
+
+    Used to label the device picker so you can tell phones apart (e.g.
+    "CPH2691" vs "OPD2480") instead of staring at raw serials/IPs.
+    """
+    res = run(["adb", "devices", "-l"])
+    models: dict[str, str] = {}
+    for line in res.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("List of devices"):
+            continue
+        parts = line.split()
+        if len(parts) >= 2 and parts[1] == "device":
+            model = next(
+                (
+                    p.split(":", 1)[1].replace("_", " ")
+                    for p in parts[2:]
+                    if p.startswith("model:")
+                ),
+                "",
+            )
+            models[parts[0]] = model
+    return models
+
+
 def mdns_connect_targets(retries: int = 3, delay: float = 0.7) -> list[str]:
     """Find already-paired Android devices broadcasting via mDNS.
 

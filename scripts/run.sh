@@ -12,22 +12,16 @@
 # the link is more stable. To avoid the dual-transport hang (USB + WiFi bound to
 # the same device confusing adb), picking USB disconnects any wireless duplicate.
 #
-# ColorOS devices (OPPO/OnePlus/realme) block USB installs behind an "Install
-# via USB" toggle that silently hangs `adb install`, so they auto-fall-back to
-# wireless. Override with USB=1 once you've enabled that toggle.
-#
 # Any extra args are passed straight to flutter run:
 #
-#   ./scripts/run.sh                 # debug, USB-first (auto-wireless on ColorOS)
+#   ./scripts/run.sh                 # debug, USB-first (wireless fallback)
 #   WIFI=1 ./scripts/run.sh          # force wireless (skip USB)
-#   USB=1  ./scripts/run.sh          # force USB even on ColorOS
 #   ./scripts/run.sh --release       # release
 #   ./scripts/run.sh -t lib/foo.dart # custom entrypoint
 #
 # Env:
 #   PORT       adb tcp port (default 5555)
 #   WIFI=1     skip the USB fast path, resolve a wireless device
-#   USB=1      use USB even on a ColorOS device (you've enabled "Install via USB")
 #   SNAPSHOT=1 pull a DB snapshot off the phone before running (data safety)
 
 set -uo pipefail
@@ -115,42 +109,26 @@ is_responsive() {
     [[ -n "$model" ]]
 }
 
-# ColorOS (OPPO/OnePlus/realme) gates USB installs behind an "Install via USB"
-# toggle + on-device dialog, which silently hangs `adb install`. For those we
-# auto-prefer wireless, which sidesteps the USB-install path. Override with
-# USB=1 if you've enabled the toggle and really want the cable.
-is_coloros() {
-    local maker
-    maker=$(adb -s "$1" shell getprop ro.product.manufacturer 2>/dev/null | tr -d '\r')
-    echo "$maker" | grep -qiE 'oppo|oneplus|realme'
-}
-
 SERIAL=""
 FORCE_WIFI="${WIFI:-0}"
-FORCE_USB="${USB:-0}"
 
 if [[ "$FORCE_WIFI" != "1" ]]; then
     step "1. Looking for a USB device (fast path)"
     usb="$(first_usb_ready)"
     if [[ -n "$usb" ]] && is_responsive "$usb"; then
-        if [[ "$FORCE_USB" != "1" ]] && is_coloros "$usb"; then
-            warn "USB device $usb is ColorOS (OPPO/OnePlus/realme) — USB installs"
-            warn "hang behind 'Install via USB'. Using wireless instead (USB=1 to force)."
-        else
-            ok "Using USB device: $usb"
-            # Drop any wireless transport to the same device — having both bound
-            # at once is what makes adb installs hang mid-transfer.
-            dupes="$(all_wireless_serials)"
-            if [[ -n "$dupes" ]]; then
-                warn "Disconnecting wireless duplicate(s) to avoid dual-transport hangs:"
-                while IFS= read -r w; do
-                    [[ -z "$w" ]] && continue
-                    info "  adb disconnect $w"
-                    adb disconnect "$w" &>/dev/null || true
-                done <<< "$dupes"
-            fi
-            SERIAL="$usb"
+        ok "Using USB device: $usb"
+        # Drop any wireless transport to the same device — having both bound
+        # at once is what makes adb installs hang mid-transfer.
+        dupes="$(all_wireless_serials)"
+        if [[ -n "$dupes" ]]; then
+            warn "Disconnecting wireless duplicate(s) to avoid dual-transport hangs:"
+            while IFS= read -r w; do
+                [[ -z "$w" ]] && continue
+                info "  adb disconnect $w"
+                adb disconnect "$w" &>/dev/null || true
+            done <<< "$dupes"
         fi
+        SERIAL="$usb"
     else
         info "No healthy USB device — falling back to wireless."
     fi
