@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
+import 'audio_backup_recorder.dart';
 import 'image_storage_service.dart';
 
 class BackupImportResult {
@@ -42,6 +43,12 @@ class _ValidatedZipContents {
 }
 
 class BackupImportService {
+
+  /// Rewrites a media path stored on the (possibly different) source device to
+  /// this device's [dir], keyed by file name — so images and audio restore
+  /// correctly regardless of the original install's absolute paths.
+  static String localMediaPath(String dir, String storedPath) =>
+      '$dir/${storedPath.split('/').last}';
 
   /// Step 1: Pick a zip file. Returns null if user cancels.
   static Future<String?> pickZipFile() async {
@@ -125,10 +132,9 @@ class BackupImportService {
             final order = Order.fromJson(json as Map<String, dynamic>);
             // Fix image paths to point to current device's directory
             if (order.imagePaths.isNotEmpty) {
-              final fixedPaths = order.imagePaths.map((path) {
-                final fileName = path.split('/').last;
-                return '$localImagesDir/$fileName';
-              }).toList();
+              final fixedPaths = order.imagePaths
+                  .map((p) => localMediaPath(localImagesDir, p))
+                  .toList();
               await orderRepository.addOrder(order.copyWith(imagePaths: fixedPaths));
             } else {
               await orderRepository.addOrder(order);
@@ -138,8 +144,17 @@ class BackupImportService {
 
         final measurementsList = boxes['measurements'] as List?;
         if (measurementsList != null) {
+          // Audio is restored into audio_backups/; rewrite each measurement's
+          // audioFilePath to point there on THIS device (same idea as images).
+          final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
           for (var json in measurementsList) {
-            final measurement = Measurement.fromJson(json as Map<String, dynamic>);
+            var measurement = Measurement.fromJson(json as Map<String, dynamic>);
+            final audioPath = measurement.audioFilePath;
+            if (audioPath != null && audioPath.trim().isNotEmpty) {
+              measurement = measurement.copyWith(
+                audioFilePath: localMediaPath(audioDir, audioPath),
+              );
+            }
             await measurementRepository.addMeasurement(measurement);
           }
         }
@@ -166,12 +181,13 @@ class BackupImportService {
           AppLogger.info('BackupImport: Restored ${contents.imageFiles.length} images');
         }
 
-        // 6. Write audio files to local storage
+        // 6. Write audio files into audio_backups/ — the same directory the
+        // measurement audioFilePaths were rewritten to point at above.
         if (contents.audioFiles.isNotEmpty) {
           onProgress?.call('Restoring ${contents.audioFiles.length} audio files...');
-          final appDir = await getApplicationDocumentsDirectory();
+          final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
           for (final entry in contents.audioFiles.entries) {
-            final file = File('${appDir.path}/${entry.key}');
+            final file = File('$audioDir/${entry.key}');
             await file.writeAsBytes(entry.value);
           }
           AppLogger.info('BackupImport: Restored ${contents.audioFiles.length} audio files');

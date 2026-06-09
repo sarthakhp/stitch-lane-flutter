@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/app_logger.dart';
@@ -124,22 +123,29 @@ class BackupExportService {
     }
     AppLogger.info('BackupExport: Added ${imagePaths.length} local images');
 
-    // 3. Read local audio files
-    final appDir = await getApplicationDocumentsDirectory();
-    final audioFiles = Directory(appDir.path)
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.m4a') && f.path.contains('measurement_'))
-        .toList();
-    onProgress?.call('Adding ${audioFiles.length} audio files...');
-    for (int i = 0; i < audioFiles.length; i++) {
-      final file = audioFiles[i];
-      final fileName = file.path.split('/').last;
-      onProgress?.call('Adding audio ${i + 1}/${audioFiles.length}...');
+    // 3. Read the audio files referenced by measurements. We read each
+    // measurement's stored audioFilePath directly (rather than globbing one
+    // folder/extension), so this covers BOTH the modern audio_backups/*.wav
+    // recordings and any legacy measurement_*.m4a.
+    final measurements = await measurementRepository.getAllMeasurements();
+    final seenAudio = <String>{};
+    var audioAdded = 0;
+    for (final m in measurements) {
+      final audioPath = m.audioFilePath;
+      if (audioPath == null || audioPath.trim().isEmpty) continue;
+      final fileName = audioPath.split('/').last;
+      if (!seenAudio.add(fileName)) continue; // de-dupe by file name
+      final file = File(audioPath);
+      if (!await file.exists()) {
+        AppLogger.warning('BackupExport: audio missing, skipping: $audioPath');
+        continue;
+      }
+      onProgress?.call('Adding audio ${audioAdded + 1}...');
       final bytes = await file.readAsBytes();
       archive.addFile(ArchiveFile('audios/$fileName', bytes.length, bytes));
+      audioAdded++;
     }
-    AppLogger.info('BackupExport: Added ${audioFiles.length} local audio files');
+    AppLogger.info('BackupExport: Added $audioAdded measurement audio files');
 
     // 4. Encode zip
     onProgress?.call('Creating zip file...');

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
+import 'audio_backup_recorder.dart';
 import 'image_storage_service.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
@@ -153,8 +154,17 @@ class BackupService {
     final measurementsList = boxes[_measurementsKey] as List?;
     if (measurementsList == null) return;
 
+    // Audio is downloaded into audio_backups/ after restore; point each
+    // measurement's audioFilePath there on THIS device (like image paths).
+    final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
+
     for (var json in measurementsList) {
-      final measurement = Measurement.fromJson(json as Map<String, dynamic>);
+      var measurement = Measurement.fromJson(json as Map<String, dynamic>);
+      final audioPath = measurement.audioFilePath;
+      if (audioPath != null && audioPath.trim().isNotEmpty) {
+        final fileName = audioPath.split('/').last;
+        measurement = measurement.copyWith(audioFilePath: '$audioDir/$fileName');
+      }
       await measurementRepository.addMeasurement(measurement);
     }
   }

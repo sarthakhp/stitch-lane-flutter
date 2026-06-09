@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:path_provider/path_provider.dart';
+import '../../backend/repositories/repository_factory.dart';
 import '../../utils/app_logger.dart';
+import 'audio_backup_recorder.dart';
 import 'drive_service.dart';
 
 class AudioSyncService {
@@ -101,7 +102,9 @@ class AudioSyncService {
       final driveAudios = await DriveServiceAudioOperations.listAudiosInFolder(driveApi);
       AppLogger.info('Found ${driveAudios.length} audio files in Drive');
 
-      final directory = await getApplicationDocumentsDirectory();
+      // Land downloaded audio in audio_backups/ — where measurement
+      // audioFilePaths point after restore (see BackupService._restoreMeasurements).
+      final directory = await AudioBackupRecorder.backupsDirectory();
 
       final total = driveAudios.length;
       for (int i = 0; i < total; i++) {
@@ -161,21 +164,22 @@ class AudioSyncService {
     return null;
   }
 
+  /// Audio files referenced by measurements. Read from each measurement's
+  /// stored audioFilePath (not a folder/extension glob), so it covers BOTH the
+  /// modern audio_backups/*.wav recordings and any legacy measurement_*.m4a.
   static Future<List<String>> _getAllAudioPaths() async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final dir = Directory(directory.path);
-      
-      if (!await dir.exists()) {
-        return [];
+      final repo = RepositoryFactory.createMeasurementRepository();
+      final measurements = await repo.getAllMeasurements();
+      final paths = <String>[];
+      final seen = <String>{};
+      for (final m in measurements) {
+        final p = m.audioFilePath;
+        if (p == null || p.trim().isEmpty) continue;
+        if (!seen.add(p.split('/').last)) continue; // de-dupe by file name
+        if (await File(p).exists()) paths.add(p);
       }
-
-      final files = await dir.list().toList();
-      return files
-          .whereType<File>()
-          .where((file) => file.path.endsWith('.m4a') && file.path.contains('measurement_'))
-          .map((file) => file.path)
-          .toList();
+      return paths;
     } catch (e) {
       AppLogger.error('Failed to get audio paths', e);
       return [];

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import 'backup_service.dart';
 import 'drive_service.dart';
@@ -86,15 +85,17 @@ class DriveSyncStatusService {
 
   static Future<int> _getLocalAudioCount() async {
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final dir = Directory(directory.path);
-      if (!await dir.exists()) return 0;
-      final files = await dir.list().toList();
-      return files
-          .whereType<File>()
-          .where((f) =>
-              f.path.endsWith('.m4a') && f.path.contains('measurement_'))
-          .length;
+      // Count the audio files actually referenced by measurements (matches
+      // what the upload sends), covering audio_backups/*.wav + legacy m4a.
+      final repo = RepositoryFactory.createMeasurementRepository();
+      final measurements = await repo.getAllMeasurements();
+      final names = <String>{};
+      for (final m in measurements) {
+        final p = m.audioFilePath;
+        if (p == null || p.trim().isEmpty) continue;
+        if (await File(p).exists()) names.add(p.split('/').last);
+      }
+      return names.length;
     } catch (_) {
       return 0;
     }
