@@ -17,72 +17,106 @@ class _FakeUser implements User {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
+/// In-memory session hint so tests never touch SharedPreferences.
+class _FakeHint implements AuthSessionHint {
+  _FakeHint(this.value);
+  bool value;
+  final writes = <bool>[];
+
+  @override
+  Future<bool> read() async => value;
+
+  @override
+  Future<void> write(bool wasSignedIn) async {
+    value = wasSignedIn;
+    writes.add(wasSignedIn);
+  }
+}
+
 void main() {
   group('AuthController status', () {
     late StreamController<User?> stream;
-    late AuthController controller;
 
-    setUp(() {
-      stream = StreamController<User?>();
-      controller = AuthController(authStream: stream.stream);
-    });
+    setUp(() => stream = StreamController<User?>());
+    tearDown(() => stream.close());
 
-    tearDown(() async {
-      controller.dispose();
-      await stream.close();
-    });
+    AuthController make({
+      bool hadSession = false,
+      Duration grace = const Duration(seconds: 8),
+    }) =>
+        AuthController(
+          authStream: stream.stream,
+          sessionHint: _FakeHint(hadSession),
+          restoreGrace: grace,
+        );
 
-    test('starts unknown before any event (must show splash, not login)', () {
-      expect(controller.status, AuthStatus.unknown);
-      controller.init();
-      // Still unknown until the stream actually emits.
-      expect(controller.status, AuthStatus.unknown);
+    test('starts unknown before any event (splash, not login)', () async {
+      final c = make();
+      await c.init();
+      expect(c.status, AuthStatus.unknown);
+      c.dispose();
     });
 
     test('a non-null user → authenticated', () async {
-      controller.init();
+      final c = make();
+      await c.init();
       stream.add(_FakeUser('u1'));
       await Future<void>.delayed(Duration.zero);
-      expect(controller.status, AuthStatus.authenticated);
-      expect(controller.uid, 'u1');
+      expect(c.status, AuthStatus.authenticated);
+      expect(c.uid, 'u1');
+      c.dispose();
     });
 
-    test('a null event → unauthenticated', () async {
-      controller.init();
+    test('null with no prior session → unauthenticated (login now)', () async {
+      final c = make(hadSession: false);
+      await c.init();
       stream.add(null);
       await Future<void>.delayed(Duration.zero);
-      expect(controller.status, AuthStatus.unauthenticated);
-      expect(controller.user, isNull);
+      expect(c.status, AuthStatus.unauthenticated);
+      c.dispose();
     });
 
-    test('never reports unauthenticated before the first event', () async {
-      var sawUnauthenticatedWhileUnknown = false;
-      controller.addListener(() {
-        // no-op; presence of listener mirrors real usage
-      });
-      controller.init();
-      // Before emitting anything, status must not be unauthenticated.
-      if (controller.status == AuthStatus.unauthenticated) {
-        sawUnauthenticatedWhileUnknown = true;
-      }
-      expect(sawUnauthenticatedWhileUnknown, isFalse);
-      expect(controller.status, AuthStatus.unknown);
-    });
+    test('null WITH prior session → stays unknown, then restores to authenticated',
+        () async {
+      // The release bug: authStateChanges emits null first, then the cached
+      // user ~2.3s later. With a prior-session hint we must NOT flash login.
+      final c = make(hadSession: true);
+      await c.init();
+      stream.add(null);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.status, AuthStatus.unknown); // splash, not login
 
-    test('user → null → user transitions resolve correctly', () async {
-      controller.init();
       stream.add(_FakeUser('u1'));
       await Future<void>.delayed(Duration.zero);
-      expect(controller.status, AuthStatus.authenticated);
+      expect(c.status, AuthStatus.authenticated);
+      c.dispose();
+    });
 
+    test('prior session but restore never arrives → falls back to login after grace',
+        () async {
+      final c = make(hadSession: true, grace: const Duration(milliseconds: 30));
+      await c.init();
       stream.add(null);
       await Future<void>.delayed(Duration.zero);
-      expect(controller.status, AuthStatus.unauthenticated);
+      expect(c.status, AuthStatus.unknown);
 
-      stream.add(_FakeUser('u2'));
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(c.status, AuthStatus.unauthenticated);
+      c.dispose();
+    });
+
+    test('user → null (real sign-out) → unauthenticated', () async {
+      final c = make(hadSession: true);
+      await c.init();
+      stream.add(_FakeUser('u1'));
       await Future<void>.delayed(Duration.zero);
-      expect(controller.status, AuthStatus.authenticated);
-      expect(controller.uid, 'u2');
+      expect(c.status, AuthStatus.authenticated);
+
+      // Already resolved → a later null is a genuine sign-out, not a restore.
+      stream.add(null);
+      await Future<void>.delayed(Duration.zero);
+      expect(c.status, AuthStatus.unauthenticated);
+      c.dispose();
     });
   });
 }
