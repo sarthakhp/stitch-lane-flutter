@@ -1,5 +1,20 @@
 # Scripts
 
+## build-apk.sh
+
+Build a release APK and copy it somewhere easy to sideload (we install
+manually because `adb install` over USB is flaky on the tablet).
+
+```bash
+./build-apk.sh            # universal release APK (all ABIs)
+./build-apk.sh --arm64    # arm64-only — ~3x smaller (OnePlus Pad 2, most phones)
+```
+
+Output defaults to `~/Desktop/StitchGenie-release-{universal,arm64}.apk`.
+Override with `OUT_DIR=<dir>`, or pass `NO_COPY=1` to just build and print the
+path. To build **and** install/run on a connected device instead, use
+`./run.sh`.
+
 ## Setup
 
 ```bash
