@@ -4,8 +4,11 @@ import '../backend/backend.dart';
 import '../config/app_config.dart';
 import '../constants/app_constants.dart';
 import '../domain/services/ai_action/ai_action_runner.dart';
+import '../domain/services/ai_action/action_labels.dart';
 import '../domain/services/ai_action/proposed_action.dart';
 import '../domain/services/ai_gateway/pricing.dart';
+import '../domain/services/recordings/recording_metadata.dart';
+import '../domain/services/recordings/recording_store.dart';
 import '../domain/services/ai_gateway/usage_event.dart';
 import '../domain/services/ai_chat_models.dart';
 import '../domain/services/ai_chat_service.dart';
@@ -85,7 +88,11 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     super.dispose();
   }
 
-  Future<void> _sendMessage(String text, {bool wasVoiceInput = false}) async {
+  Future<void> _sendMessage(
+    String text, {
+    bool wasVoiceInput = false,
+    String? audioWavPath,
+  }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _isLoading) return;
 
@@ -120,11 +127,35 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
       await _chatService.saveChat();
       _scrollToBottom();
 
+      // Best-effort: link the voice recording to what was asked and what the
+      // AI proposed, so it surfaces in the Recordings debugger.
+      if (wasVoiceInput && audioWavPath != null) {
+        await RecordingStore.writeSidecar(
+          audioWavPath,
+          RecordingMetadata(
+            source: RecordingSource.assistant,
+            transcript: trimmed,
+            actions: [
+              if (response.text.trim().isNotEmpty)
+                'Reply: ${response.text.trim()}',
+              for (final a in response.proposedActions)
+                'Proposed: ${ActionLabels.changeSummary(a)}'
+                    '${_candidateNames(a).isEmpty ? '' : ' — ${_candidateNames(a)}'}',
+            ],
+          ),
+        );
+      }
+
       if (wasVoiceInput && response.text.isNotEmpty) {
         _ttsService.speak(response.text, speaker: settings.ttsSpeaker);
       }
     }
   }
+
+  /// Distinct customer names across an action's candidates, for the recording
+  /// sidecar's "what the AI did" line.
+  String _candidateNames(ProposedAction action) =>
+      action.candidates.map((c) => c.title).toSet().join(', ');
 
   Future<void> _confirmAction(
     int messageIndex,

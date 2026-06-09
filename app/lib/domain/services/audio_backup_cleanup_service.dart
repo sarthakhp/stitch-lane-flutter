@@ -1,6 +1,7 @@
 import '../../backend/repositories/repository_factory.dart';
 import '../../utils/app_logger.dart';
 import 'audio_backup_recorder.dart';
+import 'recordings/recording_store.dart';
 
 /// Sweeps the audio backup directory for files that are no longer worth
 /// keeping. A file is "worth keeping" if any persisted [Measurement] still
@@ -57,6 +58,12 @@ class AudioBackupCleanupService {
           final age = now.difference(stat.modified);
           final path = file.path;
 
+          // Sidecar metadata is managed with its recording — never sweep a
+          // `.json` on its own (it's removed when its `.wav` is).
+          if (path.endsWith('.json')) {
+            continue;
+          }
+
           // Don't touch anything recent — could still be active.
           if (age < safetyMinAge) {
             kept++;
@@ -70,6 +77,15 @@ class AudioBackupCleanupService {
           }
 
           final isPcm = path.endsWith('.pcm');
+
+          // A recording we captured debug metadata for is a kept artifact for
+          // the Recordings debugger — never auto-delete it (the user prunes it
+          // explicitly from that screen).
+          if (!isPcm && await RecordingStore.hasSidecar(path)) {
+            kept++;
+            continue;
+          }
+
           final grace = isPcm ? stalePcmGrace : orphanedWavGrace;
           if (age < grace) {
             kept++;
@@ -77,7 +93,12 @@ class AudioBackupCleanupService {
           }
 
           final size = stat.size;
-          await file.delete();
+          if (isPcm) {
+            await file.delete();
+          } else {
+            // Remove the wav and its sidecar (if any) together.
+            await RecordingStore.deleteByWavPath(path);
+          }
           deleted++;
           bytesFreed += size;
           AppLogger.info(

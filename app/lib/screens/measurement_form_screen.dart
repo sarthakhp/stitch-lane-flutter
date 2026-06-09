@@ -7,6 +7,8 @@ import '../config/app_config.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
 import '../presentation/widgets/rich_description_input_field.dart';
+import '../domain/services/recordings/recording_metadata.dart';
+import '../domain/services/recordings/recording_store.dart';
 
 class MeasurementFormScreen extends StatefulWidget {
   final Measurement? measurement;
@@ -75,6 +77,20 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     return shouldPop ?? false;
   }
 
+  /// Best-effort: link this recording (if there is one) to its transcript +
+  /// outcome so it shows up in the Recordings debugger. Never throws.
+  Future<void> _writeRecordingSidecar(String action) async {
+    await RecordingStore.writeSidecar(
+      _audioFilePath,
+      RecordingMetadata(
+        source: RecordingSource.measurement,
+        title: widget.customer.name,
+        transcript: _descriptionValue.trim(),
+        actions: ['$action for ${widget.customer.name}'],
+      ),
+    );
+  }
+
   Future<void> _saveMeasurement() async {
     setState(() {
       _hasAttemptedSubmit = true;
@@ -100,6 +116,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
           audioFilePath: _audioFilePath,
         );
         await MeasurementService.updateMeasurement(state, repository, updatedMeasurement);
+        await _writeRecordingSidecar('Updated measurement');
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +135,7 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
           audioFilePath: _audioFilePath,
         );
         await MeasurementService.addMeasurement(state, repository, newMeasurement);
+        await _writeRecordingSidecar('Saved measurement');
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(

@@ -8,6 +8,7 @@ import 'widgets/developer/audio_backups_card.dart';
 import 'widgets/developer/drive_sync_status_section.dart';
 import 'widgets/developer/image_integrity_section.dart';
 import 'widgets/developer/local_snapshots_card.dart';
+import 'widgets/developer/recordings_nav_card.dart';
 import 'widgets/developer/streaming_stt_test_card.dart';
 
 /// Developer tools, composed from focused per-section cards under
@@ -40,6 +41,8 @@ class DeveloperScreen extends StatelessWidget {
                 AiModelsCard(),
                 SizedBox(height: AppConfig.spacing24),
                 StreamingSttTestCard(),
+                SizedBox(height: AppConfig.spacing24),
+                RecordingsNavCard(),
                 SizedBox(height: AppConfig.spacing24),
                 AudioBackupsCard(),
                 SizedBox(height: AppConfig.spacing24),

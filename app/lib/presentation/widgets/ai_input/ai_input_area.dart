@@ -23,7 +23,8 @@ import 'ai_input_bar.dart';
 class AiInputArea extends StatefulWidget {
   final TextEditingController controller;
   final bool isLoading;
-  final void Function(String, {bool wasVoiceInput}) onSend;
+  final void Function(String, {bool wasVoiceInput, String? audioWavPath})
+      onSend;
   final bool enableFormatting;
 
   /// Optional override for the text bar's placeholder. Defaults to the
@@ -76,7 +77,11 @@ class _AiInputAreaState extends State<AiInputArea> {
     final existing = widget.controller.text.trim();
     final fullText = existing.isEmpty ? result.text : '$existing ${result.text}';
     widget.controller.clear();
-    widget.onSend(fullText, wasVoiceInput: true);
+    widget.onSend(
+      fullText,
+      wasVoiceInput: true,
+      audioWavPath: result.audioWavPath,
+    );
   }
 
   void _handleVoiceCancel() {
