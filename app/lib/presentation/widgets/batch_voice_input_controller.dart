@@ -10,6 +10,7 @@ import '../../domain/services/streaming_recording_service.dart';
 import '../../domain/services/stt_service.dart';
 import '../../domain/services/transcript_formatter.dart';
 import '../../utils/app_logger.dart';
+import '../../utils/dispose_safe_notifier.dart';
 import 'voice_input_controller.dart';
 
 /// Batch (record-then-transcribe) voice input.
@@ -18,6 +19,7 @@ import 'voice_input_controller.dart';
 /// formatting — both before transitioning to [VoiceInputState.done] so the
 /// user gets a finished result from one tap.
 class BatchVoiceInputController extends ChangeNotifier
+    with DisposeSafeNotifier
     implements VoiceInputController {
   @override
   final bool isLive = false;
@@ -76,8 +78,9 @@ class BatchVoiceInputController extends ChangeNotifier
 
   @override
   Future<void> start() async {
+    if (isDisposed) return;
     _state = VoiceInputState.connecting;
-    notifyListeners();
+    safeNotify();
 
     try {
       await _backup.start();
@@ -88,22 +91,32 @@ class BatchVoiceInputController extends ChangeNotifier
       _setErrorState('Could not start recording: $e');
       return;
     }
+    // Disposed while the backup was starting → don't spin up the recorder.
+    if (isDisposed) return;
 
     _recorder = StreamingRecordingService();
 
     try {
       final stream = await _recorder!.startStream();
+      // Disposed mid-start → tear down the just-started recorder and bail,
+      // rather than wiring streams/timers/notifications onto a dead controller
+      // (that's the "used after disposed" + "add after close" crash).
+      if (isDisposed) {
+        await _recorder?.dispose();
+        _recorder = null;
+        return;
+      }
       _audioSub = stream.listen(_backup.write);
 
       _amplitudeTracker = StreamingAmplitudeTracker(
         recorder: _recorder!,
-        onUpdate: notifyListeners,
+        onUpdate: safeNotify,
       );
       _amplitudeTracker!.start();
 
       _state = VoiceInputState.listening;
       _startRecordingTimer();
-      notifyListeners();
+      safeNotify();
     } catch (e) {
       AppLogger.error('BatchVoiceInputController: failed to start', e);
       _setErrorState(e.toString().replaceFirst('Exception: ', ''));
@@ -119,7 +132,7 @@ class BatchVoiceInputController extends ChangeNotifier
     await _recorder?.pause();
 
     _state = VoiceInputState.paused;
-    notifyListeners();
+    safeNotify();
   }
 
   @override
@@ -131,7 +144,7 @@ class BatchVoiceInputController extends ChangeNotifier
 
     _state = VoiceInputState.listening;
     _startRecordingTimer();
-    notifyListeners();
+    safeNotify();
   }
 
   @override
@@ -140,7 +153,7 @@ class BatchVoiceInputController extends ChangeNotifier
     _amplitudeTracker?.stop();
 
     _state = VoiceInputState.processing;
-    notifyListeners();
+    safeNotify();
 
     await _audioSub?.cancel();
     _audioSub = null;
@@ -168,19 +181,19 @@ class BatchVoiceInputController extends ChangeNotifier
 
     if (_finalText.isEmpty) {
       _state = VoiceInputState.done;
-      notifyListeners();
+      safeNotify();
       return null;
     }
 
     if (!enableFormatting) {
       _state = VoiceInputState.done;
-      notifyListeners();
+      safeNotify();
       return _finalText;
     }
 
     _state = VoiceInputState.formatting;
     _formattingFailed = false;
-    notifyListeners();
+    safeNotify();
 
     final result = await TranscriptFormatter.format(
       _finalText,
@@ -190,7 +203,7 @@ class BatchVoiceInputController extends ChangeNotifier
     _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
-    notifyListeners();
+    safeNotify();
 
     return _formattedText ?? _finalText;
   }
@@ -201,7 +214,7 @@ class BatchVoiceInputController extends ChangeNotifier
 
     _state = VoiceInputState.formatting;
     _formattingFailed = false;
-    notifyListeners();
+    safeNotify();
 
     final result = await TranscriptFormatter.format(
       _finalText,
@@ -211,7 +224,7 @@ class BatchVoiceInputController extends ChangeNotifier
     _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
-    notifyListeners();
+    safeNotify();
 
     return _formattedText ?? _finalText;
   }
@@ -246,7 +259,7 @@ class BatchVoiceInputController extends ChangeNotifier
     _errorMessage = message;
     _state = VoiceInputState.error;
     _stopRecordingTimer();
-    notifyListeners();
+    safeNotify();
     // Make sure a .wav is on disk so the user can recover their audio even
     // after a transcription error.
     _backup.finalize();
@@ -256,7 +269,7 @@ class BatchVoiceInputController extends ChangeNotifier
     _recordingTimer?.cancel();
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _recordingSeconds++;
-      notifyListeners();
+      safeNotify();
       if (_recordingSeconds >= VoiceInputController.maxRecordingSeconds) {
         stop();
       }

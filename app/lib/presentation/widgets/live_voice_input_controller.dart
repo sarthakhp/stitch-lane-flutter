@@ -8,6 +8,7 @@ import '../../domain/services/streaming_stt_provider.dart';
 import '../../domain/services/streaming_transcription_service.dart';
 import '../../domain/services/transcript_formatter.dart';
 import '../../utils/app_logger.dart';
+import '../../utils/dispose_safe_notifier.dart';
 import 'voice_input_controller.dart';
 
 /// Live-streaming voice input.
@@ -16,6 +17,7 @@ import 'voice_input_controller.dart';
 /// (mic + WS close) modes so a tailor's 30-second silence between measurements
 /// doesn't keep an idle server connection open and billing.
 class LiveVoiceInputController extends ChangeNotifier
+    with DisposeSafeNotifier
     implements VoiceInputController {
   static const _hardPauseDelaySeconds = 10;
 
@@ -80,7 +82,7 @@ class LiveVoiceInputController extends ChangeNotifier
   @override
   Future<void> start() async {
     _state = VoiceInputState.connecting;
-    notifyListeners();
+    safeNotify();
 
     try {
       await _backup.start();
@@ -94,18 +96,19 @@ class LiveVoiceInputController extends ChangeNotifier
       _eventSub = _service.events.listen(_onEvent);
 
       await _service.start();
+      if (isDisposed) return;
 
       if (_service.recorder != null) {
         _amplitudeTracker = StreamingAmplitudeTracker(
           recorder: _service.recorder!,
-          onUpdate: notifyListeners,
+          onUpdate: safeNotify,
         );
         _amplitudeTracker!.start();
       }
 
       _state = VoiceInputState.listening;
       _startRecordingTimer();
-      notifyListeners();
+      safeNotify();
     } catch (e) {
       AppLogger.error('LiveVoiceInputController: failed to start', e);
       _setErrorState(e.toString().replaceFirst('Exception: ', ''));
@@ -120,7 +123,7 @@ class LiveVoiceInputController extends ChangeNotifier
     _amplitudeTracker?.stop();
     _state = VoiceInputState.paused;
     _hardPaused = false;
-    notifyListeners();
+    safeNotify();
 
     await _service.pauseAudio();
     _service.sendFlush();
@@ -168,12 +171,12 @@ class LiveVoiceInputController extends ChangeNotifier
       _amplitudeTracker?.start();
       _state = VoiceInputState.listening;
       _startRecordingTimer();
-      notifyListeners();
+      safeNotify();
       return;
     }
 
     _state = VoiceInputState.connecting;
-    notifyListeners();
+    safeNotify();
 
     final savedText = _finalText;
     _service = StreamingTranscriptionService();
@@ -184,11 +187,12 @@ class LiveVoiceInputController extends ChangeNotifier
       _eventSub = _service.events.listen(_onEvent);
 
       await _service.start();
+      if (isDisposed) return;
 
       if (_service.recorder != null) {
         _amplitudeTracker = StreamingAmplitudeTracker(
           recorder: _service.recorder!,
-          onUpdate: notifyListeners,
+          onUpdate: safeNotify,
         );
         _amplitudeTracker!.start();
       }
@@ -196,7 +200,7 @@ class LiveVoiceInputController extends ChangeNotifier
       _finalText = savedText;
       _state = VoiceInputState.listening;
       _startRecordingTimer();
-      notifyListeners();
+      safeNotify();
     } catch (e) {
       AppLogger.error('LiveVoiceInputController: failed to resume', e);
       _finalText = savedText;
@@ -231,11 +235,12 @@ class LiveVoiceInputController extends ChangeNotifier
       _transcriptSub = _service.transcripts.listen(_onTranscript);
       _eventSub = _service.events.listen(_onEvent);
       await _service.start();
+      if (isDisposed) return;
 
       if (_service.recorder != null) {
         _amplitudeTracker = StreamingAmplitudeTracker(
           recorder: _service.recorder!,
-          onUpdate: notifyListeners,
+          onUpdate: safeNotify,
         );
         _amplitudeTracker!.start();
       }
@@ -243,7 +248,7 @@ class LiveVoiceInputController extends ChangeNotifier
       _finalText = savedText;
       _state = VoiceInputState.listening;
       _startRecordingTimer();
-      notifyListeners();
+      safeNotify();
       AppLogger.info('LiveVoiceInputController: auto-reconnect succeeded');
     } catch (e) {
       AppLogger.error('LiveVoiceInputController: auto-reconnect failed', e);
@@ -266,7 +271,7 @@ class LiveVoiceInputController extends ChangeNotifier
     }
 
     _state = VoiceInputState.processing;
-    notifyListeners();
+    safeNotify();
 
     await _service.stop();
     _partialText = '';
@@ -282,19 +287,19 @@ class LiveVoiceInputController extends ChangeNotifier
 
     if (_finalText.isEmpty) {
       _state = VoiceInputState.done;
-      notifyListeners();
+      safeNotify();
       return null;
     }
 
     if (!enableFormatting) {
       _state = VoiceInputState.done;
-      notifyListeners();
+      safeNotify();
       return _finalText;
     }
 
     _state = VoiceInputState.formatting;
     _formattingFailed = false;
-    notifyListeners();
+    safeNotify();
 
     final result = await TranscriptFormatter.format(
       _finalText,
@@ -304,7 +309,7 @@ class LiveVoiceInputController extends ChangeNotifier
     _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
-    notifyListeners();
+    safeNotify();
 
     return _formattedText ?? _finalText;
   }
@@ -315,7 +320,7 @@ class LiveVoiceInputController extends ChangeNotifier
 
     _state = VoiceInputState.formatting;
     _formattingFailed = false;
-    notifyListeners();
+    safeNotify();
 
     final result = await TranscriptFormatter.format(
       _finalText,
@@ -325,7 +330,7 @@ class LiveVoiceInputController extends ChangeNotifier
     _formattingFailed = result.failed;
 
     _state = VoiceInputState.done;
-    notifyListeners();
+    safeNotify();
 
     return _formattedText ?? _finalText;
   }
@@ -364,7 +369,7 @@ class LiveVoiceInputController extends ChangeNotifier
     _errorMessage = message;
     _state = VoiceInputState.error;
     _stopRecordingTimer();
-    notifyListeners();
+    safeNotify();
     _backup.finalize();
   }
 
@@ -372,7 +377,7 @@ class LiveVoiceInputController extends ChangeNotifier
     _recordingTimer?.cancel();
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _recordingSeconds++;
-      notifyListeners();
+      safeNotify();
       if (_recordingSeconds >= VoiceInputController.maxRecordingSeconds) {
         stop();
       }
@@ -396,7 +401,7 @@ class LiveVoiceInputController extends ChangeNotifier
     } else {
       _partialText = t.text;
     }
-    notifyListeners();
+    safeNotify();
   }
 
   void _onEvent(StreamingSttEventData e) {
