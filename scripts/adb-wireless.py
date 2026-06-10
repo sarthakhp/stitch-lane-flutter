@@ -13,6 +13,7 @@ from adbw.commands import (
     cmd_help,
     cmd_mirror,
     cmd_pair,
+    cmd_run,
     cmd_status,
 )
 from adbw.ui import fail
@@ -22,11 +23,18 @@ def main() -> int:
     require_tool("adb", "brew install android-platform-tools")
     run(["adb", "start-server"])
 
-    args = sys.argv[1:]
+    argv = sys.argv[1:]
+    prog = os.path.basename(sys.argv[0])
+
+    # `run` passes everything after it straight through to `flutter run`, so
+    # handle it before the --no-mirror stripping (those are flutter's args).
+    if argv and argv[0] == "run":
+        return cmd_run(argv[1:])
+
+    args = argv
     no_mirror = "--no-mirror" in args
     args = [a for a in args if a != "--no-mirror"]
     cmd = args[0] if args else None
-    prog = os.path.basename(sys.argv[0])
 
     if cmd == "status":
         return cmd_status()

@@ -1,0 +1,9 @@
+# Devices whose USB `adb install` hangs — listed by serial OR model substring,
+# one per line (# comments allowed). Matching devices skip USB and use wireless
+# automatically in run.sh. WIFI=1 forces wireless for anything.
+#
+# The real fix for ColorOS/OxygenOS is enabling Developer options >
+# "Install via USB" on the device; if that doesn't help (flaky port), list it here.
+
+# OnePlus Pad 2 — USB install hangs; use wireless.
+OPD2480

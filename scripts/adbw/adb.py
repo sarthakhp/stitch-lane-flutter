@@ -133,3 +133,25 @@ def get_mac_gateway() -> str | None:
         if line.startswith("gateway:"):
             return line.split(":", 1)[1].strip()
     return None
+
+
+def is_responsive(serial: str) -> bool:
+    """True if the device actually answers (a prop read returns), not just
+    listed as 'device' in `adb devices`."""
+    res = run(["adb", "-s", serial, "shell", "getprop", "ro.product.model"])
+    return bool(res.stdout.strip())
+
+
+def best_device_ip(serial: str) -> str | None:
+    """Pick the device's WiFi IP for wireless ADB: prefer the one on the Mac's
+    subnet (so it's reachable), else the first IP, else None."""
+    ips = get_device_ips(serial)
+    if not ips:
+        return None
+    gateway = get_mac_gateway()
+    if gateway:
+        gw_subnet = ".".join(gateway.split(".")[:3])
+        for ip in ips:
+            if ".".join(ip.split(".")[:3]) == gw_subnet:
+                return ip
+    return ips[0]

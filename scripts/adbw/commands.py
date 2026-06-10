@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import subprocess
 import sys
 import time
+from pathlib import Path
 
 from adbw.adb import (
+    best_device_ip,
     device_models,
     get_device_ips,
     get_mac_gateway,
+    is_responsive,
     mdns_connect_targets,
     require_tool,
     run,
@@ -20,6 +25,15 @@ from adbw.adb import (
 from adbw.ui import BOLD, GREEN, NC, fail, info, ok, pick_from_list, step, warn
 
 PORT = 5555
+
+# Paths (mirror the old run.sh layout): scripts/ holds the cache + skip list,
+# the Flutter app is the sibling app/ dir.
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+_APP_DIR = _SCRIPTS_DIR.parent / "app"
+_CACHE_FILE = _SCRIPTS_DIR / ".last-wireless-device"
+_USB_SKIP_FILE = _SCRIPTS_DIR / ".usb-skip"
+_RECOVER_DB = _SCRIPTS_DIR / "recover-db.sh"
+_WIRELESS_RE = re.compile(r"^\d+\.\d+\.\d+\.\d+:\d+$")
 
 
 def _start_mirror(target: str, mirror: bool) -> int:
@@ -82,6 +96,9 @@ def cmd_help(prog: str) -> int:
     print("  (none)       Detect connected devices (USB + wireless); if more than")
     print("               one, ask which to use; set up wireless if it's USB; mirror.")
     print("               Falls back to mDNS lookup when nothing is connected.")
+    print("  run [args]   flutter run against the phone (USB-first, wireless")
+    print("               fallback); extra args pass to flutter (e.g. --release).")
+    print("               Env: PORT, WIFI=1, SNAPSHOT=1; skip USB via .usb-skip")
     print("  pair         One-time pairing via Android 11+ Wireless debugging")
     print("               (after this, the default command works fully cable-free)")
     print("  status       Show connected USB and wireless devices")
@@ -348,3 +365,134 @@ def _connect_usb_device(serial: str, mirror: bool) -> int:
     print(f"   Disconnect:       {sys.argv[0]} disconnect")
 
     return _start_mirror(f"{ip}:{PORT}", mirror)
+
+
+def _usb_install_blocked(serial: str, models: dict[str, str]) -> bool:
+    """Whether `serial` is listed in scripts/.usb-skip (by serial OR model
+    substring). Those devices hang on USB `adb install`, so `run` prefers
+    wireless for them. See that file's header for the rationale."""
+    if not _USB_SKIP_FILE.exists():
+        return False
+    model = models.get(serial, "")
+    for raw in _USB_SKIP_FILE.read_text().splitlines():
+        entry = raw.split("#", 1)[0].strip()
+        if not entry:
+            continue
+        if serial == entry:
+            return True
+        if model and entry.lower() in model.lower():
+            return True
+    return False
+
+
+def cmd_run(flutter_args: list[str]) -> int:
+    """`flutter run` against the phone with zero device fiddling — USB-first
+    (fast), with wireless fallback and USB->wireless bootstrap. Reuses the
+    shared adb helpers so there's one source of truth for device resolution.
+    Env: PORT (adb tcp port), WIFI=1 (force wireless), SNAPSHOT=1 (pre-run DB
+    pull). Extra args pass straight to `flutter run`."""
+    require_tool("flutter", "flutter not found in PATH")
+    port = os.environ.get("PORT", str(PORT))
+    force_wifi = os.environ.get("WIFI", "0") == "1"
+
+    serial = ""
+
+    # 1. USB fast path — fastest install + hot reload, most stable link.
+    if not force_wifi:
+        step("1. Looking for a USB device (fast path)")
+        usb_serial = next((s for s in usb_devices() if is_responsive(s)), None)
+        if usb_serial and _usb_install_blocked(usb_serial, device_models()):
+            info(f"USB device {usb_serial} is in .usb-skip (USB install hangs "
+                 f"here) — using wireless.")
+        elif usb_serial:
+            ok(f"Using USB device: {usb_serial}")
+            # Drop any wireless transport to the same device — both bound at
+            # once is what makes adb installs hang mid-transfer.
+            dupes = wireless_devices()
+            if dupes:
+                warn("Disconnecting wireless duplicate(s) to avoid dual-transport hangs:")
+                for w in dupes:
+                    info(f"  adb disconnect {w}")
+                    run(["adb", "disconnect", w])
+            serial = usb_serial
+        else:
+            info("No healthy USB device — falling back to wireless.")
+    else:
+        info("WIFI=1 set — skipping USB, resolving a wireless device.")
+
+    # 2. An already-connected wireless device.
+    if not serial:
+        step("2. Looking for an existing wireless device")
+        w = next((s for s in wireless_devices() if is_responsive(s)), None)
+        if w:
+            ok(f"Using wireless device: {w}")
+            serial = w
+
+    # 3. The IP cached from a previous run.
+    if not serial and _CACHE_FILE.exists():
+        cached = _CACHE_FILE.read_text().strip()
+        if cached:
+            step(f"3. Reconnecting to cached device ({cached})")
+            run(["adb", "connect", cached], timeout=15)
+            time.sleep(1)
+            if is_responsive(cached):
+                serial = cached
+                ok(f"Reconnected: {serial}")
+            else:
+                warn("Cached device didn't answer — will try USB bootstrap.")
+
+    # 4. Bootstrap wireless from a USB cable (read IP, tcpip, connect).
+    if not serial:
+        step("4. Bootstrapping wireless from USB")
+        usb = usb_devices()
+        if not usb:
+            fail("No wireless or USB device available.")
+            print()
+            print("   To bootstrap WiFi, plug the phone in via USB once with debugging on:")
+            print("     - USB mode = File Transfer (not charge-only)")
+            print("     - Tap 'Allow' on the USB-debugging prompt")
+            print("   Then re-run. After that, future runs reconnect over WiFi with no cable.")
+            return 1
+        usb_serial = usb[0]
+        ok(f"USB device: {usb_serial}")
+
+        ip = best_device_ip(usb_serial)
+        if not ip:
+            fail("Couldn't read the phone's WiFi IP. Is WiFi on, same network as the Mac?")
+            return 1
+        info(f"Phone WiFi IP: {ip}")
+
+        info(f"Switching phone to TCP/IP mode (port {port})...")
+        # tcpip can hang on a flaky USB link even though it takes effect on the
+        # phone — time-box it and connect anyway.
+        try:
+            run(["adb", "-s", usb_serial, "tcpip", port], timeout=6)
+        except subprocess.TimeoutExpired:
+            warn("tcpip command didn't return cleanly — trying to connect anyway.")
+        time.sleep(2)
+
+        target = f"{ip}:{port}"
+        if not _wireless_connect(target):
+            fail(f"Could not establish a wireless connection to {target}.")
+            return 1
+        serial = target
+
+    # Cache wireless serials so the next run reconnects with no cable.
+    if _WIRELESS_RE.match(serial):
+        _CACHE_FILE.write_text(serial + "\n")
+
+    # Optional pre-run DB snapshot (data safety) — opt in via SNAPSHOT=1.
+    if os.environ.get("SNAPSHOT", "0") == "1" and os.access(_RECOVER_DB, os.X_OK):
+        step("Pulling a pre-run DB snapshot")
+        rc = subprocess.run(
+            ["bash", str(_RECOVER_DB)],
+            env={**os.environ, "ANDROID_SERIAL": serial},
+        ).returncode
+        if rc != 0:
+            warn("Snapshot failed — continuing with run anyway.")
+
+    extra = " ".join(flutter_args)
+    step(f"Launching: flutter run -d {serial} {extra}".rstrip())
+    os.chdir(_APP_DIR)
+    os.execvp("flutter", ["flutter", "run", "-d", serial, *flutter_args])
+    return 0  # unreachable (execvp replaces this process)
