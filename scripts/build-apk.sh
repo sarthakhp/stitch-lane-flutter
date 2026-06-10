@@ -70,9 +70,25 @@ if [[ "${NO_COPY:-0}" == "1" ]]; then
   exit 0
 fi
 
-mkdir -p "$OUT_DIR"
+mkdir -p "$OUT_DIR" 2>/dev/null
 DEST="$OUT_DIR/StitchGenie-release-$VARIANT.apk"
-cp "$BUILT_APK" "$DEST"
+
+# -f: replace any existing file (even read-only) rather than failing. Check the
+# result — a silent cp failure must NOT be reported as success.
+if ! cp -f "$BUILT_APK" "$DEST" 2>/dev/null; then
+  fail "Built OK ($SIZE) but could NOT copy it to: $DEST"
+  echo ""
+  echo "   The APK itself is fine — grab it directly from:"
+  echo "      $BUILT_APK"
+  echo ""
+  echo "   The copy was blocked (usually macOS Privacy: your terminal isn't"
+  echo "   allowed to write to that folder). Fix any one of these, then re-run:"
+  echo "   1. System Settings > Privacy & Security > Files and Folders (or Full"
+  echo "      Disk Access) -> enable it for your terminal app."
+  echo "   2. Use an allowed folder:  OUT_DIR=~/stitch-apks ./scripts/build-apk.sh"
+  echo "   3. Skip the copy:          NO_COPY=1 ./scripts/build-apk.sh"
+  exit 1
+fi
 ok "Built ($SIZE) and copied to:"
 echo "      $DEST"
 echo ""
