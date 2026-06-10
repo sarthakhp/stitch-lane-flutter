@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../backend/backend.dart';
 import '../../firebase_options.dart';
 import '../../utils/app_logger.dart';
+import 'backup_guard.dart';
 import 'backup_service.dart';
 import 'daily_task_scheduler.dart';
 import 'drive_service.dart';
@@ -81,24 +82,37 @@ class AutoBackupService {
         return;
       }
 
+      // Serialize first (local DB read, no network) so we can short-circuit on
+      // an empty dataset BEFORE showing any notification or hitting Drive.
+      final backupJson = await BackupService.createBackup(
+        customerRepository: customerRepository,
+        orderRepository: orderRepository,
+        measurementRepository: measurementRepository,
+        settingsRepository: settingsRepository,
+      );
+
+      // Safeguard: never overwrite the cloud backup with an empty dataset
+      // (e.g. fresh sign-in before data has synced). This is a clean skip, not
+      // a failure — leave the last-backup status untouched and just reschedule.
+      if (BackupGuard.isEmptyBackupJson(backupJson)) {
+        AppLogger.info(
+          'Auto-backup skipped: no local data (0 customers, 0 orders) — '
+          'existing backup left untouched.',
+        );
+        await _scheduleNextIfEnabled(settingsRepository);
+        return;
+      }
+
       await NotificationService.showBackupInProgressNotification();
 
-      // Core backup: JSON data upload. Wrapped in retry-with-backoff so a
-      // transient network blip or Drive API throttle doesn't get reported
+      // Core backup: upload the serialized data. Wrapped in retry-with-backoff
+      // so a transient network blip or Drive API throttle doesn't get reported
       // as a hard failure on the BackupHealthCard. Up to 3 retries with
       // 10s/30s/1m delays — total max ~1m40s, well under WorkManager's
       // 10-minute task budget.
       await _retryWithBackoff(
         label: 'Auto-backup core upload',
-        task: () async {
-          final backupJson = await BackupService.createBackup(
-            customerRepository: customerRepository,
-            orderRepository: orderRepository,
-            measurementRepository: measurementRepository,
-            settingsRepository: settingsRepository,
-          );
-          await DriveService.uploadBackup(backupJson);
-        },
+        task: () => DriveService.uploadBackup(backupJson),
       );
 
       // File sync: image + audio (if these fail, it's a partial backup)
@@ -130,6 +144,17 @@ class AutoBackupService {
       }
 
       await _scheduleNextIfEnabled(settingsRepository);
+    } on EmptyBackupException catch (e) {
+      // The uploadBackup backstop fired (the pre-check above normally catches
+      // this first). It's a clean skip — don't record a failure or alarm the
+      // user, just clear the in-progress notification and reschedule.
+      AppLogger.info('Auto-backup skipped: $e');
+      await NotificationService.cancelBackupInProgressNotification();
+      try {
+        await _scheduleNextIfEnabled(RepositoryFactory.createSettingsRepository());
+      } catch (statusError) {
+        AppLogger.error('Failed to reschedule after empty-backup skip', statusError);
+      }
     } catch (e) {
       AppLogger.error('Auto-backup failed', e);
       await NotificationService.cancelBackupInProgressNotification();
@@ -178,6 +203,9 @@ class AutoBackupService {
       try {
         return await task();
       } catch (e, st) {
+        // An empty backup is a permanent refusal, not a transient error — don't
+        // burn retries/backoff on it; let the caller handle it immediately.
+        if (e is EmptyBackupException) rethrow;
         if (attempt == maxAttempts) {
           AppLogger.error(
             '$label: all $maxAttempts attempts failed',

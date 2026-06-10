@@ -47,6 +47,25 @@ Future<bool> runManualBackup(BuildContext context) async {
       measurementRepository: measurementRepository,
       settingsRepository: settingsRepository,
     );
+
+    // Safeguard: never overwrite the cloud backup with an empty dataset (e.g.
+    // a fresh sign-in before data has synced). Nudge the user instead of
+    // silently replacing their good backup with nothing.
+    if (BackupGuard.isEmptyBackupJson(backupJson)) {
+      backupState.setLoading(false);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nothing to back up yet — add a customer or order first. '
+              'Your existing backup is safe.',
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+
     backupState.setProgress(0.4);
     await DriveService.uploadBackup(backupJson);
 
@@ -110,6 +129,21 @@ Future<bool> runManualBackup(BuildContext context) async {
       );
     }
     return true;
+  } on EmptyBackupException {
+    // The uploadBackup backstop fired (the pre-check above normally catches
+    // this first). Not a failure — same gentle nudge, no error state.
+    backupState.setLoading(false);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nothing to back up yet — add a customer or order first. '
+            'Your existing backup is safe.',
+          ),
+        ),
+      );
+    }
+    return false;
   } catch (e) {
     backupState.setError('Backup failed: $e');
     try {

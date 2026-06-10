@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'auth_service.dart';
+import 'backup_guard.dart';
 import '../../utils/app_logger.dart';
 import '../../constants/app_constants.dart';
 
@@ -87,6 +88,19 @@ class DriveService {
   }
 
   static Future<void> uploadBackup(String jsonData) async {
+    // Last line of defense: never overwrite the cloud backup with an empty
+    // dataset (0 customers AND 0 orders), e.g. a backup firing right after a
+    // fresh sign-in before any data exists. The runners check this up front for
+    // good UX; this guard catches any caller — including future ones — that
+    // reaches the actual irreversible overwrite. See [BackupGuard].
+    if (BackupGuard.isEmptyBackupJson(jsonData)) {
+      AppLogger.warning(
+        'Refusing to upload an empty backup (0 customers, 0 orders) — '
+        'existing Drive backup left untouched.',
+      );
+      throw const EmptyBackupException();
+    }
+
     AppLogger.info('Starting backup upload...');
     final driveApi = await getDriveApi();
     final folderId = await _getAppDataFolderId(driveApi);

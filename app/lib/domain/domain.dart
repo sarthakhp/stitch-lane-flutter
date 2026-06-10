@@ -33,6 +33,7 @@ export 'services/ai_gateway/usage_formatters.dart';
 export 'services/ai_gateway/usage_recorder.dart';
 export 'state/ai_usage_state.dart';
 export 'services/backup_export_service.dart';
+export 'services/backup_guard.dart';
 export 'services/backup_import_service.dart';
 export 'services/backup_service.dart';
 export 'services/backup_time_service.dart';
