@@ -81,6 +81,7 @@ class OrderFormBody extends StatelessWidget {
       hintText: 'Enter order description',
       enabled: !controller.isLoading,
       onChanged: controller.setDescription,
+      onAudioRecorded: controller.addAudioFilePath,
     );
   }
 

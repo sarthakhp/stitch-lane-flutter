@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../../../utils/app_logger.dart';
+import '../../../utils/wav_duration.dart';
 import '../audio_backup_recorder.dart';
 import 'recording_metadata.dart';
 
@@ -10,12 +11,6 @@ import 'recording_metadata.dart';
 /// it as `<stem>.json`.
 class RecordingStore {
   RecordingStore._();
-
-  // The recorder captures 16 kHz mono 16-bit PCM → 32000 bytes/sec; the WAV
-  // wrapper adds a 44-byte header. Used to estimate duration from file size
-  // without decoding the file.
-  static const int _bytesPerSecond = 16000 * 1 * 2;
-  static const int _wavHeaderBytes = 44;
 
   static String _stemOf(String path) {
     final dot = path.lastIndexOf('.');
@@ -46,15 +41,12 @@ class RecordingStore {
       if (!wav.path.toLowerCase().endsWith('.wav')) continue;
       try {
         final stat = await wav.stat();
-        final durSecs = (stat.size - _wavHeaderBytes) / _bytesPerSecond;
         final meta = await _readSidecar(wav.path);
         entries.add(RecordingEntry(
           wav: wav,
           createdAt: meta?.createdAt ?? stat.modified,
           sizeBytes: stat.size,
-          duration: Duration(
-            milliseconds: (durSecs * 1000).clamp(0, 1 << 31).round(),
-          ),
+          duration: WavDuration.fromBytes(stat.size) ?? Duration.zero,
           meta: meta,
         ));
       } catch (e) {

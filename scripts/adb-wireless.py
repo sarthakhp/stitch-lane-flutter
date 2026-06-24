@@ -27,13 +27,16 @@ def main() -> int:
     prog = os.path.basename(sys.argv[0])
 
     # `run` passes everything after it straight through to `flutter run`, so
-    # handle it before the --no-mirror stripping (those are flutter's args).
+    # handle it before the --mirror stripping (those are flutter's args).
     if argv and argv[0] == "run":
         return cmd_run(argv[1:])
 
+    # Mirroring (scrcpy) is opt-in: connecting/pairing no longer launches it
+    # automatically. Pass --mirror to also start scrcpy, or use the `mirror`
+    # subcommand on an already-connected device.
     args = argv
-    no_mirror = "--no-mirror" in args
-    args = [a for a in args if a != "--no-mirror"]
+    mirror = "--mirror" in args
+    args = [a for a in args if a != "--mirror"]
     cmd = args[0] if args else None
 
     if cmd == "status":
@@ -43,11 +46,11 @@ def main() -> int:
     if cmd == "mirror":
         return cmd_mirror()
     if cmd == "pair":
-        return cmd_pair(mirror=not no_mirror)
+        return cmd_pair(mirror=mirror)
     if cmd in ("help", "--help", "-h"):
         return cmd_help(prog)
     if cmd is None:
-        return cmd_connect(mirror=not no_mirror)
+        return cmd_connect(mirror=mirror)
 
     fail(f"Unknown command: {cmd}")
     cmd_help(prog)

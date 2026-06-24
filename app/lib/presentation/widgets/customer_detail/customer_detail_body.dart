@@ -5,16 +5,23 @@ import '../../../backend/models/customer.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
+import '../detail/delete_entity_button.dart';
 import '../markdown_description_text.dart';
 import '../measurement_card.dart';
+import 'customer_voice_notes_card.dart';
 
 /// Scrollable content of a customer's detail: name, latest measurement, unpaid
 /// total, phone, and description. Purely presentational — reused by both the
 /// full-screen detail and the tablet detail pane.
 class CustomerDetailBody extends StatelessWidget {
   final Customer customer;
+  final VoidCallback onDelete;
 
-  const CustomerDetailBody({super.key, required this.customer});
+  const CustomerDetailBody({
+    super.key,
+    required this.customer,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,16 +30,7 @@ class CustomerDetailBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _infoCard(
-            context,
-            icon: Icons.person,
-            label: 'Name',
-            child: Text(
-              customer.name,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
-          const SizedBox(height: AppConfig.spacing16),
+          // Name is shown in the header (DetailHeader) — no duplicate card here.
           _buildMeasurementCard(context),
           const SizedBox(height: AppConfig.spacing16),
           _buildUnpaidCard(context),
@@ -58,6 +56,11 @@ class CustomerDetailBody extends StatelessWidget {
               child: MarkdownDescriptionText(text: customer.description!),
             ),
           ],
+          // Voice notes last. Self-hides (and contributes no spacing) when the
+          // customer has none; renders its own leading gap when visible.
+          CustomerVoiceNotesCard(customer: customer),
+          const SizedBox(height: AppConfig.spacing24),
+          DeleteEntityButton(label: 'Delete Customer', onPressed: onDelete),
         ],
       ),
     );

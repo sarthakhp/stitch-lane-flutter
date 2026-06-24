@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import '../models/measurement.dart';
+import '../util/audio_path_list.dart';
 import '../database/sqlite_database.dart';
 import 'measurement_repository.dart';
 
@@ -100,15 +103,31 @@ class SqliteMeasurementRepository implements MeasurementRepository {
         'description': m.description,
         'created': m.created.toIso8601String(),
         'modified': m.modified.toIso8601String(),
-        'audio_file_path': m.audioFilePath,
+        'audio_file_paths': AudioPathList.encode(m.audioFilePaths),
+        'structured_data':
+            m.structuredData == null ? null : jsonEncode(m.structuredData),
       };
 
-  static Measurement fromMap(Map<String, dynamic> map) => Measurement(
-        id: map['id'] as String,
-        customerId: map['customer_id'] as String,
-        description: map['description'] as String,
-        created: DateTime.parse(map['created'] as String),
-        modified: DateTime.parse(map['modified'] as String),
-        audioFilePath: map['audio_file_path'] as String?,
-      );
+  static Measurement fromMap(Map<String, dynamic> map) {
+    final rawStructured = map['structured_data'];
+    Map<String, dynamic>? structured;
+    if (rawStructured is String && rawStructured.isNotEmpty) {
+      final decoded = jsonDecode(rawStructured);
+      if (decoded is Map) {
+        structured = Map<String, dynamic>.from(decoded);
+      }
+    }
+    return Measurement(
+      id: map['id'] as String,
+      customerId: map['customer_id'] as String,
+      description: map['description'] as String,
+      created: DateTime.parse(map['created'] as String),
+      modified: DateTime.parse(map['modified'] as String),
+      audioFilePaths: AudioPathList.read(
+        map['audio_file_paths'],
+        legacySingle: map['audio_file_path'],
+      ),
+      structuredData: structured,
+    );
+  }
 }

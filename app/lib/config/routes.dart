@@ -14,6 +14,8 @@ import '../screens/measurement_form_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/notification_settings_screen.dart';
+import '../screens/measurement_fields_screen.dart';
+import '../screens/customer_recordings_screen.dart';
 import '../screens/backup_settings_screen.dart';
 import '../screens/ai_usage_screen.dart';
 import '../screens/developer_screen.dart';
@@ -167,6 +169,20 @@ class AppRoutes {
       case AppConstants.notificationSettingsRoute:
         return MaterialPageRoute(
           builder: (_) => const NotificationSettingsScreen(),
+        );
+
+      case AppConstants.measurementFieldsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const MeasurementFieldsScreen(),
+        );
+
+      case AppConstants.customerRecordingsRoute:
+        final customer = settings.arguments as Customer?;
+        if (customer == null) {
+          return _errorRoute('Customer data is required');
+        }
+        return MaterialPageRoute(
+          builder: (_) => CustomerRecordingsScreen(customer: customer),
         );
 
       case AppConstants.backupSettingsRoute:

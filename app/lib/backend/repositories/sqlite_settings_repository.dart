@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import '../models/app_settings.dart';
 import '../database/sqlite_database.dart';
@@ -56,6 +58,9 @@ class SqliteSettingsRepository implements SettingsRepository {
         'last_backup_error': s.lastBackupError,
         'stt_model': s.sttModelRaw,
         'tts_speaker': s.ttsSpeakerRaw,
+        'common_garment_headings': s.commonGarmentHeadings == null
+            ? null
+            : jsonEncode(s.commonGarmentHeadings),
       };
 
   static AppSettings fromMap(Map<String, dynamic> map) => AppSettings(
@@ -76,5 +81,14 @@ class SqliteSettingsRepository implements SettingsRepository {
         lastBackupError: map['last_backup_error'] as String?,
         sttModelRaw: map['stt_model'] as String?,
         ttsSpeakerRaw: map['tts_speaker'] as String?,
+        commonGarmentHeadings: _decodeHeadings(map['common_garment_headings']),
       );
+
+  static List<String>? _decodeHeadings(Object? raw) {
+    if (raw == null) return null;
+    if (raw is! String || raw.isEmpty) return null;
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return null;
+    return decoded.map((e) => e.toString()).toList();
+  }
 }

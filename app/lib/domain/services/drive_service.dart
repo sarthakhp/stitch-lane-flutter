@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
-import 'auth_service.dart';
+import 'drive_auth_service.dart';
 import 'backup_guard.dart';
 import '../../utils/app_logger.dart';
 import '../../constants/app_constants.dart';
@@ -14,55 +12,13 @@ class DriveService {
   static const String imagesFolderName = 'images';
   static const String audiosFolderName = 'audios';
 
-  static Future<bool> isSignedIn() async {
-    final googleSignIn = AuthService.googleSignIn;
-    var account = googleSignIn.currentUser;
-    if (account != null) return true;
+  /// Whether Google Drive is usable right now. All Drive-auth logic lives in
+  /// [DriveAuthService], kept separate from the app session — see that class.
+  static Future<bool> isSignedIn() => DriveAuthService.isConnected();
 
-    account = await googleSignIn.signInSilently();
-    return account != null;
-  }
-
-  static Future<drive.DriveApi> getDriveApi() async {
-    try {
-      AppLogger.info('Attempting to get Drive API access...');
-
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser == null) {
-        AppLogger.warning('No Firebase user, cannot access Drive');
-        throw Exception('User not authenticated');
-      }
-
-      final googleSignIn = AuthService.googleSignIn;
-      var account = googleSignIn.currentUser;
-
-      if (account == null) {
-        AppLogger.info('No GoogleSignIn user, attempting silent sign-in...');
-        account = await googleSignIn.signInSilently();
-      }
-
-      if (account == null) {
-        AppLogger.warning('Silent sign-in failed, user needs to re-authenticate');
-        throw Exception('Drive access requires re-authentication. Please sign out and sign in again to enable backup/restore.');
-      }
-
-      AppLogger.info('Signed in as: ${account.email}');
-      final authClient = await googleSignIn.authenticatedClient();
-      if (authClient == null) {
-        AppLogger.warning('Failed to get authenticated client');
-        throw Exception('Drive access expired. Please sign out and sign in again to enable backup/restore.');
-      }
-
-      AppLogger.info('Successfully obtained Drive API access');
-      return drive.DriveApi(authClient);
-    } catch (e) {
-      AppLogger.error('Drive API error', e);
-      if (e.toString().contains('popup_failed_to_open')) {
-        throw Exception('Please allow popups for this site and try again. Check your browser settings.');
-      }
-      rethrow;
-    }
-  }
+  /// Authenticated Drive client. Delegates to [DriveAuthService], which throws
+  /// [DriveAuthException] when an interactive reconnect is required.
+  static Future<drive.DriveApi> getDriveApi() => DriveAuthService.getDriveApi();
 
   static Future<String?> _getAppDataFolderId(drive.DriveApi driveApi) async {
     return 'appDataFolder';

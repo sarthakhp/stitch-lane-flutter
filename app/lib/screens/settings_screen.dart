@@ -3,6 +3,8 @@ import '../config/app_config.dart';
 import '../presentation/presentation.dart';
 import 'widgets/settings/due_date_warning_card.dart';
 import 'widgets/settings/notification_settings_card.dart';
+import 'widgets/settings/measurement_fields_card.dart';
+import 'widgets/settings/common_headings_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -24,6 +26,10 @@ class SettingsScreen extends StatelessWidget {
                 DueDateWarningCard(),
                 SizedBox(height: AppConfig.spacing24),
                 NotificationSettingsCard(),
+                SizedBox(height: AppConfig.spacing24),
+                MeasurementFieldsCard(),
+                SizedBox(height: AppConfig.spacing24),
+                CommonHeadingsCard(),
               ],
             ),
           ),

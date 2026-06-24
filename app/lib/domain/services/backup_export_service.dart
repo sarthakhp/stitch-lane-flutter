@@ -93,6 +93,7 @@ class BackupExportService {
     required OrderRepository orderRepository,
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
+    MeasurementFieldRepository? measurementFieldRepository,
     void Function(String status)? onProgress,
   }) async {
     final archive = Archive();
@@ -104,6 +105,7 @@ class BackupExportService {
       orderRepository: orderRepository,
       measurementRepository: measurementRepository,
       settingsRepository: settingsRepository,
+      measurementFieldRepository: measurementFieldRepository,
     );
     final jsonBytes = utf8.encode(backupJson);
     archive.addFile(ArchiveFile(AppConstants.backupFileName, jsonBytes.length, jsonBytes));
@@ -131,19 +133,20 @@ class BackupExportService {
     final seenAudio = <String>{};
     var audioAdded = 0;
     for (final m in measurements) {
-      final audioPath = m.audioFilePath;
-      if (audioPath == null || audioPath.trim().isEmpty) continue;
-      final fileName = audioPath.split('/').last;
-      if (!seenAudio.add(fileName)) continue; // de-dupe by file name
-      final file = File(audioPath);
-      if (!await file.exists()) {
-        AppLogger.warning('BackupExport: audio missing, skipping: $audioPath');
-        continue;
+      for (final audioPath in m.audioFilePaths) {
+        if (audioPath.trim().isEmpty) continue;
+        final fileName = audioPath.split('/').last;
+        if (!seenAudio.add(fileName)) continue; // de-dupe by file name
+        final file = File(audioPath);
+        if (!await file.exists()) {
+          AppLogger.warning('BackupExport: audio missing, skipping: $audioPath');
+          continue;
+        }
+        onProgress?.call('Adding audio ${audioAdded + 1}...');
+        final bytes = await file.readAsBytes();
+        archive.addFile(ArchiveFile('audios/$fileName', bytes.length, bytes));
+        audioAdded++;
       }
-      onProgress?.call('Adding audio ${audioAdded + 1}...');
-      final bytes = await file.readAsBytes();
-      archive.addFile(ArchiveFile('audios/$fileName', bytes.length, bytes));
-      audioAdded++;
     }
     AppLogger.info('BackupExport: Added $audioAdded measurement audio files');
 

@@ -75,14 +75,28 @@ class AuthController extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  /// DEBUG-ONLY: when true, the controller reports authenticated with a fake
+  /// identity, no Firebase user attached. Set exclusively by [signInAsDevUser],
+  /// which is asserted to only run under [kDebugMode]. Release builds tree-shake
+  /// the call sites, so this is always false in production.
+  bool _devBypass = false;
+
+  /// Fake identity used while [_devBypass] is true. Constant, deterministic, and
+  /// distinct from any real Firebase uid so dev data is partitioned and easily
+  /// scrubbed if it ever leaks into a real install.
+  static const String _devUid = 'dev-user';
+  static const String _devEmail = 'dev@stitchgenie.local';
+  static const String _devName = 'Dev User';
+
   AuthStatus get status => _status;
   User? get user => _user;
-  String? get uid => _user?.uid;
-  String? get email => _user?.email;
-  String? get name => _user?.displayName;
-  String? get photoUrl => _user?.photoURL;
+  String? get uid => _devBypass ? _devUid : _user?.uid;
+  String? get email => _devBypass ? _devEmail : _user?.email;
+  String? get name => _devBypass ? _devName : _user?.displayName;
+  String? get photoUrl => _devBypass ? null : _user?.photoURL;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isDevBypass => _devBypass;
 
   /// Subscribes to auth changes. Idempotent — call once, after Firebase is
   /// initialized (the stream can't be read before that).
@@ -134,6 +148,27 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// DEBUG-ONLY bypass: pretend a user is signed in without touching Firebase
+  /// or Google Sign-In. Call sites are wrapped in `if (kDebugMode)` so the
+  /// tree-shaker drops them from release builds; the `assert` is a second
+  /// safety net (asserts are no-ops in release, but this throws under
+  /// profile/debug if ever called outside debug). Sign out via [signOut] —
+  /// which detects dev bypass and skips the Firebase teardown.
+  void signInAsDevUser() {
+    assert(kDebugMode,
+        'signInAsDevUser is debug-only. Call sites must be gated by kDebugMode.');
+    if (_devBypass) return;
+    _restoreTimer?.cancel();
+    _devBypass = true;
+    _resolved = true;
+    _user = null;
+    _status = AuthStatus.authenticated;
+    _isLoading = false;
+    _errorMessage = null;
+    AppLogger.warning('AuthController: DEV BYPASS active (uid=$_devUid)');
+    notifyListeners();
+  }
+
   /// Interactive Google sign-in. Status flips to authenticated via the stream;
   /// this just manages the button's loading/error state.
   Future<bool> signIn() async {
@@ -159,6 +194,17 @@ class AuthController extends ChangeNotifier {
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
   }) async {
+    // Dev bypass has no Firebase session to tear down. Just flip state and
+    // notify; the auth gate will route back to login. Leaves real Firebase
+    // auth completely untouched. Local data is left alone (dev convenience).
+    if (_devBypass) {
+      _devBypass = false;
+      _resolved = true;
+      _status = AuthStatus.unauthenticated;
+      AppLogger.warning('AuthController: DEV BYPASS ended');
+      notifyListeners();
+      return;
+    }
     await AuthService.signOut(
       customerRepository: customerRepository,
       orderRepository: orderRepository,

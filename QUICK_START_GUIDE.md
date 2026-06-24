@@ -28,6 +28,28 @@ adb connect 192.168.29.151:5555
 
 **Prerequisites**: USB debugging AND wireless debugging must be enabled in Developer Options.
 
+## Android Emulator (Mac, no Android Studio)
+
+AVD installed: **Pixel_7_API36** (Android 16, Google Play, arm64)
+
+```bash
+# Launch emulator
+emulator -avd Pixel_7_API36
+
+# List available AVDs
+avdmanager list avd
+
+# Create a new AVD (if needed)
+sdkmanager "system-images;android-36;google_apis_playstore;arm64-v8a"
+echo no | avdmanager create avd -n "MyAVD" -k "system-images;android-36;google_apis_playstore;arm64-v8a" -d "pixel_7"
+
+# Delete an AVD + free its system image
+avdmanager delete avd -n "MyAVD"
+sdkmanager --uninstall "system-images;android-36;google_apis_playstore;arm64-v8a"
+```
+
+**Note:** `ANDROID_HOME` = `~/Library/Android/sdk`. The SDK cmdline-tools are prepended in `~/.zshrc` so they take priority over any Homebrew-installed SDK tools.
+
 ## Run the App
 
 ```bash

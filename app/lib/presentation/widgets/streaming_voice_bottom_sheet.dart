@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../connectivity_guard.dart';
 import 'streaming_voice_input.dart';
 
 class StreamingVoiceBottomSheet {
@@ -10,7 +11,16 @@ class StreamingVoiceBottomSheet {
     // passing `enableFormatting: true`.
     bool enableFormatting = false,
     String? formattingModelName,
-  }) {
+    String? formattingPromptOverride,
+  }) async {
+    // Pre-flight: every voice flow needs the network up front — live STT
+    // streams immediately, and batch STT records locally but can't transcribe
+    // offline. Gating here, the single shared entry point, means the user
+    // learns they're offline BEFORE recording a whole message rather than
+    // after tapping Done.
+    final online = await ConnectivityGuard.ensureOnline(context);
+    if (!online || !context.mounted) return null;
+
     return showModalBottomSheet<VoiceInputResult?>(
       context: context,
       isScrollControlled: true,
@@ -23,6 +33,7 @@ class StreamingVoiceBottomSheet {
       builder: (sheetContext) => StreamingVoiceInput(
         enableFormatting: enableFormatting,
         formattingModelName: formattingModelName,
+        formattingPromptOverride: formattingPromptOverride,
         onDone: (result) => Navigator.of(sheetContext).pop(result),
         onCancel: () => Navigator.of(sheetContext).pop(null),
       ),

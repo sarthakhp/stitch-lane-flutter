@@ -45,6 +45,11 @@ class RichDescriptionInputField extends StatefulWidget {
   final bool enabled;
   final int minLines;
 
+  /// Optional override for the voice-formatting prompt. When null, the default
+  /// generic tailoring prompt is used. Measurement screens pass a prompt
+  /// built from the user's predefined field list + common headings.
+  final String? formattingPromptOverride;
+
   const RichDescriptionInputField({
     super.key,
     this.initialValue = '',
@@ -54,6 +59,7 @@ class RichDescriptionInputField extends StatefulWidget {
     this.hintText = 'Enter description...',
     this.enabled = true,
     this.minLines = 3,
+    this.formattingPromptOverride,
   });
 
   @override
@@ -133,6 +139,7 @@ class RichDescriptionInputFieldState extends State<RichDescriptionInputField> {
       context,
       formattingModelName: formattingModel,
       enableFormatting: true,
+      formattingPromptOverride: widget.formattingPromptOverride,
     );
     if (result == null || result.text.isEmpty || !mounted) return;
 

@@ -1,3 +1,4 @@
+import '../backend/models/measurement_field.dart';
 import 'tailoring_glossary.dart';
 
 /// Prompts for Gemini-powered transcription and formatting.
@@ -83,4 +84,103 @@ STRICT:
 - Never invent prices, measurements, or details not in the input
 - If the input is empty or nonsensical, return it as-is
 ''';
+
+  // ── Measurement extraction (transcript → structured JSON) ─────────────
+
+  /// System instruction for [buildMeasurementExtractionPrompt]. Keeps the
+  /// model in "extract, don't invent" mode.
+  static const String measurementExtractionSystemInstruction = '''
+You extract tailoring measurements from a spoken-and-transcribed note (mixed
+English + Gujarati) into a strict JSON structure. You never invent values and
+never drop anything the user said.
+''';
+
+  /// Prompt that asks the model to return the measurement as structured JSON
+  /// (validated against a response schema), NOT markdown. Injects the user's
+  /// predefined fields (canonical labels + aliases) and common garment
+  /// headings as hints.
+  ///
+  /// Why JSON instead of markdown: the structured editor needs structure, and
+  /// a schema-constrained JSON response is far more reliable than emitting
+  /// markdown and re-parsing it with regex. Anything the model can't map to a
+  /// field must go into the section's `notes` so nothing is lost.
+  static String buildMeasurementExtractionPrompt({
+    required List<MeasurementField> fields,
+    required List<String> headings,
+  }) {
+    final fieldLines = fields.map((f) {
+      if (f.aliases.isEmpty) return '- ${f.label}';
+      return '- ${f.label} (also: ${f.aliases.join(", ")})';
+    }).join('\n');
+    final headingsLine =
+        headings.isEmpty ? '(none configured)' : headings.join(', ');
+
+    return '''
+Extract the measurements from this raw voice transcription of a tailoring note.
+
+RULES:
+1. Transliterate Gujarati-script English terms to English using this glossary:
+   ${TailoringGlossary.asPromptList()}. Any other English word written in
+   Gujarati script should also be converted to English.
+2. Keep genuine Gujarati words in Gujarati script (e.g. ડગલો, ચણિયો, કુર્તી,
+   સાડી) — EXCEPT when a word matches a field alias below, then use the
+   canonical English label.
+3. Fix transcription artifacts using tailoring context:
+   - "into" between numbers means multiplication: "20 into 13" → "20 x 13"
+   - Spoken fractions: "10 and half" → "10.5", "quarter" → "0.25"
+4. Group measurements under garment sections (one object per garment). Common
+   garments the user dictates: $headingsLine. Prefer these when the audio
+   matches; otherwise use whatever garment name you heard. If no garment is
+   mentioned, use an empty heading "".
+5. Map each spoken measurement label to the closest field below (case- and
+   alias-insensitive) and output the CANONICAL label. Known fields:
+$fieldLines
+6. Put anything that is NOT a measurement (free remarks, instructions), or any
+   measurement you cannot confidently map, into that section's "notes" string.
+   NEVER discard words the user said.
+
+OUTPUT: JSON only, matching the provided schema. No markdown, no commentary.
+Each section: { "heading": string, "measurements": [ { "label": string,
+"value": string } ], "notes": string }. Values are strings (keep "13.5",
+"10 x 13"). If the input is empty or nonsensical, return {"sections": []}.
+
+EXAMPLE INPUT:
+"blouse લેન્થ 13 and half upper bust 33 waist 30 મોરી 10 loose at waist"
+
+EXAMPLE OUTPUT:
+{"sections":[{"heading":"Blouse","measurements":[{"label":"Length","value":"13.5"},{"label":"Upper Bust","value":"33"},{"label":"Waist","value":"30"},{"label":"Mori","value":"10"}],"notes":"loose at waist"}]}
+''';
+  }
+
+  /// Response schema for [buildMeasurementExtractionPrompt]. Uses an array of
+  /// {label, value} pairs (not a free-form object) so it's expressible as a
+  /// strict schema; the caller folds it into a label→value map.
+  static const Map<String, dynamic> measurementExtractionSchema = {
+    'type': 'object',
+    'properties': {
+      'sections': {
+        'type': 'array',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'heading': {'type': 'string'},
+            'measurements': {
+              'type': 'array',
+              'items': {
+                'type': 'object',
+                'properties': {
+                  'label': {'type': 'string'},
+                  'value': {'type': 'string'},
+                },
+                'required': ['label', 'value'],
+              },
+            },
+            'notes': {'type': 'string'},
+          },
+          'required': ['heading', 'measurements', 'notes'],
+        },
+      },
+    },
+    'required': ['sections'],
+  };
 }

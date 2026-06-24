@@ -8,7 +8,7 @@ class SqliteDatabase {
   /// Public filename of the live SQLite DB. Used by [DbSnapshotService] which
   /// reads / writes the file alongside this class on disk.
   static String get dbName => _dbName;
-  static const int _dbVersion = 9;
+  static const int _dbVersion = 12;
 
   static Future<Database> get database async {
     _database ??= await _initDatabase();
@@ -55,6 +55,8 @@ class SqliteDatabase {
         payment_date TEXT,
         payments TEXT NOT NULL DEFAULT '[]',
         total_paid_amount INTEGER NOT NULL DEFAULT 0,
+        audio_file_path TEXT,
+        audio_file_paths TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -70,6 +72,8 @@ class SqliteDatabase {
         created TEXT NOT NULL,
         modified TEXT NOT NULL,
         audio_file_path TEXT,
+        audio_file_paths TEXT,
+        structured_data TEXT,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
     ''');
@@ -90,11 +94,29 @@ class SqliteDatabase {
         last_backup_status TEXT,
         last_backup_error TEXT,
         stt_model TEXT,
-        tts_speaker TEXT
+        tts_speaker TEXT,
+        common_garment_headings TEXT
       )
     ''');
 
     await _createAiUsageEventsTable(db);
+    await _createMeasurementFieldsTable(db);
+  }
+
+  /// v10: flat global list of measurement field labels + aliases, used by the
+  /// structured measurement form and by the AI to normalize transcribed
+  /// labels. See [DefaultMeasurementFields] for the seed set.
+  static Future<void> _createMeasurementFieldsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE measurement_fields (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        aliases TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX idx_measurement_fields_sort_order ON measurement_fields(sort_order)');
   }
 
   /// One row per external-AI network call. Written by the AiGateway via
@@ -185,6 +207,24 @@ class SqliteDatabase {
       // from a real ₹0. SQLite can't drop a NOT NULL constraint in place, so
       // rebuild the table. Nothing references orders via FK, so this is safe.
       await _migrateOrdersValueNullable(db);
+    }
+    if (oldVersion < 10) {
+      // Predefined measurement fields feature.
+      await _createMeasurementFieldsTable(db);
+      await db.execute('ALTER TABLE settings ADD COLUMN common_garment_headings TEXT');
+      await db.execute('ALTER TABLE measurements ADD COLUMN structured_data TEXT');
+    }
+    if (oldVersion < 11) {
+      // Per-order audio link, so order dictations are reachable from the
+      // order (and aggregated up to the customer) — not just the dev list.
+      await db.execute('ALTER TABLE orders ADD COLUMN audio_file_path TEXT');
+    }
+    if (oldVersion < 12) {
+      // Multiple recordings per entity. A new JSON-array column on each table;
+      // the legacy single audio_file_path column is read as a fallback (see
+      // [AudioPathList]) so no data backfill is needed.
+      await db.execute('ALTER TABLE measurements ADD COLUMN audio_file_paths TEXT');
+      await db.execute('ALTER TABLE orders ADD COLUMN audio_file_paths TEXT');
     }
   }
 

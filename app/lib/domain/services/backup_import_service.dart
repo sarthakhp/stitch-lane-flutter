@@ -127,32 +127,42 @@ class BackupImportService {
         if (ordersList != null) {
           final appDir = await getApplicationDocumentsDirectory();
           final localImagesDir = '${appDir.path}/${AppConstants.imagesFolderName}';
+          final orderAudioDir = (await AudioBackupRecorder.backupsDirectory()).path;
 
           for (var json in ordersList) {
-            final order = Order.fromJson(json as Map<String, dynamic>);
-            // Fix image paths to point to current device's directory
+            var order = Order.fromJson(json as Map<String, dynamic>);
+            // Fix image paths to point to current device's directory.
             if (order.imagePaths.isNotEmpty) {
-              final fixedPaths = order.imagePaths
-                  .map((p) => localMediaPath(localImagesDir, p))
-                  .toList();
-              await orderRepository.addOrder(order.copyWith(imagePaths: fixedPaths));
-            } else {
-              await orderRepository.addOrder(order);
+              order = order.copyWith(
+                imagePaths: order.imagePaths
+                    .map((p) => localMediaPath(localImagesDir, p))
+                    .toList(),
+              );
             }
+            // Same for linked audio recordings.
+            if (order.audioFilePaths.isNotEmpty) {
+              order = order.copyWith(
+                audioFilePaths: order.audioFilePaths
+                    .map((p) => localMediaPath(orderAudioDir, p))
+                    .toList(),
+              );
+            }
+            await orderRepository.addOrder(order);
           }
         }
 
         final measurementsList = boxes['measurements'] as List?;
         if (measurementsList != null) {
           // Audio is restored into audio_backups/; rewrite each measurement's
-          // audioFilePath to point there on THIS device (same idea as images).
+          // recordings to point there on THIS device (same idea as images).
           final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
           for (var json in measurementsList) {
             var measurement = Measurement.fromJson(json as Map<String, dynamic>);
-            final audioPath = measurement.audioFilePath;
-            if (audioPath != null && audioPath.trim().isNotEmpty) {
+            if (measurement.audioFilePaths.isNotEmpty) {
               measurement = measurement.copyWith(
-                audioFilePath: localMediaPath(audioDir, audioPath),
+                audioFilePaths: measurement.audioFilePaths
+                    .map((p) => localMediaPath(audioDir, p))
+                    .toList(),
               );
             }
             await measurementRepository.addMeasurement(measurement);

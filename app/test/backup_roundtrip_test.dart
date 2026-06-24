@@ -76,14 +76,17 @@ void main() {
       expect(r.value, isNull);
     });
 
-    test('Measurement (incl. audioFilePath)', () {
+    test('Measurement (incl. audioFilePaths)', () {
       final m = Measurement(
         id: 'm1',
         customerId: 'c1',
         description: '### Blouse\n- **Bust:** 39',
         created: DateTime(2026, 6, 9, 10, 0),
         modified: DateTime(2026, 6, 9, 10, 5),
-        audioFilePath: '/data/app/audio_backups/2026-06-09T10-00-00.wav',
+        audioFilePaths: const [
+          '/data/app/audio_backups/2026-06-09T10-00-00.wav',
+          '/data/app/audio_backups/2026-06-09T10-02-00.wav',
+        ],
       );
       final r = Measurement.fromJson(_rt(m.toJson()));
       expect(r.id, m.id);
@@ -91,7 +94,19 @@ void main() {
       expect(r.description, m.description);
       expect(r.created, m.created);
       expect(r.modified, m.modified);
-      expect(r.audioFilePath, m.audioFilePath);
+      expect(r.audioFilePaths, m.audioFilePaths);
+    });
+
+    test('Measurement legacy audioFilePath JSON migrates to a 1-element list', () {
+      final r = Measurement.fromJson({
+        'id': 'm1',
+        'customerId': 'c1',
+        'description': 'd',
+        'created': DateTime(2026, 1, 1).toIso8601String(),
+        'modified': DateTime(2026, 1, 1).toIso8601String(),
+        'audioFilePath': '/legacy/one.wav',
+      });
+      expect(r.audioFilePaths, ['/legacy/one.wav']);
     });
 
     test('AppSettings (all fields incl. debugLogs, sttModel, ttsSpeaker)', () {

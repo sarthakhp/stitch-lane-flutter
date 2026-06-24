@@ -1,3 +1,4 @@
+import '../util/audio_path_list.dart';
 import 'order_status.dart';
 import 'payment_entry.dart';
 
@@ -47,6 +48,11 @@ class Order {
 
   final int totalPaidAmount;
 
+  /// Voice dictations linked to this order, in capture order. Linked at
+  /// creation (order creator) and from the order form's description mic.
+  /// Empty for typed orders and all pre-feature orders.
+  final List<String> audioFilePaths;
+
   Order({
     required this.id,
     required this.customerId,
@@ -61,7 +67,12 @@ class Order {
     this.paymentDate,
     this.payments = const [],
     this.totalPaidAmount = 0,
+    this.audioFilePaths = const [],
   });
+
+  /// First linked recording, for the few spots that only need one.
+  String? get primaryAudioFilePath =>
+      audioFilePaths.isEmpty ? null : audioFilePaths.first;
 
   /// True only when a real price is set and fully covered by payments.
   bool get isFullyPaid =>
@@ -94,6 +105,7 @@ class Order {
     bool clearPaymentDate = false,
     List<PaymentEntry>? payments,
     int? totalPaidAmount,
+    List<String>? audioFilePaths,
   }) {
     return Order(
       id: id ?? this.id,
@@ -109,6 +121,7 @@ class Order {
       paymentDate: clearPaymentDate ? null : (paymentDate ?? this.paymentDate),
       payments: payments ?? this.payments,
       totalPaidAmount: totalPaidAmount ?? this.totalPaidAmount,
+      audioFilePaths: audioFilePaths ?? this.audioFilePaths,
     );
   }
 
@@ -127,6 +140,7 @@ class Order {
       'paymentDate': paymentDate?.toIso8601String(),
       'payments': payments.map((p) => p.toJson()).toList(),
       'totalPaidAmount': totalPaidAmount,
+      'audioFilePaths': audioFilePaths,
     };
   }
 
@@ -158,6 +172,10 @@ class Order {
               .toList()
           : [],
       totalPaidAmount: json['totalPaidAmount'] as int? ?? 0,
+      audioFilePaths: AudioPathList.read(
+        json['audioFilePaths'],
+        legacySingle: json['audioFilePath'],
+      ),
     );
   }
 

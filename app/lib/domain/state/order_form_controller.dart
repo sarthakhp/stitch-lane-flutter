@@ -23,6 +23,7 @@ class OrderFormController extends ChangeNotifier {
   bool _isLoading = false;
   bool _hasUnsavedChanges = false;
   List<double> _extractedValues = [];
+  List<String> _audioFilePaths = [];
 
   OrderFormController({this.existingOrder, this.initialCustomer}) {
     _initializeFromOrder();
@@ -42,6 +43,7 @@ class OrderFormController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   List<double> get extractedValues => List.unmodifiable(_extractedValues);
+  List<String> get audioFilePaths => List.unmodifiable(_audioFilePaths);
 
   void _initializeFromOrder() {
     _selectedCustomer = initialCustomer;
@@ -57,7 +59,16 @@ class OrderFormController extends ChangeNotifier {
       _isPaid = existingOrder!.isPaid;
       _paymentDate = existingOrder!.paymentDate;
       _extractedValues = MoneyExtractor.extractValues(_description);
+      _audioFilePaths = [...existingOrder!.audioFilePaths];
     }
+  }
+
+  /// Append a voice recording captured from the description field's mic. Each
+  /// dictation is kept (de-duped), so the order can hold several voice notes.
+  void addAudioFilePath(String path) {
+    if (path.trim().isEmpty || _audioFilePaths.contains(path)) return;
+    _audioFilePaths.add(path);
+    _markChanged();
   }
 
   void setTitle(String value) {
@@ -152,6 +163,7 @@ class OrderFormController extends ChangeNotifier {
       imagePaths: _imagePaths,
       payments: _payments,
       totalPaidAmount: _totalPaidAmount,
+      audioFilePaths: _audioFilePaths,
     );
   }
 

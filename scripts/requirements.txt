@@ -1,4 +1,7 @@
-# scripts/adb-wireless.py uses stdlib only.
-# Dev tooling below.
+# scripts/adb-wireless.py is stdlib-only except the optional QR pairing path,
+# which uses segno (pure-Python, zero transitive deps). Without segno, `pair`
+# still works via the 6-digit-code flow.
+segno==1.6.6
 
+# Dev tooling below.
 ruff==0.8.4

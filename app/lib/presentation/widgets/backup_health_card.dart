@@ -40,6 +40,35 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
     }
   }
 
+  /// Recovery for a Drive RE-AUTH failure: a plain "Back up now" would just hit
+  /// the same dead token. Reconnect Google Drive first (interactive sign-in
+  /// that touches ONLY the Drive grant — never the app session or local data),
+  /// then run the normal backup. If the user cancels the Google prompt, nothing
+  /// changes.
+  Future<void> _reauthAndBackup() async {
+    setState(() => _isBackingUp = true);
+    try {
+      final reconnected = await DriveAuthService.reconnect();
+      if (!reconnected) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Google Drive sign-in cancelled. Your data and app sign-in '
+                'are untouched.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+      await runManualBackup(context);
+    } finally {
+      if (mounted) setState(() => _isBackingUp = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Nothing to lose, nothing to warn about. A brand-new account (no
@@ -56,6 +85,12 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
         final error = state.settings.lastBackupError;
 
         final health = _computeHealth(last, status);
+
+        // A failed backup caused specifically by Drive needing re-authentication
+        // can't be fixed by retrying the same flow — offer to reconnect Drive
+        // first. (Drive grant only; the app session is never touched.)
+        final needsReauth =
+            health == _Health.red && DriveAuthException.matches(error);
 
         // When the last backup succeeded and is recent (green), hide the card
         // entirely — there's nothing to act on, so it shouldn't take up home
@@ -103,7 +138,9 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _title(health, last, status),
+                        needsReauth
+                            ? 'Sign in to keep backups safe'
+                            : _title(health, last, status),
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: fg,
                           fontWeight: FontWeight.w600,
@@ -111,7 +148,9 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _subtitle(health, last, error),
+                        needsReauth
+                            ? _reauthSubtitle(last)
+                            : _subtitle(health, last, error),
                         style: theme.textTheme.bodySmall?.copyWith(color: fg),
                       ),
                     ],
@@ -119,7 +158,9 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
                 ),
                 const SizedBox(width: AppConfig.spacing8),
                 TextButton(
-                  onPressed: _isBackingUp ? null : _backupNow,
+                  onPressed: _isBackingUp
+                      ? null
+                      : (needsReauth ? _reauthAndBackup : _backupNow),
                   style: TextButton.styleFrom(foregroundColor: fg),
                   child: _isBackingUp
                       ? SizedBox(
@@ -130,7 +171,7 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
                             color: fg,
                           ),
                         )
-                      : const Text('Back up now'),
+                      : Text(needsReauth ? 'Sign in & back up' : 'Back up now'),
                 ),
               ],
             ),
@@ -177,6 +218,14 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
       return '$dateLine · $clipped';
     }
     return dateLine;
+  }
+
+  static String _reauthSubtitle(DateTime? last) {
+    if (last == null) {
+      return 'Sign in to Google Drive to start backing up.';
+    }
+    final dateLine = DateFormat('MMM d, h:mm a').format(last);
+    return '$dateLine · Reconnect Google Drive to resume backups.';
   }
 
   static String _ago(Duration d) {

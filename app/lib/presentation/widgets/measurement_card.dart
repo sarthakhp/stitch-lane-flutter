@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../backend/models/measurement.dart';
 import '../../config/app_config.dart';
+import '../../domain/services/measurement_structurer.dart';
 import 'markdown_description_text.dart';
+import 'measurement/structured_measurement_view.dart';
 
 class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
@@ -17,6 +19,33 @@ class MeasurementCard extends StatelessWidget {
     required this.onViewAll,
     this.onTapLatest,
   });
+
+  /// Structured chip preview for measurements created since the predefined
+  /// fields feature; older ones (markdown only) keep the truncated text
+  /// preview inside a fixed-height scroll box.
+  Widget _buildPreview() {
+    final structuredData = latestMeasurement!.structuredData;
+    if (structuredData != null) {
+      final structured = StructuredMeasurement.fromJson(structuredData);
+      if (!structured.isEmpty) {
+        return StructuredMeasurementView(
+          data: structured,
+          compact: true,
+          maxRows: 4,
+        );
+      }
+    }
+    return SizedBox(
+      height: 80,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: MarkdownDescriptionText(
+          text: latestMeasurement!.description,
+          selectable: false,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,16 +109,7 @@ class MeasurementCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: AppConfig.spacing8),
-                      SizedBox(
-                        height: 80,
-                        child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: MarkdownDescriptionText(
-                            text: latestMeasurement!.description,
-                            selectable: false,
-                          ),
-                        ),
-                      ),
+                      _buildPreview(),
                       const SizedBox(height: AppConfig.spacing12),
                       Row(
                         children: [

@@ -27,6 +27,7 @@ class BatchVoiceInputController extends ChangeNotifier
   final AppSettings settings;
   final bool enableFormatting;
   final String? formattingModelName;
+  final String? formattingPromptOverride;
 
   VoiceInputState _state = VoiceInputState.connecting;
   String _finalText = '';
@@ -46,6 +47,7 @@ class BatchVoiceInputController extends ChangeNotifier
     required this.settings,
     this.enableFormatting = false,
     this.formattingModelName,
+    this.formattingPromptOverride,
   });
 
   @override
@@ -198,6 +200,7 @@ class BatchVoiceInputController extends ChangeNotifier
     final result = await TranscriptFormatter.format(
       _finalText,
       modelName: formattingModelName,
+      formattingPromptOverride: formattingPromptOverride,
     );
     _formattedText = result.text;
     _formattingFailed = result.failed;
@@ -219,6 +222,7 @@ class BatchVoiceInputController extends ChangeNotifier
     final result = await TranscriptFormatter.format(
       _finalText,
       modelName: formattingModelName,
+      formattingPromptOverride: formattingPromptOverride,
     );
     _formattedText = result.text;
     _formattingFailed = result.failed;

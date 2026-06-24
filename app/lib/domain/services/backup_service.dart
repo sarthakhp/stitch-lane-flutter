@@ -21,6 +21,7 @@ class BackupService {
   static const String _ordersKey = 'orders';
   static const String _measurementsKey = 'measurements';
   static const String _settingsKey = 'settings';
+  static const String _measurementFieldsKey = 'measurementFields';
   static const String _customerCountKey = 'customerCount';
   static const String _orderCountKey = 'orderCount';
   static const String _measurementCountKey = 'measurementCount';
@@ -30,11 +31,14 @@ class BackupService {
     required OrderRepository orderRepository,
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
+    MeasurementFieldRepository? measurementFieldRepository,
   }) async {
     final customers = await customerRepository.getAllCustomers();
     final orders = await orderRepository.getAllOrders();
     final measurements = await measurementRepository.getAllMeasurements();
     final settings = await settingsRepository.getSettings();
+    final measurementFields =
+        await measurementFieldRepository?.getAll() ?? const [];
 
     final backup = {
       _versionKey: _backupVersion,
@@ -45,6 +49,8 @@ class BackupService {
         _ordersKey: orders.map((o) => o.toJson()).toList(),
         _measurementsKey: measurements.map((m) => m.toJson()).toList(),
         _settingsKey: settings.toJson(),
+        _measurementFieldsKey:
+            measurementFields.map((f) => f.toJson()).toList(),
       },
       _metadataKey: {
         _customerCountKey: customers.length,
@@ -62,6 +68,7 @@ class BackupService {
     required OrderRepository orderRepository,
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
+    MeasurementFieldRepository? measurementFieldRepository,
     void Function(int current, int total, String message)? onImageProgress,
     void Function(int current, int total, String message)? onAudioProgress,
   }) async {
@@ -79,6 +86,9 @@ class BackupService {
       await _restoreOrders(boxes, orderRepository);
       await _restoreMeasurements(boxes, measurementRepository);
       await _restoreSettings(boxes, settingsRepository);
+      if (measurementFieldRepository != null) {
+        await _restoreMeasurementFields(boxes, measurementFieldRepository);
+      }
     }
 
     await SqliteDatabase.withForeignKeysDisabled(doRestore);
@@ -131,19 +141,27 @@ class BackupService {
 
     final appDir = await getApplicationDocumentsDirectory();
     final localImagesDir = '${appDir.path}/${AppConstants.imagesFolderName}';
+    final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
 
     for (var json in ordersList) {
-      final order = Order.fromJson(json as Map<String, dynamic>);
-      // Fix image paths to point to current device's directory
+      var order = Order.fromJson(json as Map<String, dynamic>);
+      // Fix image paths to point to current device's directory.
       if (order.imagePaths.isNotEmpty) {
-        final fixedPaths = order.imagePaths.map((path) {
-          final fileName = path.split('/').last;
-          return '$localImagesDir/$fileName';
-        }).toList();
-        await orderRepository.addOrder(order.copyWith(imagePaths: fixedPaths));
-      } else {
-        await orderRepository.addOrder(order);
+        order = order.copyWith(
+          imagePaths: order.imagePaths
+              .map((path) => '$localImagesDir/${path.split('/').last}')
+              .toList(),
+        );
       }
+      // Same for audio: downloaded into audio_backups/ on this device.
+      if (order.audioFilePaths.isNotEmpty) {
+        order = order.copyWith(
+          audioFilePaths: order.audioFilePaths
+              .map((path) => '$audioDir/${path.split('/').last}')
+              .toList(),
+        );
+      }
+      await orderRepository.addOrder(order);
     }
   }
 
@@ -155,18 +173,38 @@ class BackupService {
     if (measurementsList == null) return;
 
     // Audio is downloaded into audio_backups/ after restore; point each
-    // measurement's audioFilePath there on THIS device (like image paths).
+    // measurement's recordings there on THIS device (like image paths).
     final audioDir = (await AudioBackupRecorder.backupsDirectory()).path;
 
     for (var json in measurementsList) {
       var measurement = Measurement.fromJson(json as Map<String, dynamic>);
-      final audioPath = measurement.audioFilePath;
-      if (audioPath != null && audioPath.trim().isNotEmpty) {
-        final fileName = audioPath.split('/').last;
-        measurement = measurement.copyWith(audioFilePath: '$audioDir/$fileName');
+      if (measurement.audioFilePaths.isNotEmpty) {
+        final rewritten = measurement.audioFilePaths
+            .map((p) => '$audioDir/${p.split('/').last}')
+            .toList();
+        measurement = measurement.copyWith(audioFilePaths: rewritten);
       }
       await measurementRepository.addMeasurement(measurement);
     }
+  }
+
+  /// Wipe + re-insert the predefined measurement fields list. Backups created
+  /// before this feature won't have the key — in that case we leave the
+  /// existing fields alone (the first-run seeder will fill them on next open
+  /// if the table is empty).
+  static Future<void> _restoreMeasurementFields(
+    Map<String, dynamic> boxes,
+    MeasurementFieldRepository repository,
+  ) async {
+    final raw = boxes[_measurementFieldsKey];
+    if (raw is! List) return;
+    final fields = <MeasurementField>[
+      for (final item in raw)
+        if (item is Map)
+          MeasurementField.fromJson(Map<String, dynamic>.from(item)),
+    ];
+    if (fields.isEmpty) return;
+    await repository.replaceAll(fields);
   }
 
   static Future<void> _restoreSettings(

@@ -169,6 +169,81 @@ class GeminiService {
     }
   }
 
+  /// One-shot structured generation: sends [prompt] + [input] and returns the
+  /// model's response decoded as JSON (constrained by [schema] via response
+  /// schema). Returns null on empty output, malformed JSON, or any error — the
+  /// caller is expected to fall back gracefully (e.g. keep the raw transcript),
+  /// so a bad extraction never loses the user's words.
+  static Future<Map<String, dynamic>?> generateStructured({
+    required String systemInstruction,
+    required String prompt,
+    required String input,
+    required Map<String, dynamic> schema,
+    String? modelName,
+    String callerTag = UsageCallerTags.transcriptFormat,
+  }) async {
+    modelName ??= defaultAiFormattingModel;
+    try {
+      final client = _getClient();
+      final response = await _generateContentWithRecording(
+        client: client,
+        modelName: modelName,
+        request: GenerateContentRequest(
+          systemInstruction: Content(parts: [TextPart(systemInstruction)]),
+          contents: [
+            Content.user([TextPart('$prompt\n\nINPUT:\n$input')]),
+          ],
+          generationConfig: _buildJsonGenerationConfig(modelName, schema),
+        ),
+        callerTag: callerTag,
+        kind: UsageKind.chat,
+      );
+
+      final text = response.text;
+      if (text == null || text.trim().isEmpty) {
+        AppLogger.warning('generateStructured: empty response');
+        return null;
+      }
+      final decoded = jsonDecode(_stripCodeFences(text));
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } on SocketException catch (e) {
+      // Bubble up so the UI can show the offline message; audio is already
+      // saved, so nothing is lost either way.
+      AppLogger.error('Network error during structured generation', e);
+      throw Exception('No internet connection. Please check your network');
+    } catch (e) {
+      AppLogger.error('Structured generation failed (caller will fall back)', e);
+      return null;
+    }
+  }
+
+  /// Like [_buildGenerationConfig] but adds JSON-mode output bound to [schema].
+  static GenerationConfig _buildJsonGenerationConfig(
+    String modelName,
+    Map<String, dynamic> schema,
+  ) {
+    final thinking = modelName.startsWith('gemini-3')
+        ? const ThinkingConfig(thinkingLevel: ThinkingLevel.minimal)
+        : const ThinkingConfig(thinkingBudget: 0);
+    return GenerationConfig(
+      thinkingConfig: thinking,
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    );
+  }
+
+  /// Defensive: strip a ```json … ``` fence if the model wraps its JSON despite
+  /// JSON mode. Returns the inner payload, or the input unchanged.
+  static String _stripCodeFences(String s) {
+    final t = s.trim();
+    if (!t.startsWith('```')) return t;
+    final firstNl = t.indexOf('\n');
+    if (firstNl == -1) return t;
+    var body = t.substring(firstNl + 1);
+    if (body.endsWith('```')) body = body.substring(0, body.length - 3);
+    return body.trim();
+  }
+
   /// Wraps a `client.models.generateContent` call with a stopwatch and emits
   /// a [UsageEvent] on both success and failure (then rethrows). Token counts
   /// are extracted from the `usageMetadata` field of [googleai_dart]'s

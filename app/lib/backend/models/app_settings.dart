@@ -25,6 +25,13 @@ class AppSettings {
 
   final String? ttsSpeakerRaw;
 
+  /// Garment headings the user dictates frequently (e.g. Blouse, Pant). Used
+  /// as a hint to the AI when sectioning a transcript and as the chip row
+  /// above the measurement form. Not a constraint — the user/AI can use any
+  /// heading. Null means "not configured yet"; the UI falls back to
+  /// [DefaultMeasurementFields.defaultHeadings].
+  final List<String>? commonGarmentHeadings;
+
   bool get pendingOrdersReminderEnabled => pendingOrdersReminderEnabledRaw ?? false;
   String get pendingOrdersReminderTime => pendingOrdersReminderTimeRaw ?? '08:30';
   bool get autoBackupEnabled => autoBackupEnabledRaw ?? false;
@@ -50,6 +57,7 @@ class AppSettings {
     this.lastBackupError,
     this.sttModelRaw,
     this.ttsSpeakerRaw,
+    this.commonGarmentHeadings,
   });
 
   AppSettings copyWith({
@@ -66,6 +74,7 @@ class AppSettings {
     String? lastBackupError,
     String? sttModel,
     String? ttsSpeaker,
+    List<String>? commonGarmentHeadings,
   }) {
     return AppSettings(
       dueDateWarningThreshold: dueDateWarningThreshold ?? this.dueDateWarningThreshold,
@@ -81,6 +90,7 @@ class AppSettings {
       lastBackupError: lastBackupError ?? this.lastBackupError,
       sttModelRaw: sttModel ?? sttModelRaw,
       ttsSpeakerRaw: ttsSpeaker ?? ttsSpeakerRaw,
+      commonGarmentHeadings: commonGarmentHeadings ?? this.commonGarmentHeadings,
     );
   }
 
@@ -99,6 +109,7 @@ class AppSettings {
       'lastBackupError': lastBackupError,
       'sttModel': sttModelRaw,
       'ttsSpeaker': ttsSpeakerRaw,
+      'commonGarmentHeadings': commonGarmentHeadings,
     };
   }
 
@@ -124,6 +135,9 @@ class AppSettings {
       lastBackupError: json['lastBackupError'] as String?,
       sttModelRaw: json['sttModel'] as String?,
       ttsSpeakerRaw: json['ttsSpeaker'] as String?,
+      commonGarmentHeadings: (json['commonGarmentHeadings'] as List?)
+          ?.map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -148,7 +162,18 @@ class AppSettings {
            other.lastBackupStatus == lastBackupStatus &&
            other.lastBackupError == lastBackupError &&
            other.sttModelRaw == sttModelRaw &&
-           other.ttsSpeakerRaw == ttsSpeakerRaw;
+           other.ttsSpeakerRaw == ttsSpeakerRaw &&
+           _listEquals(other.commonGarmentHeadings, commonGarmentHeadings);
+  }
+
+  static bool _listEquals(List<String>? a, List<String>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -166,6 +191,7 @@ class AppSettings {
     lastBackupError,
     sttModelRaw,
     ttsSpeakerRaw,
+    commonGarmentHeadings == null ? null : Object.hashAll(commonGarmentHeadings!),
   );
 }
 

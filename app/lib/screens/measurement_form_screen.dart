@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
+import '../domain/services/measurement_structurer.dart';
+import '../domain/services/measurement_extractor.dart';
+import '../domain/services/measurement_save_service.dart';
 import '../config/app_config.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/sticky_bottom_action_bar.dart';
-import '../presentation/widgets/rich_description_input_field.dart';
-import '../domain/services/recordings/recording_metadata.dart';
-import '../domain/services/recordings/recording_store.dart';
+import '../presentation/widgets/measurement/structured_measurement_editor.dart';
+import '../presentation/widgets/measurement/form/customer_summary_card.dart';
+import '../presentation/widgets/measurement/form/legacy_import_banner.dart';
+import '../presentation/widgets/measurement/form/dictate_button.dart';
+import '../presentation/widgets/audio/recordings_card.dart';
 
+/// Structured-only measurement editor.
+///
+/// Dictation is turned into structure by the AI ([MeasurementExtractor]);
+/// manual entry uses the field rows; free remarks live in each section's
+/// Notes. The markdown `description` is *derived* from the structure on save
+/// ([MeasurementSaveService]) — it's no longer hand-authored.
 class MeasurementFormScreen extends StatefulWidget {
   final Measurement? measurement;
   final Customer customer;
@@ -25,42 +35,58 @@ class MeasurementFormScreen extends StatefulWidget {
 }
 
 class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _descriptionKey = GlobalKey<RichDescriptionInputFieldState>();
-  bool _isLoading = false;
-  bool _hasAttemptedSubmit = false;
+  bool _isLoading = false; // saving
+  bool _isExtracting = false; // turning a dictation into structure
   bool _hasUnsavedChanges = false;
-  String _descriptionValue = '';
-  // Linked audio recording path. Starts from the existing measurement (if
-  // editing) and gets replaced any time the user does a new voice input.
-  String? _audioFilePath;
+
+  /// Single source of truth: sections + per-field values + notes.
+  StructuredMeasurement _structured = StructuredMeasurement.empty();
+
+  /// Shown once when an old (markdown-only) measurement was imported to Notes.
+  bool _legacyImported = false;
+
+  List<MeasurementField> _fieldsSnapshot = const [];
+
+  // Linked recordings; each dictation appends (multiple kept). The "new" list
+  // is the subset captured this session that needs a sidecar at save.
+  List<String> _audioFilePaths = [];
+  final List<String> _newAudioFilePaths = [];
 
   bool get _isEditing => widget.measurement != null;
+  bool get _isBusy => _isLoading || _isExtracting;
 
   @override
   void initState() {
     super.initState();
+    _fieldsSnapshot = context.read<MeasurementFieldsState>().fields;
+
     if (_isEditing) {
-      _descriptionValue = widget.measurement!.description;
-      _audioFilePath = widget.measurement!.audioFilePath;
+      _audioFilePaths = [...widget.measurement!.audioFilePaths];
+      final stored = widget.measurement!.structuredData;
+      if (stored != null) {
+        _structured = StructuredMeasurement.fromJson(stored);
+      } else {
+        // Legacy (markdown-only): keep its text verbatim in a Notes section —
+        // no lossy parsing. The user can re-key into fields.
+        _structured =
+            MeasurementStructurer.fromLegacyText(widget.measurement!.description);
+        _legacyImported = !_structured.isEmpty;
+      }
     }
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
+  List<String> get _headings =>
+      context.read<SettingsState>().settings.commonGarmentHeadings ??
+      DefaultMeasurementFields.defaultHeadings;
 
-  Future<bool> _onWillPop() async {
-    if (!_hasUnsavedChanges || _isLoading) {
-      return true;
-    }
-
+  Future<bool> _confirmDiscard() async {
+    if (!_hasUnsavedChanges || _isBusy) return true;
     final shouldPop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Discard changes?'),
-        content: const Text('You have unsaved changes. Do you want to discard them?'),
+        content: const Text(
+            'You have unsaved changes. Do you want to discard them?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -73,75 +99,97 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
         ],
       ),
     );
-
     return shouldPop ?? false;
   }
 
-  /// Best-effort: link this recording (if there is one) to its transcript +
-  /// outcome so it shows up in the Recordings debugger. Never throws.
-  Future<void> _writeRecordingSidecar(String action) async {
-    await RecordingStore.writeSidecar(
-      _audioFilePath,
-      RecordingMetadata(
-        source: RecordingSource.measurement,
-        title: widget.customer.name,
-        transcript: _descriptionValue.trim(),
-        actions: ['$action for ${widget.customer.name}'],
-      ),
-    );
+  void _markDirty() {
+    if (!_hasUnsavedChanges) setState(() => _hasUnsavedChanges = true);
   }
 
-  Future<void> _saveMeasurement() async {
-    setState(() {
-      _hasAttemptedSubmit = true;
-    });
+  void _onStructuredChanged(StructuredMeasurement next) {
+    setState(() => _structured = next);
+    _markDirty();
+  }
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  /// Append a freshly-captured recording (de-duped); tracked as new-this-session
+  /// so save writes its sidecar.
+  void _addAudio(String? path) {
+    if (path == null || path.trim().isEmpty) return;
+    if (_audioFilePaths.contains(path)) return;
+    setState(() => _audioFilePaths.add(path));
+    _newAudioFilePaths.add(path);
+    _markDirty();
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
+  /// Capture a raw transcript, turn it into structured sections via the AI,
+  /// and merge into the form. If the AI can't structure it, the raw transcript
+  /// is kept in a Notes section so words are never lost. Audio is saved either
+  /// way.
+  Future<void> _runVoice() async {
+    final result = await StreamingVoiceBottomSheet.show(context);
+    if (result == null || result.text.trim().isEmpty || !mounted) return;
 
-    final state = context.read<MeasurementState>();
-    final repository = context.read<MeasurementRepository>();
-    final now = DateTime.now();
+    _addAudio(result.audioWavPath);
 
+    setState(() => _isExtracting = true);
+    StructuredMeasurement? extracted;
+    var failed = false;
     try {
-      if (_isEditing) {
-        final updatedMeasurement = widget.measurement!.copyWith(
-          description: _descriptionValue.trim(),
-          modified: now,
-          audioFilePath: _audioFilePath,
-        );
-        await MeasurementService.updateMeasurement(state, repository, updatedMeasurement);
-        await _writeRecordingSidecar('Updated measurement');
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Measurement updated successfully')),
-          );
-        }
-      } else {
-        final measurementId = const Uuid().v4();
+      extracted = await MeasurementExtractor.extract(
+        result.text,
+        fields: _fieldsSnapshot,
+        headings: _headings,
+        modelName: context.read<SettingsState>().settings.aiFormattingModel,
+      );
+    } catch (_) {
+      failed = true;
+    }
+    if (!mounted) return;
+    setState(() => _isExtracting = false);
 
-        final newMeasurement = Measurement(
-          id: measurementId,
-          customerId: widget.customer.id,
-          description: _descriptionValue.trim(),
-          created: now,
-          modified: now,
-          audioFilePath: _audioFilePath,
+    final incoming = extracted ?? _rawTranscriptFallback(result.text);
+    setState(() => _structured =
+        MeasurementStructurer.mergeSections(_structured, incoming));
+    _markDirty();
+
+    if ((failed || extracted == null) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Couldn't auto-organize that — added your dictation to Notes."),
+        ),
+      );
+    }
+  }
+
+  /// Preserve a dictation we couldn't structure as a single notes section.
+  StructuredMeasurement _rawTranscriptFallback(String transcript) =>
+      StructuredMeasurement(sections: [
+        MeasurementSection(heading: '', values: const {}, notes: transcript.trim()),
+      ]);
+
+  Future<void> _save() async {
+    setState(() => _isLoading = true);
+    try {
+      await MeasurementSaveService.save(
+        state: context.read<MeasurementState>(),
+        repository: context.read<MeasurementRepository>(),
+        customer: widget.customer,
+        existing: widget.measurement,
+        structured: _structured,
+        audioFilePaths: _audioFilePaths,
+        newAudioFilePaths: _newAudioFilePaths,
+        now: DateTime.now(),
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEditing
+                ? 'Measurement updated successfully'
+                : 'Measurement created successfully'),
+          ),
         );
-        await MeasurementService.addMeasurement(state, repository, newMeasurement);
-        await _writeRecordingSidecar('Saved measurement');
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Measurement created successfully')),
-          );
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -150,24 +198,20 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Keep the field snapshot fresh (newly-added fields/aliases take effect).
+    _fieldsSnapshot = context.watch<MeasurementFieldsState>().fields;
+
     return PopScope(
-      canPop: !_hasUnsavedChanges || _isLoading,
+      canPop: !_hasUnsavedChanges || _isBusy,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final shouldPop = await _onWillPop();
-        if (shouldPop && context.mounted) {
-          Navigator.pop(context);
-        }
+        if (await _confirmDiscard() && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
         appBar: CustomAppBar(
@@ -184,60 +228,32 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppConfig.spacing16),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: _hasAttemptedSubmit
-                  ? AutovalidateMode.onUserInteraction
-                  : AutovalidateMode.disabled,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppConfig.spacing16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Customer',
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          const SizedBox(height: AppConfig.spacing8),
-                          Text(
-                            widget.customer.name,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppConfig.spacing16),
-                  RichDescriptionInputField(
-                    key: _descriptionKey,
-                    initialValue: _descriptionValue,
-                    labelText: 'Measurement Description',
-                    hintText: 'Enter measurement details...',
-                    onChanged: (value) {
-                      _descriptionValue = value;
-                      if (!_hasUnsavedChanges) {
-                        setState(() {
-                          _hasUnsavedChanges = true;
-                        });
-                      }
-                    },
-                    onAudioRecorded: (path) {
-                      _audioFilePath = path;
-                      if (!_hasUnsavedChanges) {
-                        setState(() {
-                          _hasUnsavedChanges = true;
-                        });
-                      }
-                    },
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CustomerSummaryCard(name: widget.customer.name),
+                const SizedBox(height: AppConfig.spacing16),
+                if (_legacyImported) ...[
+                  const LegacyImportBanner(),
+                  const SizedBox(height: AppConfig.spacing12),
                 ],
-              ),
+                StructuredMeasurementEditor(
+                  value: _structured,
+                  enabled: !_isBusy,
+                  onChanged: _onStructuredChanged,
+                ),
+                const SizedBox(height: AppConfig.spacing12),
+                DictateButton(
+                  enabled: !_isBusy,
+                  busy: _isExtracting,
+                  onTap: _runVoice,
+                ),
+                // Hear what was dictated — this session's and earlier recordings.
+                if (_audioFilePaths.isNotEmpty) ...[
+                  const SizedBox(height: AppConfig.spacing16),
+                  RecordingsCard(filePaths: _audioFilePaths),
+                ],
+              ],
             ),
           ),
         ),
@@ -245,15 +261,12 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
           onCancel: () async {
             if (_hasUnsavedChanges) {
               final navigator = Navigator.of(context);
-              final shouldPop = await _onWillPop();
-              if (shouldPop) {
-                navigator.pop();
-              }
+              if (await _confirmDiscard()) navigator.pop();
             } else {
               Navigator.pop(context);
             }
           },
-          onSave: _saveMeasurement,
+          onSave: _save,
           saveLabel: _isEditing ? 'Update' : 'Create',
           isLoading: _isLoading,
         ),
@@ -261,4 +274,3 @@ class _MeasurementFormScreenState extends State<MeasurementFormScreen> {
     );
   }
 }
-

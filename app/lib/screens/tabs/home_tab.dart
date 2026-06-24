@@ -43,6 +43,9 @@ class HomeTab extends StatelessWidget {
                 children: [
                   WelcomeHero(userName: context.watch<AuthController>().name),
                   const SizedBox(height: AppConfig.spacing16),
+                  // Permission banner self-collapses to zero when nothing is
+                  // missing, so no dead space on a fully-granted device.
+                  const PermissionBanner(),
                   // BackupHealthCard owns its own bottom gap when shown; when
                   // hidden it shrinks to zero, so only the single gap above
                   // remains (no dead space on a fresh/healthy account).

@@ -128,14 +128,15 @@ class _CustomerDetailViewState extends State<CustomerDetailView> {
                   tooltip: 'Edit',
                   onPressed: () => _editCustomer(customer),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  tooltip: 'Delete',
-                  onPressed: _deleteCustomer,
-                ),
               ],
             ),
-            Expanded(child: CustomerDetailBody(customer: customer)),
+            // Delete lives at the end of the body (rarely used), not the header.
+            Expanded(
+              child: CustomerDetailBody(
+                customer: customer,
+                onDelete: _deleteCustomer,
+              ),
+            ),
             CustomerDetailActionBar(customer: customer),
           ],
         );

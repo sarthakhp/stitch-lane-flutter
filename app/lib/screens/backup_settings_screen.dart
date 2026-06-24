@@ -87,8 +87,18 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
     try {
       backupState.setLoading(true);
       backupState.clearError();
-      final googleSignIn = AuthService.googleSignIn;
-      await googleSignIn.signIn();
+      // Connect/re-consent the Google Drive grant ONLY — never touches the app
+      // (Firebase) session or local data. See [DriveAuthService].
+      final connected = await DriveAuthService.reconnect();
+      if (!connected) {
+        backupState.setLoading(false);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Google Drive sign-in cancelled.')),
+          );
+        }
+        return;
+      }
       final backupInfo = await DriveService.getBackupInfo();
       backupState.setBackupInfo(backupInfo);
       backupState.setLoading(false);
@@ -166,6 +176,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       final orderRepository = context.read<OrderRepository>();
       final measurementRepository = context.read<MeasurementRepository>();
       final settingsRepository = context.read<SettingsRepository>();
+      final measurementFieldRepository = context.read<MeasurementFieldRepository>();
 
       backupState.setDetailedProgress(0.6, 'Restoring data...');
       await BackupService.restoreBackup(
@@ -174,6 +185,7 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         orderRepository: orderRepository,
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
+        measurementFieldRepository: measurementFieldRepository,
         onImageProgress: (current, total, message) {
           if (context.mounted) {
             backupState.setDetailedProgress(
@@ -258,11 +270,13 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         final orderRepository = context.read<OrderRepository>();
         final measurementRepository = context.read<MeasurementRepository>();
         final settingsRepository = context.read<SettingsRepository>();
+        final measurementFieldRepository = context.read<MeasurementFieldRepository>();
         await BackupExportService.exportLocalBackupAsZip(
           customerRepository: customerRepository,
           orderRepository: orderRepository,
           measurementRepository: measurementRepository,
           settingsRepository: settingsRepository,
+          measurementFieldRepository: measurementFieldRepository,
           onProgress: (status) {
             if (context.mounted) {
               backupState.setDetailedProgress(0.5, status);

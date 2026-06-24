@@ -144,9 +144,17 @@ class _AppRootHomeState extends State<_AppRootHome> {
   Future<void> _runAppInit() async {
     final settingsState = context.read<SettingsState>();
     final settingsRepository = context.read<SettingsRepository>();
+    final fieldsState = context.read<MeasurementFieldsState>();
+    final fieldRepository = context.read<MeasurementFieldRepository>();
 
     await SettingsService.loadSettings(settingsState, settingsRepository);
     StartupTracker.instance.mark('settings_loaded');
+
+    // Load + seed measurement fields on first run. Fast (single SQLite query
+    // + at most one bulk insert of ~20 rows) so we await it before unblocking
+    // the UI — the measurement form needs the list ready.
+    await MeasurementFieldsService.loadFields(fieldsState, fieldRepository);
+    StartupTracker.instance.mark('measurement_fields_loaded');
 
     // Fire-and-forget: non-blocking tasks.
     _initDebugLogsAsync(settingsState);
@@ -280,15 +288,18 @@ class _AuthGateState extends State<_AuthGate> {
         return const LoginScreen();
 
       case AuthStatus.authenticated:
-        final user = auth.user!;
+        final uid = auth.uid!;
         // Fire-and-forget: silent sign-in keeps the Drive token fresh.
-        AuthService.silentSignIn().catchError((e) {
-          AppLogger.warning('Silent sign-in failed: $e');
-        });
+        // Skipped under dev bypass — no Google Sign-In session to refresh.
+        if (!auth.isDevBypass) {
+          AuthService.silentSignIn().catchError((e) {
+            AppLogger.warning('Silent sign-in failed: $e');
+          });
+        }
 
         return FutureBuilder<bool>(
           key: ValueKey(_refreshKey),
-          future: OnboardingService.hasCompletedBackupChoice(user.uid),
+          future: OnboardingService.hasCompletedBackupChoice(uid),
           builder: (context, choiceSnapshot) {
             if (choiceSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
@@ -303,7 +314,7 @@ class _AuthGateState extends State<_AuthGate> {
                   .markOnce('auth_gate_backup_restore_check');
               return BackupRestoreCheckScreen(
                 onComplete: () async {
-                  await OnboardingService.setBackupChoiceCompleted(user.uid);
+                  await OnboardingService.setBackupChoiceCompleted(uid);
                   _onBackupChoiceCompleted();
                 },
               );

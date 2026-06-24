@@ -29,6 +29,7 @@ class StreamingVoiceInput extends StatefulWidget {
   final String? existingText;
   final bool enableFormatting;
   final String? formattingModelName;
+  final String? formattingPromptOverride;
 
   /// Whether the host is currently visible. When this goes false (e.g. the user
   /// switches away from the Assistant tab) an in-progress recording is paused
@@ -43,6 +44,7 @@ class StreamingVoiceInput extends StatefulWidget {
     this.existingText,
     this.enableFormatting = false,
     this.formattingModelName,
+    this.formattingPromptOverride,
     this.active = true,
   });
 
@@ -62,6 +64,7 @@ class _StreamingVoiceInputState extends State<StreamingVoiceInput> {
       settings: settings,
       enableFormatting: widget.enableFormatting,
       formattingModelName: widget.formattingModelName,
+      formattingPromptOverride: widget.formattingPromptOverride,
     );
     _controller.addListener(_onControllerUpdate);
     _controller.start();

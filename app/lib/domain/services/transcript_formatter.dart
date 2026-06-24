@@ -14,6 +14,7 @@ class TranscriptFormatter {
   static Future<FormatResult> format(
     String rawText, {
     String? modelName,
+    String? formattingPromptOverride,
   }) async {
     if (rawText.isEmpty) return const FormatResult();
 
@@ -21,6 +22,7 @@ class TranscriptFormatter {
       final formatted = await GeminiService.formatTranscription(
         rawText,
         modelName: modelName,
+        formattingPrompt: formattingPromptOverride,
       );
       if (formatted == null || formatted.isEmpty) {
         return const FormatResult(failed: true);

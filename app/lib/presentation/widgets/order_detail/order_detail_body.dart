@@ -7,6 +7,8 @@ import '../../../backend/models/order.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
+import '../audio/recordings_card.dart';
+import '../detail/delete_entity_button.dart';
 import '../markdown_description_text.dart';
 import '../measurement_card.dart';
 import '../order_detail_card.dart';
@@ -21,12 +23,14 @@ class OrderDetailBody extends StatelessWidget {
   final Order order;
   final Customer customer;
   final ValueChanged<Order> onOrderUpdated;
+  final VoidCallback onDelete;
 
   const OrderDetailBody({
     super.key,
     required this.order,
     required this.customer,
     required this.onOrderUpdated,
+    required this.onDelete,
   });
 
   String _formatDate(DateTime date) => DateFormat('MMMM d, y').format(date);
@@ -67,6 +71,10 @@ class OrderDetailBody extends StatelessWidget {
               child: MarkdownDescriptionText(text: order.description!),
             ),
           ],
+          if (order.audioFilePaths.isNotEmpty) ...[
+            const SizedBox(height: AppConfig.spacing16),
+            RecordingsCard(filePaths: order.audioFilePaths),
+          ],
           const SizedBox(height: AppConfig.spacing16),
           OrderDetailCard(
             icon: Icons.access_time,
@@ -81,6 +89,8 @@ class OrderDetailBody extends StatelessWidget {
             onImagesChanged: (paths) =>
                 onOrderUpdated(order.copyWith(imagePaths: paths)),
           ),
+          const SizedBox(height: AppConfig.spacing24),
+          DeleteEntityButton(label: 'Delete Order', onPressed: onDelete),
         ],
       ),
     );

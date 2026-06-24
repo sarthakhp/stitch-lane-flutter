@@ -93,7 +93,8 @@ def mdns_connect_targets(retries: int = 3, delay: float = 0.7) -> list[str]:
     Retries briefly because mDNS discovery can be slow on the first scan.
     """
     pattern = re.compile(r"_adb-tls-connect\._tcp")
-    ip_port = re.compile(r"(\d+\.\d+\.\d+\.\d+):?\s+(\d+)")
+    # ip:port (colon-joined) or "ip port" (whitespace) — adb varies by version.
+    ip_port = re.compile(r"(\d+\.\d+\.\d+\.\d+)[:\s]+(\d+)")
     for attempt in range(retries):
         res = run(["adb", "mdns", "services"], timeout=5)
         targets = []
@@ -108,6 +109,29 @@ def mdns_connect_targets(retries: int = 3, delay: float = 0.7) -> list[str]:
         if attempt < retries - 1:
             time.sleep(delay)
     return []
+
+
+def mdns_pairing_targets() -> list[tuple[str, str]]:
+    """Find phones currently in QR pairing mode.
+
+    When a phone scans a pairing QR code it briefly advertises an
+    `_adb-tls-pairing._tcp` mDNS service whose instance name is the name we
+    embedded in the QR payload. Returns a list of (instance_name, "ip:port").
+    """
+    # ip:port (colon-joined) or "ip port" (whitespace) — adb varies by version.
+    ip_port = re.compile(r"(\d+\.\d+\.\d+\.\d+)[:\s]+(\d+)")
+    res = run(["adb", "mdns", "services"], timeout=5)
+    out: list[tuple[str, str]] = []
+    for line in res.stdout.splitlines():
+        if "_adb-tls-pairing._tcp" not in line:
+            continue
+        m = ip_port.search(line)
+        if not m:
+            continue
+        parts = line.split()
+        instance = parts[0] if parts else ""
+        out.append((instance, f"{m.group(1)}:{m.group(2)}"))
+    return out
 
 
 def get_device_ips(serial: str) -> list[str]:

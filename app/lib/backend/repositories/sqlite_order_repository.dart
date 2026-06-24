@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../models/order.dart';
 import '../models/order_status.dart';
 import '../models/payment_entry.dart';
+import '../util/audio_path_list.dart';
 import '../database/sqlite_database.dart';
 import 'order_repository.dart';
 
@@ -113,6 +114,7 @@ class SqliteOrderRepository implements OrderRepository {
         'payment_date': o.paymentDate?.toIso8601String(),
         'payments': jsonEncode(o.payments.map((p) => p.toJson()).toList()),
         'total_paid_amount': o.totalPaidAmount,
+        'audio_file_paths': AudioPathList.encode(o.audioFilePaths),
       };
 
   static Order fromMap(Map<String, dynamic> map) => Order(
@@ -136,5 +138,9 @@ class SqliteOrderRepository implements OrderRepository {
             .map((p) => PaymentEntry.fromJson(p as Map<String, dynamic>))
             .toList(),
         totalPaidAmount: map['total_paid_amount'] as int? ?? 0,
+        audioFilePaths: AudioPathList.read(
+          map['audio_file_paths'],
+          legacySingle: map['audio_file_path'],
+        ),
       );
 }

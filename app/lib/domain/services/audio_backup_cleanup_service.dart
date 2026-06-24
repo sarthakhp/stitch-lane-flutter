@@ -43,12 +43,16 @@ class AudioBackupCleanupService {
         return const CleanupResult(kept: 0, deleted: 0, bytesFreed: 0);
       }
 
-      final repo = RepositoryFactory.createMeasurementRepository();
-      final measurements = await repo.getAllMeasurements();
-      final referencedPaths = measurements
-          .map((m) => m.audioFilePath)
-          .whereType<String>()
-          .toSet();
+      // A file is referenced if ANY measurement or order links it. Both can
+      // hold multiple recordings now, so flatten every audioFilePaths list.
+      final measurements =
+          await RepositoryFactory.createMeasurementRepository().getAllMeasurements();
+      final orders =
+          await RepositoryFactory.createOrderRepository().getAllOrders();
+      final referencedPaths = <String>{
+        for (final m in measurements) ...m.audioFilePaths,
+        for (final o in orders) ...o.audioFilePaths,
+      };
 
       final now = DateTime.now();
 

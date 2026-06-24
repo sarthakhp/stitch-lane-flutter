@@ -167,18 +167,15 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                   tooltip: 'Edit',
                   onPressed: () => _editOrder(order, customer),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  tooltip: 'Delete',
-                  onPressed: _deleteOrder,
-                ),
               ],
             ),
+            // Delete lives at the end of the body (rarely used), not the header.
             Expanded(
               child: OrderDetailBody(
                 order: order,
                 customer: customer,
                 onOrderUpdated: _updateOrder,
+                onDelete: _deleteOrder,
               ),
             ),
             OrderDetailActionBar(

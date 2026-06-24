@@ -85,15 +85,27 @@ class DriveSyncStatusService {
 
   static Future<int> _getLocalAudioCount() async {
     try {
-      // Count the audio files actually referenced by measurements (matches
+      // Count the audio files referenced by measurements AND orders (matches
       // what the upload sends), covering audio_backups/*.wav + legacy m4a.
-      final repo = RepositoryFactory.createMeasurementRepository();
-      final measurements = await repo.getAllMeasurements();
+      final measurements =
+          await RepositoryFactory.createMeasurementRepository().getAllMeasurements();
+      final orders =
+          await RepositoryFactory.createOrderRepository().getAllOrders();
       final names = <String>{};
-      for (final m in measurements) {
-        final p = m.audioFilePath;
-        if (p == null || p.trim().isEmpty) continue;
+      Future<void> consider(String p) async {
+        if (p.trim().isEmpty) return;
         if (await File(p).exists()) names.add(p.split('/').last);
+      }
+
+      for (final m in measurements) {
+        for (final p in m.audioFilePaths) {
+          await consider(p);
+        }
+      }
+      for (final o in orders) {
+        for (final p in o.audioFilePaths) {
+          await consider(p);
+        }
       }
       return names.length;
     } catch (_) {

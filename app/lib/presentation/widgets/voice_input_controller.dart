@@ -57,6 +57,7 @@ abstract class VoiceInputController extends ChangeNotifier {
     required AppSettings settings,
     bool enableFormatting = false,
     String? formattingModelName,
+    String? formattingPromptOverride,
   }) {
     final prefix = settings.sttModel.split(':').first;
     if (prefix == 'gemini') {
@@ -64,11 +65,13 @@ abstract class VoiceInputController extends ChangeNotifier {
         settings: settings,
         enableFormatting: enableFormatting,
         formattingModelName: formattingModelName,
+        formattingPromptOverride: formattingPromptOverride,
       );
     }
     return LiveVoiceInputController(
       enableFormatting: enableFormatting,
       formattingModelName: formattingModelName,
+      formattingPromptOverride: formattingPromptOverride,
     );
   }
 }

@@ -25,20 +25,28 @@ class DetailHeader extends StatelessWidget {
       color: theme.colorScheme.surface,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: kToolbarHeight,
+        // Min toolbar height, but grows to fit a long name wrapped to 2 lines.
+        // The name lives only here now (no duplicate card in the body), so it
+        // must stay fully visible.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: kToolbarHeight),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (leading != null)
                 leading!
               else
                 const SizedBox(width: AppConfig.spacing16),
               Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleLarge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: AppConfig.spacing8),
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
               ...actions,

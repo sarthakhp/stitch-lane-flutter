@@ -26,6 +26,7 @@ class LiveVoiceInputController extends ChangeNotifier
 
   final bool enableFormatting;
   final String? formattingModelName;
+  final String? formattingPromptOverride;
 
   VoiceInputState _state = VoiceInputState.connecting;
   String _finalText = '';
@@ -49,7 +50,11 @@ class LiveVoiceInputController extends ChangeNotifier
   /// SAME file — the user gets one continuous audio file per measurement.
   final AudioBackupRecorder _backup = AudioBackupRecorder();
 
-  LiveVoiceInputController({this.enableFormatting = false, this.formattingModelName});
+  LiveVoiceInputController({
+    this.enableFormatting = false,
+    this.formattingModelName,
+    this.formattingPromptOverride,
+  });
 
   @override
   VoiceInputState get state => _state;
@@ -304,6 +309,7 @@ class LiveVoiceInputController extends ChangeNotifier
     final result = await TranscriptFormatter.format(
       _finalText,
       modelName: formattingModelName,
+      formattingPromptOverride: formattingPromptOverride,
     );
     _formattedText = result.text;
     _formattingFailed = result.failed;
@@ -325,6 +331,7 @@ class LiveVoiceInputController extends ChangeNotifier
     final result = await TranscriptFormatter.format(
       _finalText,
       modelName: formattingModelName,
+      formattingPromptOverride: formattingPromptOverride,
     );
     _formattedText = result.text;
     _formattingFailed = result.failed;

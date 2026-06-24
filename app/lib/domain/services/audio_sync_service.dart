@@ -48,15 +48,27 @@ class AudioSyncService {
         }
       }
 
-      final audiosToDelete = driveAudioNames.difference(localAudioNames);
-      AppLogger.info('Audio files to delete from Drive: ${audiosToDelete.length}');
-
-      for (final audioName in audiosToDelete) {
-        final audioFile = driveAudios.firstWhere(
-          (audio) => audio['name'] == audioName,
+      // SAFETY: never prune when we resolved zero local recordings. That state
+      // is ambiguous — it happens both when the user genuinely has no audio AND
+      // when [_getAllAudioPaths] swallowed a transient DB error and returned an
+      // empty list. Pruning here would delete EVERY audio backup from Drive on
+      // a hiccup. Skipping at worst leaves a few orphans; it can't lose data.
+      if (localAudioNames.isEmpty) {
+        AppLogger.warning(
+          'Audio sync: 0 local recordings resolved — skipping Drive prune to '
+          'avoid deleting backups. (${driveAudioNames.length} remain in Drive.)',
         );
-        await DriveServiceAudioOperations.deleteAudioFromDrive(driveApi, audioFile['id'] as String);
-        AppLogger.info('Deleted audio from Drive: $audioName');
+      } else {
+        final audiosToDelete = driveAudioNames.difference(localAudioNames);
+        AppLogger.info('Audio files to delete from Drive: ${audiosToDelete.length}');
+
+        for (final audioName in audiosToDelete) {
+          final audioFile = driveAudios.firstWhere(
+            (audio) => audio['name'] == audioName,
+          );
+          await DriveServiceAudioOperations.deleteAudioFromDrive(driveApi, audioFile['id'] as String);
+          AppLogger.info('Deleted audio from Drive: $audioName');
+        }
       }
 
       AppLogger.info('Audio sync completed successfully');
@@ -164,20 +176,39 @@ class AudioSyncService {
     return null;
   }
 
-  /// Audio files referenced by measurements. Read from each measurement's
-  /// stored audioFilePath (not a folder/extension glob), so it covers BOTH the
-  /// modern audio_backups/*.wav recordings and any legacy measurement_*.m4a.
+  /// Every audio file referenced by a measurement OR an order. Read from each
+  /// entity's stored audioFilePaths (not a folder/extension glob), so it
+  /// covers the modern audio_backups/*.wav recordings and any legacy
+  /// measurement_*.m4a.
+  ///
+  /// This set drives BOTH what gets uploaded and what gets pruned from Drive
+  /// (Drive files absent here are deleted), so every entity that links audio
+  /// must be included or its recordings would never sync — and could be
+  /// deleted from Drive.
   static Future<List<String>> _getAllAudioPaths() async {
     try {
-      final repo = RepositoryFactory.createMeasurementRepository();
-      final measurements = await repo.getAllMeasurements();
+      final measurements =
+          await RepositoryFactory.createMeasurementRepository().getAllMeasurements();
+      final orders =
+          await RepositoryFactory.createOrderRepository().getAllOrders();
+
       final paths = <String>[];
       final seen = <String>{};
-      for (final m in measurements) {
-        final p = m.audioFilePath;
-        if (p == null || p.trim().isEmpty) continue;
-        if (!seen.add(p.split('/').last)) continue; // de-dupe by file name
+      Future<void> consider(String p) async {
+        if (p.trim().isEmpty) return;
+        if (!seen.add(p.split('/').last)) return; // de-dupe by file name
         if (await File(p).exists()) paths.add(p);
+      }
+
+      for (final m in measurements) {
+        for (final p in m.audioFilePaths) {
+          await consider(p);
+        }
+      }
+      for (final o in orders) {
+        for (final p in o.audioFilePaths) {
+          await consider(p);
+        }
       }
       return paths;
     } catch (e) {

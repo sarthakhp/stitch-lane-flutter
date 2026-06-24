@@ -25,7 +25,7 @@ class RawSqlHandler {
       }
     }
 
-    final limit = AiQueryResult.defaultMaxRows;
+    const limit = AiQueryResult.defaultMaxRows;
     final clean = sql.endsWith(';') ? sql.substring(0, sql.length - 1) : sql;
     final limited = upper.contains('LIMIT') ? clean : '$clean LIMIT ${limit + 1}';
 

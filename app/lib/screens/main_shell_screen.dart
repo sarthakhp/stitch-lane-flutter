@@ -5,10 +5,11 @@ import '../backend/repositories/customer_repository.dart';
 import '../domain/services/notification_router.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/customer_service.dart';
-import '../domain/services/permission_service.dart';
+import '../domain/services/permissions/permission_prompt_coordinator.dart';
 import '../domain/state/order_state.dart';
 import '../domain/state/customer_state.dart';
 import '../domain/state/main_shell_state.dart';
+import '../domain/state/permission_controller.dart';
 import '../utils/startup_orchestrator.dart';
 import '../utils/startup_tracker.dart';
 import 'tabs/home_tab.dart';
@@ -56,11 +57,21 @@ class _MainShellScreenState extends State<MainShellScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _processNotificationsWhenReady();
+      // The user may have toggled permissions in system settings while we
+      // were backgrounded — re-query so the home banner updates immediately.
+      context.read<PermissionController>().refresh();
     }
   }
 
+  /// First-frame permission entry point. Loads cached state, then shows the
+  /// friendly explainer once per install. Subsequent app opens just refresh
+  /// state (handled in [didChangeAppLifecycleState]) and the home banner
+  /// becomes the persistent nudge.
   Future<void> _requestPermissions() async {
-    await PermissionService.requestAllPermissions();
+    final controller = context.read<PermissionController>();
+    await controller.init();
+    if (!mounted) return;
+    await PermissionPromptCoordinator.runFirstTimeIfNeeded(context, controller);
   }
 
   /// Waits for NotificationService to finish initializing (in background since

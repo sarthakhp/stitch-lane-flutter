@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show SocketException;
 
+import '../connectivity/connectivity_service.dart';
+
 /// Converts any exception thrown by an AI / transcription call — Gemini (via
 /// googleai_dart or langchain_google), network failures, or timeouts — into a
 /// short, non-technical message that is safe to show the user.
@@ -40,7 +42,7 @@ String describeAiError(Object error) {
       has('network is unreachable') ||
       has('connection refused') ||
       has('connection closed')) {
-    return 'No internet connection. Please check your network and try again.';
+    return ConnectivityService.offlineMessage;
   }
 
   // Took too long.

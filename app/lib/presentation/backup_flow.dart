@@ -35,6 +35,7 @@ Future<bool> runManualBackup(BuildContext context) async {
   final orderRepository = context.read<OrderRepository>();
   final measurementRepository = context.read<MeasurementRepository>();
   final settingsRepository = context.read<SettingsRepository>();
+  final measurementFieldRepository = context.read<MeasurementFieldRepository>();
   final settingsState = context.read<SettingsState>();
 
   try {
@@ -46,6 +47,7 @@ Future<bool> runManualBackup(BuildContext context) async {
       orderRepository: orderRepository,
       measurementRepository: measurementRepository,
       settingsRepository: settingsRepository,
+      measurementFieldRepository: measurementFieldRepository,
     );
 
     // Safeguard: never overwrite the cloud backup with an empty dataset (e.g.
@@ -129,6 +131,25 @@ Future<bool> runManualBackup(BuildContext context) async {
       );
     }
     return true;
+  } on DriveAuthException catch (e) {
+    // Drive needs an interactive re-consent — a plain retry can't fix it.
+    // Record the typed error (so the home BackupHealthCard switches its button
+    // to "Sign in & back up") and guide the user with a friendly message
+    // instead of a scary "Backup failed". Never a sign-out / data loss.
+    backupState.setLoading(false);
+    try {
+      await BackupTimeService.recordFailed(
+        settingsRepository: settingsRepository,
+        error: e.toString(),
+      );
+      await SettingsService.loadSettings(settingsState, settingsRepository);
+    } catch (_) {}
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${e.message} Use "Sign in & back up".')),
+      );
+    }
+    return false;
   } on EmptyBackupException {
     // The uploadBackup backstop fired (the pre-check above normally catches
     // this first). Not a failure — same gentle nudge, no error state.

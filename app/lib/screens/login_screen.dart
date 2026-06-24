@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/domain.dart';
@@ -49,12 +50,43 @@ class LoginScreen extends StatelessWidget {
                       isLoading: auth.isLoading,
                       onPressed: () => context.read<AuthController>().signIn(),
                     ),
+                    // Debug-only bypass. `kDebugMode` is a compile-time const
+                    // so this whole branch is tree-shaken from release builds.
+                    if (kDebugMode) ...[
+                      const SizedBox(height: AppConfig.spacing16),
+                      _DevSkipSignInButton(
+                        onPressed: () => context
+                            .read<AuthController>()
+                            .signInAsDevUser(),
+                      ),
+                    ],
                   ],
                 );
               },
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Debug-only "skip sign-in" button. Mounted from a `kDebugMode` branch so it
+/// never renders in release builds.
+class _DevSkipSignInButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _DevSkipSignInButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.bug_report_outlined, size: 18),
+        label: const Text('Continue without signing in (dev)'),
       ),
     );
   }

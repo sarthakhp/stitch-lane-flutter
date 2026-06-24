@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ from adbw.adb import (
     get_mac_gateway,
     is_responsive,
     mdns_connect_targets,
+    mdns_pairing_targets,
     require_tool,
     run,
     usb_devices,
@@ -90,30 +92,178 @@ def cmd_mirror() -> int:
 
 
 def cmd_help(prog: str) -> int:
-    print(f"{BOLD}Usage:{NC} {prog} [command] [--no-mirror]")
+    print(f"{BOLD}Usage:{NC} {prog} [command] [--mirror]")
     print()
     print("Commands:")
     print("  (none)       Detect connected devices (USB + wireless); if more than")
-    print("               one, ask which to use; set up wireless if it's USB; mirror.")
+    print("               one, ask which to use; set up wireless if it's USB.")
     print("               Falls back to mDNS lookup when nothing is connected.")
     print("  run [args]   flutter run against the phone (USB-first, wireless")
     print("               fallback); extra args pass to flutter (e.g. --release).")
     print("               Env: PORT, WIFI=1, SNAPSHOT=1; skip USB via .usb-skip")
-    print("  pair         One-time pairing via Android 11+ Wireless debugging")
-    print("               (after this, the default command works fully cable-free)")
+    print("  pair         One-time pairing via Android 11+ Wireless debugging.")
+    print("               Auto-connects if already paired; otherwise offers QR-code")
+    print("               or 6-digit-code pairing. After this, the default command")
+    print("               works fully cable-free.")
     print("  status       Show connected USB and wireless devices")
     print("  disconnect   Drop all wireless connections")
     print("  mirror       Start screen mirroring (scrcpy) on an already-connected device")
     print("  help         Show this help")
     print()
     print("Flags:")
-    print("  --no-mirror  Skip the automatic scrcpy launch after connecting")
+    print("  --mirror     Also launch scrcpy screen mirroring after connecting")
     return 0
+
+
+def _connect_if_already_paired(mirror: bool) -> int:
+    """If the phone is already paired and reachable, connect and return 0.
+    Returns 1 when nothing paired could be reached (so the caller proceeds to
+    first-time pairing)."""
+    # 1. A live wireless device is, by definition, already paired.
+    live = [w for w in wireless_devices() if is_responsive(w)]
+    if live:
+        target = live[0] if len(live) == 1 else pick_from_list(live, "Pick a device")
+        if target is None:
+            return 1
+        ok(f"Already paired and connected: {target}")
+        print(f"   Next time just run:  {sys.argv[0]}   (no 'pair' needed)")
+        return _start_mirror(target, mirror)
+
+    # 2. mDNS-advertised paired devices, then 3. the cached address. mDNS is
+    # flaky on macOS, so retry it a bit harder here than the default scan.
+    candidates = mdns_connect_targets(retries=6, delay=1.0)
+    if _CACHE_FILE.exists():
+        cached = _CACHE_FILE.read_text().strip()
+        if cached and cached not in candidates:
+            candidates.append(cached)
+
+    for cand in candidates:
+        info(f"Trying paired device {cand}…")
+        if _wireless_connect(cand, attempts=2):
+            print()
+            print(f"{GREEN}{BOLD}Done!{NC} No pairing needed — you were already paired.")
+            print(f"   Next time just run:  {sys.argv[0]}   (no 'pair' needed)")
+            return _start_mirror(cand, mirror)
+    return 1
 
 
 def cmd_pair(mirror: bool = True) -> int:
     """Pair using Android 11+ Wireless debugging. Persists across USB unplug and reboots."""
-    step("Android 11+ Wireless debugging pairing")
+    # Re-running `pair` on an already-set-up phone is common. Detect that and
+    # just connect — no manual IP/code typing. We try, in order of reliability:
+    #   1. a live wireless device (already connected → definitely paired),
+    #   2. mDNS-advertised paired devices (_adb-tls-connect._tcp),
+    #   3. the address cached from a previous run.
+    # `adb mdns services` is flaky on macOS, hence the layered fallbacks.
+    step("Checking whether this phone is already paired")
+    if _connect_if_already_paired(mirror) == 0:
+        return 0
+    info("No already-paired device reachable — starting first-time pairing.")
+    print()
+
+    method = pick_from_list(
+        ["Scan a QR code on your phone (easiest)", "Type a 6-digit pairing code"],
+        "How do you want to pair",
+    )
+    if method is None:
+        return 1
+    if method.startswith("Scan"):
+        if _pair_via_qr(mirror) == 0:
+            return 0
+        warn("QR pairing didn't complete — falling back to the pairing code.")
+        print()
+    return _pair_via_code(mirror)
+
+
+def _pair_via_qr(mirror: bool, timeout: float = 90.0) -> int:
+    """First-time pairing by showing a QR code the phone scans
+    (Settings > Wireless debugging > 'Pair device with QR code').
+
+    Generates a one-time pairing name + password, encodes them in the payload
+    Android expects, then watches mDNS for the phone to enter pairing mode and
+    runs `adb pair` automatically — no IP or code typing.
+    """
+    try:
+        import segno
+    except ImportError:
+        warn("QR pairing needs the 'segno' package (not installed).")
+        info("Install it with:  scripts/.venv/bin/pip install -r scripts/requirements.txt")
+        return 1
+
+    name = "ADB_WIFI_" + secrets.token_hex(3)
+    password = secrets.token_hex(8)
+    payload = f"WIFI:T:ADB;S:{name};P:{password};;"
+
+    step("Scan this QR code with your phone")
+    print(f"   {BOLD}On your phone:{NC}")
+    print("   Settings > Developer options > Wireless debugging >")
+    print("   'Pair device with QR code', then point the camera at this:")
+    print()
+    segno.make(payload, error="m").terminal(compact=True)
+    print()
+    info("Waiting for the phone to scan and start pairing…  (Ctrl+C to cancel)")
+
+    target: str | None = None
+    deadline = time.monotonic() + timeout
+    try:
+        while time.monotonic() < deadline:
+            candidates = mdns_pairing_targets()
+            # Prefer the service whose name matches the QR we generated; if a
+            # single phone is pairing, take it even if the name didn't echo.
+            target = next((t for n, t in candidates if name in n), None)
+            if target is None and len(candidates) == 1:
+                target = candidates[0][1]
+            if target:
+                break
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print()
+        warn("Cancelled.")
+        return 1
+
+    if target is None:
+        fail("Timed out waiting for the phone to scan the QR code.")
+        return 1
+
+    step(f"Pairing with {target}")
+    res = run(["adb", "pair", target, password], timeout=30)
+    output = (res.stdout + res.stderr).strip()
+    if res.returncode != 0 or "successfully paired" not in output.lower():
+        fail(f"Pairing failed: {output}")
+        return 1
+    ok(output)
+
+    # Paired phones advertise _adb-tls-connect — find it and connect, no typing.
+    step("Looking for the device to connect")
+    connect_target: str | None = None
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        targets = mdns_connect_targets()
+        if targets:
+            connect_target = (
+                targets[0] if len(targets) == 1
+                else pick_from_list(targets, "Pick a device")
+            )
+            break
+        time.sleep(1.0)
+
+    if connect_target is None:
+        warn("Paired, but couldn't auto-find the connect address via mDNS.")
+        info(f"Just run the default command to connect:  {sys.argv[0]}")
+        return 0
+
+    step(f"Connecting to {connect_target}")
+    if not _wireless_connect(connect_target, attempts=3):
+        return 1
+    print()
+    print(f"{GREEN}{BOLD}Done!{NC} Paired by QR — survives unplug and reboot.")
+    print(f"   Reconnect later:  {sys.argv[0]}   (no 'pair' needed)")
+    return _start_mirror(connect_target, mirror)
+
+
+def _pair_via_code(mirror: bool = True) -> int:
+    """First-time pairing by typing the IP:port and 6-digit code from the phone."""
+    step("Pair with a 6-digit code")
     print("   This pairs your Mac to the phone over wifi only — no USB needed,")
     print("   and the pairing survives unplug, reboot, and wifi reconnect.")
     print()

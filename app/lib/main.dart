@@ -105,7 +105,14 @@ class StitchGenieApp extends StatelessWidget {
         Provider<SettingsRepository>(
           create: (_) => RepositoryFactory.createSettingsRepository(),
         ),
+        ChangeNotifierProvider(create: (_) => MeasurementFieldsState()),
+        Provider<MeasurementFieldRepository>(
+          create: (_) => RepositoryFactory.createMeasurementFieldRepository(),
+        ),
         ChangeNotifierProvider(create: (_) => MainShellState()),
+        // Permission state is read by the home banner and main-shell init.
+        // init() is called once from MainShellScreen (post-Firebase, post-auth).
+        ChangeNotifierProvider(create: (_) => PermissionController()),
       ],
       child: const AppRoot(),
     );

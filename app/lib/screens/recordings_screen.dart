@@ -20,6 +20,9 @@ class RecordingsScreen extends StatefulWidget {
 class _RecordingsScreenState extends State<RecordingsScreen> {
   late Future<List<RecordingEntry>> _future;
 
+  /// Active source filter; null means "All".
+  RecordingSource? _sourceFilter;
+
   @override
   void initState() {
     super.initState();
@@ -99,17 +102,97 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
-          final entries = snap.data ?? const <RecordingEntry>[];
-          if (entries.isEmpty) return _buildEmpty(context);
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.all(AppConfig.spacing16),
-              children: _buildItems(context, entries),
-            ),
+          final all = snap.data ?? const <RecordingEntry>[];
+          if (all.isEmpty) return _buildEmpty(context);
+          final entries = _sourceFilter == null
+              ? all
+              : all.where((e) => e.source == _sourceFilter).toList();
+          return Column(
+            children: [
+              _buildFilterBar(context, all),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async => _refresh(),
+                  child: entries.isEmpty
+                      ? _buildNoMatches(context)
+                      : ListView(
+                          padding: const EdgeInsets.all(AppConfig.spacing16),
+                          children: _buildItems(context, entries),
+                        ),
+                ),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  /// Source filter chips. Each chip shows only when at least one recording
+  /// has that source, so we never offer an empty filter.
+  Widget _buildFilterBar(BuildContext context, List<RecordingEntry> all) {
+    final present = <RecordingSource>{for (final e in all) e.source};
+    final sources = RecordingSource.values.where(present.contains).toList();
+    // A lone source isn't worth a filter bar.
+    if (sources.length < 2) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppConfig.spacing16,
+        AppConfig.spacing12,
+        AppConfig.spacing16,
+        0,
+      ),
+      child: SizedBox(
+        height: 36,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _filterChip(label: 'All', selected: _sourceFilter == null, onTap: () {
+              setState(() => _sourceFilter = null);
+            }),
+            for (final s in sources) ...[
+              const SizedBox(width: AppConfig.spacing8),
+              _filterChip(
+                label: s.label,
+                selected: _sourceFilter == s,
+                onTap: () => setState(() => _sourceFilter = s),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+    );
+  }
+
+  Widget _buildNoMatches(BuildContext context) {
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(AppConfig.spacing24),
+          child: Center(
+            child: Text(
+              'No recordings for this filter.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

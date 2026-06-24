@@ -327,6 +327,10 @@ class OrderCreatorController extends ChangeNotifier {
           created: now,
           value: (p.value != null && p.value! < 0) ? 0 : p.value,
           imagePaths: p.imagePaths,
+          // One dictation can yield several orders; link the source audio to
+          // each so any of them can replay it. The customer timeline dedupes
+          // by file path so it still appears once there.
+          audioFilePaths: _audioPath == null ? const [] : [_audioPath!],
         );
       }).toList();
 
@@ -352,7 +356,7 @@ class OrderCreatorController extends ChangeNotifier {
             description: body,
             created: now,
             modified: now,
-            audioFilePath: _audioPath,
+            audioFilePaths: _audioPath == null ? const [] : [_audioPath!],
           );
           await MeasurementService.addMeasurement(
             measurementState,
@@ -370,6 +374,12 @@ class OrderCreatorController extends ChangeNotifier {
           source: RecordingSource.orderCreator,
           title: customer.name,
           transcript: _transcript,
+          customerId: customer.id,
+          // Multiple orders may share this dictation; the per-order link lives
+          // on each order row. Record the single order id only when there's
+          // exactly one, plus the measurement id if one was saved.
+          orderId: savedOrders.length == 1 ? savedOrders.first.id : null,
+          measurementId: savedMeasurement?.id,
           actions: [
             for (final o in savedOrders)
               '${o.title ?? 'Order'} — '

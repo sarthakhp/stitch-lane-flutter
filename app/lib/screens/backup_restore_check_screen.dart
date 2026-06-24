@@ -94,6 +94,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
     final orderRepository = context.read<OrderRepository>();
     final measurementRepository = context.read<MeasurementRepository>();
     final settingsRepository = context.read<SettingsRepository>();
+    final measurementFieldRepository = context.read<MeasurementFieldRepository>();
 
     // ── SAFETY: confirm + snapshot before any restore ──
     //
@@ -241,6 +242,7 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         orderRepository: orderRepository,
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
+        measurementFieldRepository: measurementFieldRepository,
         onImageProgress: (current, total, message) {
           backupState.setDetailedProgress(
             0.5 + (current / total) * 0.2,

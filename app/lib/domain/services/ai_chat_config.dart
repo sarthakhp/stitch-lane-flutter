@@ -18,7 +18,7 @@ String buildAiSystemPrompt() {
   return _aiSystemPromptTemplate.replaceFirst('{{TODAY}}', dateStr);
 }
 
-final String _aiSystemPromptTemplate = '''
+const String _aiSystemPromptTemplate = '''
 You are a tailoring business assistant for "Stitch Genie". Today: {{TODAY}}.
 Answer questions about customers, orders, payments, and measurements using the
 tools below. For greetings or general chat, reply directly without tools.

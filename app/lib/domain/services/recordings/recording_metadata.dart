@@ -25,7 +25,10 @@ extension RecordingSourceLabel on RecordingSource {
 /// (transcript) and what the AI did (actions), so the Recordings debugger can
 /// answer "she said X, the AI did Y" without grepping logs.
 class RecordingMetadata {
-  static const int currentVersion = 1;
+  // v2 added the entity-id links (customerId / orderId / measurementId) so a
+  // recording can be traced back to the domain object it produced. v1 sidecars
+  // decode fine — the new fields just default to null.
+  static const int currentVersion = 2;
 
   final int version;
   final DateTime createdAt;
@@ -40,12 +43,23 @@ class RecordingMetadata {
   /// Human-readable bullets of what the AI did / the outcome of this recording.
   final List<String> actions;
 
+  /// Entity links (v2+). Let the dev browser filter by customer and let any
+  /// future cross-reference jump straight to the source object. The
+  /// authoritative playback link still lives on the domain row's
+  /// `audioFilePath`; these are for context/filtering.
+  final String? customerId;
+  final String? orderId;
+  final String? measurementId;
+
   RecordingMetadata({
     required this.source,
     DateTime? createdAt,
     this.title,
     this.transcript,
     this.actions = const [],
+    this.customerId,
+    this.orderId,
+    this.measurementId,
     this.version = currentVersion,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -56,6 +70,9 @@ class RecordingMetadata {
         'title': title,
         'transcript': transcript,
         'actions': actions,
+        'customer_id': customerId,
+        'order_id': orderId,
+        'measurement_id': measurementId,
       };
 
   factory RecordingMetadata.fromJson(Map<String, dynamic> json) {
@@ -70,6 +87,9 @@ class RecordingMetadata {
       transcript: json['transcript'] as String?,
       actions: (json['actions'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
+      customerId: json['customer_id'] as String?,
+      orderId: json['order_id'] as String?,
+      measurementId: json['measurement_id'] as String?,
     );
   }
 

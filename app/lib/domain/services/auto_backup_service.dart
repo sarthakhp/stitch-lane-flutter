@@ -7,6 +7,7 @@ import '../../utils/app_logger.dart';
 import 'backup_guard.dart';
 import 'backup_service.dart';
 import 'daily_task_scheduler.dart';
+import 'drive_auth_service.dart';
 import 'drive_service.dart';
 import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
@@ -60,6 +61,8 @@ class AutoBackupService {
       final orderRepository = RepositoryFactory.createOrderRepository();
       final measurementRepository = RepositoryFactory.createMeasurementRepository();
       final settingsRepository = RepositoryFactory.createSettingsRepository();
+      final measurementFieldRepository =
+          RepositoryFactory.createMeasurementFieldRepository();
 
       // Safety check: verify backup is still enabled (WorkManager tasks persist
       // even after toggle is turned off)
@@ -76,8 +79,24 @@ class AutoBackupService {
         return;
       }
 
-      if (!await _checkDriveAccess()) {
-        AppLogger.warning('Google Drive not accessible. Please sign in manually.');
+      // Verify Drive is reachable. A re-auth failure (DriveAuthException) won't
+      // fix itself by retrying, so record it as a failure — that proactively
+      // surfaces the "Sign in & back up" CTA on the home BackupHealthCard
+      // instead of silently skipping every cycle until backups go stale. Other
+      // (transient) Drive errors stay a silent skip-and-retry. No notification
+      // here: the card is the surface, and a re-prompt every cycle would nag.
+      try {
+        await DriveService.getDriveApi();
+      } on DriveAuthException catch (e) {
+        AppLogger.warning('Auto-backup: Drive needs re-authentication — $e');
+        await BackupTimeService.recordFailed(
+          settingsRepository: settingsRepository,
+          error: e.toString(),
+        );
+        await _scheduleNextIfEnabled(settingsRepository);
+        return;
+      } catch (e) {
+        AppLogger.warning('Google Drive not accessible: $e');
         await _scheduleNextIfEnabled(settingsRepository);
         return;
       }
@@ -89,6 +108,7 @@ class AutoBackupService {
         orderRepository: orderRepository,
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
+        measurementFieldRepository: measurementFieldRepository,
       );
 
       // Safeguard: never overwrite the cloud backup with an empty dataset
@@ -155,6 +175,23 @@ class AutoBackupService {
       } catch (statusError) {
         AppLogger.error('Failed to reschedule after empty-backup skip', statusError);
       }
+    } on DriveAuthException catch (e) {
+      // Token died mid-backup (rare — the up-front check normally catches this).
+      // Record the typed error so the home card shows the "Sign in & back up"
+      // CTA; skip the failure notification (the raw exception text isn't for
+      // users, and the card is the recovery surface).
+      AppLogger.warning('Auto-backup: Drive needs re-authentication — $e');
+      await NotificationService.cancelBackupInProgressNotification();
+      try {
+        final settingsRepository = RepositoryFactory.createSettingsRepository();
+        await BackupTimeService.recordFailed(
+          settingsRepository: settingsRepository,
+          error: e.toString(),
+        );
+        await _scheduleNextIfEnabled(settingsRepository);
+      } catch (statusError) {
+        AppLogger.error('Failed to record Drive re-auth skip', statusError);
+      }
     } catch (e) {
       AppLogger.error('Auto-backup failed', e);
       await NotificationService.cancelBackupInProgressNotification();
@@ -203,9 +240,10 @@ class AutoBackupService {
       try {
         return await task();
       } catch (e, st) {
-        // An empty backup is a permanent refusal, not a transient error — don't
-        // burn retries/backoff on it; let the caller handle it immediately.
-        if (e is EmptyBackupException) rethrow;
+        // An empty backup or a Drive re-auth failure is a permanent refusal,
+        // not a transient error — don't burn retries/backoff on it; let the
+        // caller handle it immediately.
+        if (e is EmptyBackupException || e is DriveAuthException) rethrow;
         if (attempt == maxAttempts) {
           AppLogger.error(
             '$label: all $maxAttempts attempts failed',
@@ -245,16 +283,6 @@ class AutoBackupService {
     } catch (e) {
       AppLogger.warning('Could not check battery level: $e');
       return true;
-    }
-  }
-
-  static Future<bool> _checkDriveAccess() async {
-    try {
-      await DriveService.getDriveApi();
-      return true;
-    } catch (e) {
-      AppLogger.warning('Drive access check failed: $e');
-      return false;
     }
   }
 

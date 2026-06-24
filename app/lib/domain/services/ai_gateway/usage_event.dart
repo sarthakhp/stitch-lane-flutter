@@ -29,6 +29,7 @@ class UsageCallerTags {
   static const orderCreator = 'order_creator';
   static const transcription = 'transcription';
   static const transcriptFormat = 'transcript_format';
+  static const measurementExtract = 'measurement_extract';
   static const sttBatch = 'stt_batch';
   static const sttStream = 'stt_stream';
   static const ttsStream = 'tts_stream';
@@ -38,6 +39,7 @@ class UsageCallerTags {
     orderCreator,
     transcription,
     transcriptFormat,
+    measurementExtract,
     sttBatch,
     sttStream,
     ttsStream,
