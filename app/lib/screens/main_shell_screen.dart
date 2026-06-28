@@ -10,8 +10,11 @@ import '../domain/state/order_state.dart';
 import '../domain/state/customer_state.dart';
 import '../domain/state/main_shell_state.dart';
 import '../domain/state/permission_controller.dart';
+import '../domain/services/home_widget/home_widget_service.dart';
 import '../utils/startup_orchestrator.dart';
 import '../utils/startup_tracker.dart';
+import 'shell/shell_tab_navigator_access.dart';
+import 'shell/tab_navigator.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/orders_tab.dart';
 import 'tabs/customers_tab.dart';
@@ -30,18 +33,39 @@ class _MainShellScreenState extends State<MainShellScreen>
   final _customersTabKey = GlobalKey<CustomersTabState>();
   final _aiTabKey = GlobalKey<AiAssistantScreenState>();
 
+  // One Navigator per tab so detail screens push *inside* the tab and the
+  // bottom bar stays put. The observers nudge a rebuild whenever a tab's stack
+  // changes, so the back-button gate (canPop) stays accurate.
+  late final List<GlobalKey<NavigatorState>> _navKeys =
+      List.generate(4, (_) => GlobalKey<NavigatorState>());
+  late final List<NavigatorObserver> _navObservers =
+      List.generate(4, (_) => _NavStackObserver(_scheduleRebuild));
+
   // Lazily mount Orders/Customers tabs on first navigation.
   // Home (index 0) is always considered mounted.
   final Set<int> _mountedTabs = {0};
+
+  void _scheduleRebuild() {
+    // Observer callbacks can fire mid-build (the initial route push), so defer
+    // the setState to the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Lets the deep-link coordinator push into whichever tab is showing.
+  NavigatorState? _resolveActiveNavigator() =>
+      _navKeys[context.read<MainShellState>().selectedIndex].currentState;
 
   @override
   void initState() {
     super.initState();
     StartupTracker.instance.markOnce('main_shell_init_state');
     WidgetsBinding.instance.addObserver(this);
+    ShellTabNavigatorAccess.register(_resolveActiveNavigator);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       StartupTracker.instance.markOnce('main_shell_first_frame');
-      _loadInitialData();
+      _loadInitialDataWhenUncovered();
       _requestPermissions();
       _processNotificationsWhenReady();
     });
@@ -50,6 +74,7 @@ class _MainShellScreenState extends State<MainShellScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ShellTabNavigatorAccess.clear(_resolveActiveNavigator);
     super.dispose();
   }
 
@@ -82,6 +107,25 @@ class _MainShellScreenState extends State<MainShellScreen>
     NotificationRouter.processPendingNotification(context);
   }
 
+  /// Loads the dashboard's data now, unless a widget-launched screen (e.g. the
+  /// order creator) is currently covering the shell — in which case we defer
+  /// the load until that screen is dismissed. The shell + bottom bar are
+  /// already on screen meanwhile, so a cold widget launch stays fast.
+  void _loadInitialDataWhenUncovered() {
+    final covered = HomeWidgetService.instance.shellCovered;
+    if (!covered.value) {
+      _loadInitialData();
+      return;
+    }
+    late final VoidCallback listener;
+    listener = () {
+      if (covered.value) return;
+      covered.removeListener(listener);
+      if (mounted) _loadInitialData();
+    };
+    covered.addListener(listener);
+  }
+
   Future<void> _loadInitialData() async {
     final orderState = context.read<OrderState>();
     final orderRepository = context.read<OrderRepository>();
@@ -98,11 +142,17 @@ class _MainShellScreenState extends State<MainShellScreen>
   }
 
   void _onDestinationSelected(int index) {
+    final shellState = context.read<MainShellState>();
+    // Re-tapping the current tab pops it back to its root (standard shell UX).
+    if (index == shellState.selectedIndex) {
+      _navKeys[index].currentState?.popUntil((route) => route.isFirst);
+      return;
+    }
     if (_mountedTabs.add(index)) {
       // First visit to this tab — trigger a rebuild so the real widget mounts.
       setState(() {});
     }
-    context.read<MainShellState>().switchToTab(index);
+    shellState.switchToTab(index);
   }
 
   void _applyPendingFilters(MainShellState shellState) {
@@ -151,19 +201,32 @@ class _MainShellScreenState extends State<MainShellScreen>
     final body = IndexedStack(
       index: selectedIndex,
       children: [
-        const HomeTab(),
+        _tabNavigator(0, (_) => const HomeTab()),
         _mountedTabs.contains(1)
-            ? OrdersTab(key: _ordersTabKey)
+            ? _tabNavigator(1, (_) => OrdersTab(key: _ordersTabKey))
             : const SizedBox.shrink(),
         _mountedTabs.contains(2)
-            ? CustomersTab(key: _customersTabKey)
+            ? _tabNavigator(2, (_) => CustomersTab(key: _customersTabKey))
             : const SizedBox.shrink(),
         _mountedTabs.contains(3)
-            ? AiAssistantScreen(key: _aiTabKey, active: selectedIndex == 3)
+            ? _tabNavigator(
+                3,
+                // active must track the visible tab, but the nested navigator
+                // builds the root once — so derive it reactively here instead
+                // of from a frozen constructor arg.
+                (_) => Consumer<MainShellState>(
+                  builder: (_, shell, __) => AiAssistantScreen(
+                    key: _aiTabKey,
+                    active: shell.selectedIndex == 3,
+                  ),
+                ),
+              )
             : const SizedBox.shrink(),
       ],
     );
 
+    // The read-only banner is applied app-wide by ReaderModeOverlay (in
+    // MaterialApp.builder), so the shell renders its body directly.
     Widget scaffold;
     if (useNavigationRail) {
       scaffold = Scaffold(
@@ -234,17 +297,54 @@ class _MainShellScreenState extends State<MainShellScreen>
       );
     }
 
+    // Back priority: (1) pop a detail inside the active tab, (2) return to the
+    // previously-visited tab, (3) let the OS pop the shell and exit the app.
+    final activeNav = _navKeys[selectedIndex].currentState;
+    final nestedCanPop = activeNav?.canPop() ?? false;
     return PopScope(
-      // Walk back through visited tabs first (Customers → Orders → Home);
-      // once there's no tab history the shell is the root route, so let the OS
-      // pop it and exit the app.
-      canPop: !shellState.canPopTab,
+      canPop: !nestedCanPop && !shellState.canPopTab,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        shellState.popTab();
+        if (nestedCanPop) {
+          activeNav!.pop();
+        } else {
+          shellState.popTab();
+        }
       },
       child: scaffold,
     );
   }
+
+  Widget _tabNavigator(int index, WidgetBuilder rootBuilder) {
+    return TabNavigator(
+      navigatorKey: _navKeys[index],
+      observers: [_navObservers[index]],
+      rootBuilder: rootBuilder,
+    );
+  }
+}
+
+/// Rebuilds the shell whenever a tab's nested navigator stack changes, so the
+/// back-button gate ([PopScope.canPop]) reflects the current depth.
+class _NavStackObserver extends NavigatorObserver {
+  _NavStackObserver(this.onChanged);
+
+  final VoidCallback onChanged;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      onChanged();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      onChanged();
 }
 

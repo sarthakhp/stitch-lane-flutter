@@ -6,6 +6,7 @@ import '../config/app_config.dart';
 import '../domain/domain.dart';
 import '../presentation/presentation.dart';
 import '../presentation/widgets/confirmation_dialog.dart';
+import '../domain/state/sync_state.dart';
 
 enum _ExportSource { local, drive }
 
@@ -44,6 +45,10 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
       appBar: const CustomAppBar(title: Text('Backup & Restore')),
       body: Consumer2<BackupState, SettingsState>(
         builder: (context, backupState, settingsState, child) {
+          // A reader device doesn't own the cloud backup — the primary device
+          // does. Show its status read-only, but hide every write action
+          // (backup/restore/import) and the auto-backup schedule.
+          final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
           return SingleChildScrollView(
             padding: const EdgeInsets.all(AppConfig.spacing16),
             child: Center(
@@ -57,21 +62,24 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
                       settingsState: settingsState,
                     ),
                     const SizedBox(height: AppConfig.spacing24),
-                    _BackupActionsSection(
-                      backupState: backupState,
-                      onSignIn: () => _handleDriveSignIn(context),
-                      onBackup: () => _handleBackup(context),
-                      onRestore: () => _handleRestore(context),
-                      onExport: () => _handleExport(context),
-                      onImport: () => _handleImport(context),
-                    ),
-                    const SizedBox(height: AppConfig.spacing24),
-                    _AutoBackupSection(
-                      settingsState: settingsState,
-                      isSaving: _isSaving,
-                      onToggle: _onAutoBackupToggled,
-                      onTimeSelected: _onTimeSelected,
-                    ),
+                    if (canWrite) ...[
+                      _BackupActionsSection(
+                        backupState: backupState,
+                        onSignIn: () => _handleDriveSignIn(context),
+                        onBackup: () => _handleBackup(context),
+                        onRestore: () => _handleRestore(context),
+                        onExport: () => _handleExport(context),
+                        onImport: () => _handleImport(context),
+                      ),
+                      const SizedBox(height: AppConfig.spacing24),
+                      _AutoBackupSection(
+                        settingsState: settingsState,
+                        isSaving: _isSaving,
+                        onToggle: _onAutoBackupToggled,
+                        onTimeSelected: _onTimeSelected,
+                      ),
+                    ] else
+                      const _ReaderBackupNotice(),
                   ],
                 ),
               ),
@@ -186,23 +194,8 @@ class _BackupSettingsScreenState extends State<BackupSettingsScreen> {
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
         measurementFieldRepository: measurementFieldRepository,
-        onImageProgress: (current, total, message) {
-          if (context.mounted) {
-            backupState.setDetailedProgress(
-              0.6 + (current / total) * 0.2,
-              message,
-            );
-          }
-        },
-        onAudioProgress: (current, total, message) {
-          if (context.mounted) {
-            backupState.setDetailedProgress(
-              0.8 + (current / total) * 0.1,
-              message,
-            );
-          }
-        },
       );
+      // Photos and audio download in the background (see MediaHydrationService).
       backupState.setProgress(0.9);
       await CustomerService.loadCustomers(customerState, customerRepository);
       await OrderService.loadOrders(orderState, orderRepository);
@@ -540,7 +533,7 @@ class _BackupStatusSection extends StatelessWidget {
               _buildInfoRow(
                 context,
                 Icons.account_circle,
-                'Account',
+                '',
                 context.read<AuthController>().email ?? '—',
               ),
               const SizedBox(height: AppConfig.spacing8),
@@ -602,6 +595,17 @@ class _BackupStatusSection extends StatelessWidget {
   }
 
   Widget _buildBackupStatusRow(BuildContext context, SettingsState settingsState) {
+    // A reader never backs up, so its local lastBackupTime/status are stale or
+    // empty — and settings don't sync, so the writer's never reach it. Show the
+    // Drive file's real modifiedTime instead (authoritative, cross-device,
+    // already fetched into backupInfo). No success/partial/failed badge: that's
+    // the writer's local-only signal the reader can't know.
+    final canWrite = context.watch<SyncState>().canWrite;
+    if (!canWrite) {
+      return _buildBackupTimeRow(context, Icons.cloud_done, 'Last backup',
+          backupState.backupInfo?.lastModified);
+    }
+
     final status = settingsState.settings.lastBackupStatus;
     final error = settingsState.settings.lastBackupError;
     final lastTime = settingsState.lastBackupTime;
@@ -664,7 +668,35 @@ class _BackupStatusSection extends StatelessWidget {
       );
     }
 
-    return _buildInfoRow(context, Icons.cloud_done, 'Last Backup', timeStr);
+    return _buildBackupTimeRow(context, Icons.cloud_done, 'Last Backup', lastTime);
+  }
+
+  /// An info row whose value is a backup timestamp split across two lines —
+  /// date on the first, time on the second — so it never wraps awkwardly.
+  Widget _buildBackupTimeRow(
+      BuildContext context, IconData icon, String label, DateTime? time) {
+    final theme = Theme.of(context);
+    final valueStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: AppConfig.spacing8),
+        Text('$label: ', style: theme.textTheme.bodyMedium),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: time == null
+                ? [Text('Never', style: valueStyle)]
+                : [
+                    Text(DateFormat('MMM d, y').format(time), style: valueStyle),
+                    Text(DateFormat('h:mm a').format(time), style: valueStyle),
+                  ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildInfoRow(
@@ -674,7 +706,8 @@ class _BackupStatusSection extends StatelessWidget {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: AppConfig.spacing8),
-        Text('$label: ', style: theme.textTheme.bodyMedium),
+        if (label.isNotEmpty)
+          Text('$label: ', style: theme.textTheme.bodyMedium),
         Flexible(
           child: Text(
             value,
@@ -893,6 +926,41 @@ class _AutoBackupSection extends StatelessWidget {
       return '$displayHour:$displayMinute $period';
     }
     return '3:00 AM';
+  }
+}
+
+/// Shown on a reader device in place of the backup/restore actions. Backups are
+/// owned and managed by the primary (writer) device; a reader is a replica, so
+/// it neither backs up (would clobber the primary's copy) nor restores (the
+/// sync applier owns its local data).
+class _ReaderBackupNotice extends StatelessWidget {
+  const _ReaderBackupNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      color: scheme.secondaryContainer,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(AppConfig.spacing16),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_sync_outlined, color: scheme.onSecondaryContainer),
+            const SizedBox(width: AppConfig.spacing12),
+            Expanded(
+              child: Text(
+                'This device syncs from the primary device, which manages '
+                'backups for the account. Back up or restore from there.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: scheme.onSecondaryContainer),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

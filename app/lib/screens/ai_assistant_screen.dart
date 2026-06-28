@@ -15,6 +15,7 @@ import '../domain/services/ai_chat_service.dart';
 import '../domain/services/tts_service.dart';
 import '../domain/state/order_state.dart';
 import '../domain/state/settings_state.dart';
+import '../domain/state/sync_state.dart';
 import '../presentation/presentation.dart';
 import 'widgets/ai/action/ai_proposed_action_card.dart';
 import 'widgets/ai/ai_message_bubble.dart';
@@ -69,7 +70,8 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
 
   Future<void> _loadSavedChat() async {
     final modelName = context.read<SettingsState>().settings.aiChatModel;
-    final saved = await _chatService.loadChat(modelName: modelName);
+    final canWrite = context.read<SyncState>().canWrite;
+    final saved = await _chatService.loadChat(modelName: modelName, canWrite: canWrite);
     if (mounted) {
       setState(() {
         _messages.addAll(saved);
@@ -106,11 +108,13 @@ class AiAssistantScreenState extends State<AiAssistantScreen> {
     _scrollToBottom();
 
     final settings = context.read<SettingsState>().settings;
+    final canWrite = context.read<SyncState>().canWrite;
     final response = await _chatService.sendMessage(
       trimmed,
       customerRepo: context.read<CustomerRepository>(),
       orderRepo: context.read<OrderRepository>(),
       modelName: settings.aiChatModel,
+      canWrite: canWrite,
     );
 
     if (mounted) {

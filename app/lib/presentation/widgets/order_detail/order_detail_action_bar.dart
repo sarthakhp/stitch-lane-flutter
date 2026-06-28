@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../backend/models/order.dart';
 import '../../../config/app_config.dart';
+import '../../../domain/state/sync_state.dart';
 import 'order_status_presentation.dart';
 
 /// Bottom action area of an order's detail: cycle status, a (read-only) paid
@@ -27,16 +29,17 @@ class OrderDetailActionBar extends StatelessWidget {
     this.onViewCustomer,
   });
 
-  /// "View <name>'s Profile" when a name is known, else a generic fallback.
+  /// The customer's name when known, else a generic fallback.
   String get _viewLabel {
     final name = customerName?.trim() ?? '';
-    return name.isEmpty ? 'View Customer' : "View $name's Profile";
+    return name.isEmpty ? 'View Customer' : name;
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final statusColor = orderStatusColor(context, order.status);
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
 
     return Container(
       padding: const EdgeInsets.all(AppConfig.spacing16),
@@ -59,12 +62,14 @@ class OrderDetailActionBar extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.tonalIcon(
-                    onPressed: onToggleStatus,
+                    onPressed: canWrite ? onToggleStatus : null,
                     icon: Icon(orderStatusIcon(order.status)),
                     label: Text(orderStatusText(order.status)),
                     style: FilledButton.styleFrom(
                       backgroundColor: statusColor.withValues(alpha: 0.2),
                       foregroundColor: statusColor,
+                      disabledBackgroundColor: statusColor.withValues(alpha: 0.2),
+                      disabledForegroundColor: statusColor,
                     ),
                   ),
                 ),

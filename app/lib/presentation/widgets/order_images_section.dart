@@ -5,6 +5,7 @@ import '../../config/app_config.dart';
 import '../../domain/domain.dart';
 import 'common/full_image_viewer.dart';
 import 'common/local_image.dart';
+import 'sync/writer_only.dart';
 
 /// Logical width to decode grid thumbnails at; scaled by DPR inside [LocalImage].
 const double _kThumbnailDecodeWidth = 300;
@@ -148,10 +149,12 @@ class OrderImagesSection extends StatelessWidget {
                   'Images',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _showImageSourceDialog(context),
-                  icon: const Icon(Icons.add_photo_alternate),
-                  label: const Text('Add'),
+                WriterOnly(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _showImageSourceDialog(context),
+                    icon: const Icon(Icons.add_photo_alternate),
+                    label: const Text('Add'),
+                  ),
                 ),
               ],
             ),

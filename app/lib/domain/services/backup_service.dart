@@ -1,12 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import '../../backend/backend.dart';
 import '../../constants/app_constants.dart';
 import 'audio_backup_recorder.dart';
-import 'image_storage_service.dart';
-import 'image_sync_service.dart';
-import 'audio_sync_service.dart';
-import '../../utils/app_logger.dart';
+import 'sync/media_hydration_service.dart';
+import 'sync/restore_media_state.dart';
 
 class BackupService {
   static const String _backupVersion = '1.0.0';
@@ -62,6 +61,12 @@ class BackupService {
     return jsonEncode(backup);
   }
 
+  /// Restores the database from [backupJson] and returns as soon as the data is
+  /// in place, so the user can start using the app immediately. Photos and audio
+  /// are NOT downloaded here — they are pulled lazily on view and swept in the
+  /// background by [MediaHydrationService] (kicked here and re-kicked on every
+  /// launch until complete). This keeps a fresh login fast and makes the media
+  /// download resumable across app kills. Nothing is ever deleted.
   static Future<void> restoreBackup(
     String backupJson, {
     required CustomerRepository customerRepository,
@@ -69,8 +74,6 @@ class BackupService {
     required MeasurementRepository measurementRepository,
     required SettingsRepository settingsRepository,
     MeasurementFieldRepository? measurementFieldRepository,
-    void Function(int current, int total, String message)? onImageProgress,
-    void Function(int current, int total, String message)? onAudioProgress,
   }) async {
     final backupData = jsonDecode(backupJson) as Map<String, dynamic>;
     _validateBackup(backupData);
@@ -93,30 +96,11 @@ class BackupService {
 
     await SqliteDatabase.withForeignKeysDisabled(doRestore);
 
-    try {
-      AppLogger.info('Starting image download from Drive after restore');
-      await ImageSyncService.downloadImagesFromDrive(onProgress: onImageProgress);
-      AppLogger.info('Images restored successfully');
-    } catch (e) {
-      AppLogger.error('Failed to restore images from Drive', e);
-    }
-
-    try {
-      AppLogger.info('Starting audio download from Drive after restore');
-      await AudioSyncService.downloadAudiosFromDrive(onProgress: onAudioProgress);
-      AppLogger.info('Audio files restored successfully');
-    } catch (e) {
-      AppLogger.error('Failed to restore audio files from Drive', e);
-    }
-
-    // Verify: log any images referenced by orders but missing locally.
-    // Restore never deletes local image files.
-    try {
-      final orders = await orderRepository.getAllOrders();
-      await ImageStorageService.verifyReferencedImages(orders);
-    } catch (e) {
-      AppLogger.error('Image verification failed after restore', e);
-    }
+    // Mark media as owed and start the background sweep without awaiting it, so
+    // the caller can proceed into the app. The flag makes the download resume
+    // on the next launch if this run is interrupted.
+    await RestoreMediaState.markPending();
+    unawaited(MediaHydrationService.hydrate());
   }
 
   static Future<void> _restoreCustomers(

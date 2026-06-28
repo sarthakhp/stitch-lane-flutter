@@ -25,6 +25,8 @@ class AppConstants {
   static const String measurementFieldsRoute = '/settings/measurement-fields';
   static const String customerRecordingsRoute = '/customer/recordings';
   static const String backupSettingsRoute = '/backup-settings';
+  static const String syncSettingsRoute = '/sync-settings';
+  static const String syncQuarantineRoute = '/sync-settings/quarantine';
   static const String developerRoute = '/developer';
   static const String aiUsageRoute = '/ai-usage';
 	  static const String businessAnalysisRoute = '/business-analysis';

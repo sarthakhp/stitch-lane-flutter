@@ -25,6 +25,10 @@ class ImageStorageService {
     return imagesDir;
   }
 
+  /// The on-device images directory (created if absent). Exposed so the sync
+  /// [MediaResolver] can land lazily-downloaded images alongside captured ones.
+  static Future<Directory> imagesDirectory() => _getImagesDirectory();
+
   static Future<String> saveImage(
     Uint8List imageBytes, {
     String? extension,

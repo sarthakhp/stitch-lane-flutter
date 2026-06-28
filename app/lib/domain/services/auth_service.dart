@@ -11,6 +11,8 @@ import 'auto_backup_service.dart';
 import 'notification_service.dart';
 import 'onboarding_service.dart';
 import 'pending_orders_reminder_service.dart';
+import 'sync/media_hydration_service.dart';
+import 'sync/restore_media_state.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -73,10 +75,28 @@ class AuthService {
     try {
       final userId = _auth.currentUser?.uid;
 
-      await Future.wait([
-        _auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
+      // Stop any in-flight restore media download FIRST, so it can't keep
+      // repopulating the files we're about to delete, fetch the previous
+      // account's media, or starve this sign-out by saturating the isolate.
+      // Clearing the flag also stops a relaunch from resuming it.
+      MediaHydrationService.cancel();
+      await RestoreMediaState.clearPending();
+
+      // Firebase sign-out flips the auth stream → the app returns to login, so
+      // it must run; bound it so a stuck call can't hang sign-out forever.
+      await _auth.signOut().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () =>
+            AppLogger.warning('signOut: FirebaseAuth.signOut timed out'),
+      );
+
+      // Google session disconnect is best-effort and not required for the app's
+      // auth state; it can hang on poor connectivity, so never let it block.
+      try {
+        await _googleSignIn.signOut().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        AppLogger.warning('signOut: GoogleSignIn.signOut skipped ($e)');
+      }
 
       await Future.wait([
         _clearLocalDatabases(

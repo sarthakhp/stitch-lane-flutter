@@ -1,14 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class SqliteDatabase {
   static Database? _database;
-  static const String _dbName = 'stitch_genie.db';
+  static String _dbName = 'stitch_genie.db';
 
   /// Public filename of the live SQLite DB. Used by [DbSnapshotService] which
   /// reads / writes the file alongside this class on disk.
   static String get dbName => _dbName;
-  static const int _dbVersion = 12;
+
+  /// Test-only: isolate each test file onto its own DB file so parallel test
+  /// isolates don't contend on one shared SQLite file. Never call in app code.
+  @visibleForTesting
+  static set databaseNameForTesting(String name) => _dbName = name;
+  static const int _dbVersion = 13;
 
   static Future<Database> get database async {
     _database ??= await _initDatabase();
@@ -101,6 +107,47 @@ class SqliteDatabase {
 
     await _createAiUsageEventsTable(db);
     await _createMeasurementFieldsTable(db);
+    await _createSyncTables(db);
+  }
+
+  /// v13: three new side-tables for multi-device sync. Entity tables and all
+  /// existing reads are untouched — sync bookkeeping lives here only.
+  static Future<void> _createSyncTables(Database db) async {
+    // Writer push queue. PK (collection, entity_id) means multiple edits to
+    // the same row collapse into one pending intent (the latest wins).
+    await db.execute('''
+      CREATE TABLE sync_outbox (
+        collection   TEXT NOT NULL,
+        entity_id    TEXT NOT NULL,
+        op           TEXT NOT NULL,
+        enqueued_at  INTEGER NOT NULL,
+        PRIMARY KEY (collection, entity_id)
+      )
+    ''');
+
+    // Device-local key/value store (never synced to cloud).
+    // Known keys: device_id, device_name, sync_enabled, writer_epoch,
+    // cached_control, backfill_done, last_push_at, last_pull_at.
+    await db.execute('''
+      CREATE TABLE sync_meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT
+      )
+    ''');
+
+    // Holds outbox rows that could not be pushed because this device was
+    // fenced (another device became the writer). Nothing is silently dropped.
+    await db.execute('''
+      CREATE TABLE sync_quarantine (
+        id             TEXT PRIMARY KEY,
+        collection     TEXT NOT NULL,
+        entity_id      TEXT NOT NULL,
+        op             TEXT NOT NULL,
+        payload        TEXT,
+        reason         TEXT NOT NULL,
+        quarantined_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   /// v10: flat global list of measurement field labels + aliases, used by the
@@ -225,6 +272,11 @@ class SqliteDatabase {
       // [AudioPathList]) so no data backfill is needed.
       await db.execute('ALTER TABLE measurements ADD COLUMN audio_file_paths TEXT');
       await db.execute('ALTER TABLE orders ADD COLUMN audio_file_paths TEXT');
+    }
+    if (oldVersion < 13) {
+      // Multi-device sync infrastructure. Purely additive — entity tables and
+      // all existing queries are untouched.
+      await _createSyncTables(db);
     }
   }
 

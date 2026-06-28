@@ -1,37 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../domain/services/home_widget/home_widget_service.dart';
 import 'main_shell_screen.dart';
-import 'widgets/app_logo.dart';
 
-/// Renders the authenticated home.
+/// Renders the authenticated home shell.
 ///
-/// On a cold widget launch the shell is "covered" before the first build, so
-/// we show a lightweight splash instead of building the (expensive) dashboard
-/// underneath a destination the user launched straight into. Once the
-/// dashboard has been built it stays built — warm widget taps never tear it
-/// down, so returning from a widget destination is instant.
-class HomeShellHost extends StatefulWidget {
+/// The shell (and its bottom bar) is always built so a widget-launched screen
+/// can push *inside* the active tab and keep the bottom bar. Cold-start cost is
+/// avoided not by skipping the shell build (the dashboard widget is cheap) but
+/// by deferring the dashboard's data load while a launched screen covers it —
+/// see [MainShellScreen]'s `shellCovered`-gated initial load.
+class HomeShellHost extends StatelessWidget {
   const HomeShellHost({super.key});
 
   @override
-  State<HomeShellHost> createState() => _HomeShellHostState();
-}
-
-class _HomeShellHostState extends State<HomeShellHost> {
-  bool _shellBuilt = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: HomeWidgetService.instance.shellCovered,
-      builder: (context, covered, _) {
-        if (covered && !_shellBuilt) {
-          return const Scaffold(body: Center(child: AppLogo(size: 120)));
-        }
-        _shellBuilt = true;
-        return const MainShellScreen();
-      },
-    );
-  }
+  Widget build(BuildContext context) => const MainShellScreen();
 }

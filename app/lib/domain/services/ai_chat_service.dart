@@ -13,13 +13,14 @@ import 'ai_executor.dart';
 class AiChatService {
   ChatGoogleGenerativeAI? _model;
   String? _currentModelName;
+  bool? _currentCanWrite;
   List<ChatExchange> _exchanges = [];
   AiTokenUsage _sessionUsage = AiTokenUsage.zero;
 
   AiTokenUsage get sessionUsage => _sessionUsage;
 
-  void _ensureModel(String modelName) {
-    if (_model != null && _currentModelName == modelName) return;
+  void _ensureModel(String modelName, {required bool canWrite}) {
+    if (_model != null && _currentModelName == modelName && _currentCanWrite == canWrite) return;
 
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
@@ -30,16 +31,17 @@ class AiChatService {
       apiKey: apiKey,
       defaultOptions: ChatGoogleGenerativeAIOptions(
         model: modelName,
-        tools: aiTools,
+        tools: canWrite ? aiTools : aiReadOnlyTools,
         responseMimeType: 'application/json',
         responseSchema: aiResponseSchema,
       ),
     );
     _currentModelName = modelName;
+    _currentCanWrite = canWrite;
   }
 
-  Future<List<AiChatMessage>> loadChat({String modelName = defaultAiChatModel}) async {
-    _ensureModel(modelName);
+  Future<List<AiChatMessage>> loadChat({String modelName = defaultAiChatModel, bool canWrite = true}) async {
+    _ensureModel(modelName, canWrite: canWrite);
     _exchanges = await AiChatHistory.load();
 
     final savedUsage = await AiChatHistory.loadUsage();
@@ -84,10 +86,11 @@ class AiChatService {
     required CustomerRepository customerRepo,
     required OrderRepository orderRepo,
     String modelName = defaultAiChatModel,
+    bool canWrite = true,
   }) async {
-    _ensureModel(modelName);
+    _ensureModel(modelName, canWrite: canWrite);
 
-    var systemPrompt = buildAiSystemPrompt();
+    var systemPrompt = buildAiSystemPrompt(canWrite: canWrite);
     final historyText = AiChatHistory.buildHistoryText(_exchanges);
     if (historyText != null) {
       systemPrompt += '\n\nConversation history:\n$historyText';
@@ -280,5 +283,7 @@ class AiChatService {
   void dispose() {
     _exchanges.clear();
     _model = null;
+    _currentModelName = null;
+    _currentCanWrite = null;
   }
 }

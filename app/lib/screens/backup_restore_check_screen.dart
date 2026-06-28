@@ -243,20 +243,10 @@ class _BackupRestoreCheckScreenState extends State<BackupRestoreCheckScreen> {
         measurementRepository: measurementRepository,
         settingsRepository: settingsRepository,
         measurementFieldRepository: measurementFieldRepository,
-        onImageProgress: (current, total, message) {
-          backupState.setDetailedProgress(
-            0.5 + (current / total) * 0.2,
-            message,
-          );
-        },
-        onAudioProgress: (current, total, message) {
-          backupState.setDetailedProgress(
-            0.7 + (current / total) * 0.2,
-            message,
-          );
-        },
       );
 
+      // Photos and audio download in the background (see MediaHydrationService),
+      // so the user reaches the app now instead of waiting for every file.
       backupState.setDetailedProgress(0.95, 'Loading data...');
 
       await CustomerService.loadCustomers(customerState, customerRepository);

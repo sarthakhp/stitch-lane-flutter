@@ -1,0 +1,9 @@
+# Device friendly names — used by adb-wireless.py status lines.
+# One entry per line:  serial-or-model = Friendly Name
+# Matches the device's USB serial, wireless mDNS name, ip:port, or model name
+# (the value of ro.product.model, e.g. from `adb devices -l`).
+# Lines starting with # are comments.
+
+CPH2691 = OnePlus 13R
+CPH2569 = Nord CE3
+OPD2480 = OnePlus Pad Lite

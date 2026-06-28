@@ -8,6 +8,7 @@ import '../confirmation_dialog.dart';
 import '../detail/detail_header.dart';
 import 'order_detail_action_bar.dart';
 import 'order_detail_body.dart';
+import '../sync/writer_only.dart';
 
 /// Self-contained order detail: a header (edit/delete), the scrollable body,
 /// and the bottom action bar. Live-resolves the order/customer from state so it
@@ -162,10 +163,12 @@ class _OrderDetailViewState extends State<OrderDetailView> {
               title: "${customer.name}'s Order",
               leading: widget.leading,
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Edit',
-                  onPressed: () => _editOrder(order, customer),
+                WriterOnly(
+                  child: IconButton(
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Edit',
+                    onPressed: () => _editOrder(order, customer),
+                  ),
                 ),
               ],
             ),

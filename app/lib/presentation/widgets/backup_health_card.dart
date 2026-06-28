@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_config.dart';
 import '../../domain/domain.dart';
+import '../../domain/state/sync_state.dart';
 import '../backup_flow.dart';
 
 /// "Is my data safe in the cloud?" banner, shown on the home screen only when
@@ -71,6 +72,11 @@ class _BackupHealthCardState extends State<BackupHealthCard> {
 
   @override
   Widget build(BuildContext context) {
+    // A reader device doesn't own the cloud backup — the primary device does.
+    // Hide the nudge entirely so we never prompt a reader to back up.
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
+    if (!canWrite) return const SizedBox.shrink();
+
     // Nothing to lose, nothing to warn about. A brand-new account (no
     // customers, no orders) shouldn't be nagged to back up empty data — the
     // nudge appears the moment real data exists.

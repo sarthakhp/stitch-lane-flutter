@@ -6,6 +6,7 @@ import '../../backend/models/order.dart';
 import '../../backend/models/payment_entry.dart';
 import '../../config/app_config.dart';
 import 'confirmation_dialog.dart';
+import 'sync/writer_only.dart';
 
 class PaymentsSection extends StatefulWidget {
   final Order order;
@@ -143,7 +144,7 @@ class _PaymentsSectionState extends State<PaymentsSection> {
               _buildPaymentsList(context, colorScheme),
             ],
             const SizedBox(height: AppConfig.spacing12),
-            _buildAddButton(context),
+            WriterOnly(child: _buildAddButton(context)),
           ],
         ),
       ),

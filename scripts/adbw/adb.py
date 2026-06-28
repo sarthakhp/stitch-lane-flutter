@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 from adbw.ui import fail
 
@@ -34,18 +35,20 @@ def adb_devices_raw() -> str:
     return res.stdout if res.returncode == 0 else ""
 
 
-def wireless_devices() -> list[str]:
-    """Return list of wireless device serials (IP:PORT format)."""
-    pattern = re.compile(r"^(\d+\.\d+\.\d+\.\d+:\d+)\s+device$")
-    return [
-        m.group(1)
-        for line in adb_devices_raw().splitlines()
-        if (m := pattern.match(line.strip()))
-    ]
+_IP_PORT_RE = re.compile(r"^\d+\.\d+\.\d+\.\d+:\d+$")
 
 
-def usb_devices() -> list[str]:
-    """Return list of USB device serials (non-IP)."""
+def is_wireless_serial(serial: str) -> bool:
+    """True for adb wireless transports. These come in two forms:
+      - tcpip:        192.168.29.151:34787
+      - Wireless dbg: adb-f56e0b55-YO5sRu._adb-tls-connect._tcp  (mDNS name)
+    USB serials are plain device IDs, so anything matching either wireless
+    form is treated as wireless (and excluded from the USB list)."""
+    return bool(_IP_PORT_RE.match(serial)) or "_adb-tls-" in serial or serial.endswith("._tcp")
+
+
+def _devices_where(keep_wireless: bool) -> list[str]:
+    """Serials listed as 'device', filtered to wireless or USB transports."""
     out = []
     for line in adb_devices_raw().splitlines():
         line = line.strip()
@@ -53,11 +56,19 @@ def usb_devices() -> list[str]:
             continue
         parts = line.split()
         if len(parts) >= 2 and parts[1] == "device":
-            serial = parts[0]
-            # Exclude wireless (IP:port) serials
-            if not re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", serial):
-                out.append(serial)
+            if is_wireless_serial(parts[0]) == keep_wireless:
+                out.append(parts[0])
     return out
+
+
+def wireless_devices() -> list[str]:
+    """Return wireless device serials (ip:port or the mDNS _adb-tls name)."""
+    return _devices_where(keep_wireless=True)
+
+
+def usb_devices() -> list[str]:
+    """Return USB device serials (anything not a wireless transport)."""
+    return _devices_where(keep_wireless=False)
 
 
 def device_models() -> dict[str, str]:
@@ -164,6 +175,47 @@ def is_responsive(serial: str) -> bool:
     listed as 'device' in `adb devices`."""
     res = run(["adb", "-s", serial, "shell", "getprop", "ro.product.model"])
     return bool(res.stdout.strip())
+
+
+_ALIASES_FILE = Path(__file__).resolve().parent.parent / ".device-aliases"
+
+
+def _load_aliases() -> dict[str, str]:
+    """Read scripts/.device-aliases → {key: friendly_name}. Keys are matched
+    case-insensitively against serials and model names."""
+    if not _ALIASES_FILE.exists():
+        return {}
+    aliases: dict[str, str] = {}
+    for raw in _ALIASES_FILE.read_text().splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if "=" not in line:
+            continue
+        key, _, name = line.partition("=")
+        key, name = key.strip().lower(), name.strip()
+        if key and name:
+            aliases[key] = name
+    return aliases
+
+
+def friendly_name(serial: str, models: dict[str, str] | None = None) -> str:
+    """Human-readable label for a device serial.
+
+    Priority: alias-by-serial → alias-by-model → model name → serial.
+    The mDNS serial form (`adb-xxx._adb-tls-connect._tcp`) is also matched
+    against the alias file, and the model lookup is used as a tiebreaker.
+    """
+    aliases = _load_aliases()
+    # Try serial directly.
+    if serial.lower() in aliases:
+        return aliases[serial.lower()]
+    # Try looking up the model for this serial and alias by model.
+    if models is None:
+        models = device_models()
+    model = models.get(serial, "")
+    if model and model.lower() in aliases:
+        return aliases[model.lower()]
+    # Fall back: model name if known, else raw serial.
+    return model or serial
 
 
 def best_device_ip(serial: str) -> str | None:

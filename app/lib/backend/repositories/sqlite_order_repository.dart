@@ -6,6 +6,7 @@ import '../models/payment_entry.dart';
 import '../util/audio_path_list.dart';
 import '../database/sqlite_database.dart';
 import 'order_repository.dart';
+import 'sync_outbox.dart';
 
 class SqliteOrderRepository implements OrderRepository {
   Future<Database> get _db => SqliteDatabase.database;
@@ -51,6 +52,7 @@ class SqliteOrderRepository implements OrderRepository {
       final db = await _db;
       await db.insert('orders', toMap(order),
           conflictAlgorithm: ConflictAlgorithm.replace);
+      await SyncOutbox.enqueue('orders', order.id, SyncOutbox.opUpsert);
     } catch (e) {
       throw Exception('Failed to add order: $e');
     }
@@ -63,6 +65,7 @@ class SqliteOrderRepository implements OrderRepository {
       final count = await db.update('orders', toMap(order),
           where: 'id = ?', whereArgs: [order.id]);
       if (count == 0) throw Exception('Order not found');
+      await SyncOutbox.enqueue('orders', order.id, SyncOutbox.opUpsert);
     } catch (e) {
       throw Exception('Failed to update order: $e');
     }
@@ -73,6 +76,7 @@ class SqliteOrderRepository implements OrderRepository {
     try {
       final db = await _db;
       await db.delete('orders', where: 'id = ?', whereArgs: [id]);
+      await SyncOutbox.enqueue('orders', id, SyncOutbox.opDelete);
     } catch (e) {
       throw Exception('Failed to delete order: $e');
     }
@@ -82,7 +86,18 @@ class SqliteOrderRepository implements OrderRepository {
   Future<void> deleteOrdersByCustomerId(String customerId) async {
     try {
       final db = await _db;
-      await db.delete('orders', where: 'customer_id = ?', whereArgs: [customerId]);
+      // Enumerate ids before deleting so each removed order can be enqueued for
+      // the mirror; do it all in one transaction so the enqueues are atomic.
+      await db.transaction((txn) async {
+        final ids = await txn.query('orders',
+            columns: ['id'], where: 'customer_id = ?', whereArgs: [customerId]);
+        await txn.delete('orders',
+            where: 'customer_id = ?', whereArgs: [customerId]);
+        for (final row in ids) {
+          await SyncOutbox.enqueueOn(
+              txn, 'orders', row['id'] as String, SyncOutbox.opDelete);
+        }
+      });
     } catch (e) {
       throw Exception('Failed to delete orders for customer: $e');
     }
@@ -96,6 +111,35 @@ class SqliteOrderRepository implements OrderRepository {
     } catch (e) {
       throw Exception('Failed to clear orders: $e');
     }
+  }
+
+  @override
+  Future<void> upsertFromSync(Order order) async {
+    final db = await _db;
+    await db.insert('orders', toMap(order),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  Future<void> deleteFromSync(String id) async {
+    final db = await _db;
+    await db.delete('orders', where: 'id = ?', whereArgs: [id]);
+  }
+
+  @override
+  Future<int> deleteAllExcept(Iterable<String> keepIds) async {
+    final db = await _db;
+    final keep = keepIds.toSet();
+    final rows = await db.query('orders', columns: ['id']);
+    final stale = rows
+        .map((r) => r['id'] as String)
+        .where((id) => !keep.contains(id))
+        .toList();
+    var deleted = 0;
+    for (final id in stale) {
+      deleted += await db.delete('orders', where: 'id = ?', whereArgs: [id]);
+    }
+    return deleted;
   }
 
   static Map<String, dynamic> toMap(Order o) => {

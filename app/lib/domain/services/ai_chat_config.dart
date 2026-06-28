@@ -6,19 +6,35 @@ const String defaultAiChatModel = 'gemini-3.1-flash-lite';
 const String defaultAiFormattingModel = 'gemini-2.5-flash-lite';
 const String defaultSttModel = 'gemini:gemini-3.1-flash-lite';
 
-/// Tools exposed to the chat model: read tools (typed queries + run_sql) plus
-/// the write `propose_*` tools that stage changes for user confirmation.
+/// Full tool set (read + write propose_* actions). Used in writer mode.
 const aiTools = [...aiQueryToolSpecs, ...aiActionToolSpecs];
 
-String buildAiSystemPrompt() {
-  final now = DateTime.now();
-  final months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  final days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  final dateStr = '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
-  return _aiSystemPromptTemplate.replaceFirst('{{TODAY}}', dateStr);
+/// Read-only tool set (no propose_* actions). Used in reader mode.
+const aiReadOnlyTools = [...aiQueryToolSpecs];
+
+/// Builds the chat system prompt. Tool availability (writer vs reader) is the
+/// hard capability boundary — see [aiTools] / [aiReadOnlyTools]. This prompt
+/// only tells the model the *truth* about that boundary so it never claims to
+/// have made a change it couldn't: the shared [_promptBase] is filled with the
+/// writer "making changes" block or the read-only notice.
+String buildAiSystemPrompt({bool canWrite = true}) {
+  final modeBlock = canWrite ? _makingChangesBlock : _readOnlyBlock;
+  return _promptBase
+      .replaceFirst('{{TODAY}}', _todayLabel())
+      .replaceFirst('{{MODE}}', modeBlock);
 }
 
-const String _aiSystemPromptTemplate = '''
+String _todayLabel() {
+  final now = DateTime.now();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+}
+
+/// Shared prompt skeleton. `{{MODE}}` is swapped for the writer or reader block
+/// so the intro, KEY RULES, schema, and OUTPUT contract live in exactly one
+/// place and can't drift between the two modes.
+const String _promptBase = '''
 You are a tailoring business assistant for "Stitch Genie". Today: {{TODAY}}.
 Answer questions about customers, orders, payments, and measurements using the
 tools below. For greetings or general chat, reply directly without tools.
@@ -35,6 +51,20 @@ KEY RULES:
   done = collected/delivered.
 - Amounts are rupees (₹). For name lookups, partial spelling is fine.
 
+{{MODE}}
+
+For run_sql only, this is the schema and the exact business rules to follow:
+${AiQuerySchema.description}
+
+OUTPUT: JSON with "response_text" (markdown) and "ui_components" (array of
+{type:customer|order, id:UUID} for entities the user can tap — use the id
+columns returned by the tools; customer rows -> type customer, order rows ->
+type order; never measurement ids). Empty [] when not applicable.
+Style: concise, ₹ for currency, readable dates, never fabricate data.
+''';
+
+/// Writer-mode block: how to stage changes via the propose_* tools.
+const String _makingChangesBlock = '''
 MAKING CHANGES (status, payments, price, due date):
 A change happens only when you call a propose_* tool — describing it in text
 does nothing. To change an order: find it with a read tool to get its id, then
@@ -50,17 +80,15 @@ the card already shows the order's details, so don't look up its title.
 orderIds is the set of orders the change may apply to; the user ticks which to
 confirm. Pass one id for a single order; pass every relevant id when the request
 covers several ("mark all her orders done") or when you're unsure which is meant.
-Make ONE propose_* call per change — list all ids in it, don't repeat the call.
+Make ONE propose_* call per change — list all ids in it, don't repeat the call.''';
 
-For run_sql only, this is the schema and the exact business rules to follow:
-${AiQuerySchema.description}
-
-OUTPUT: JSON with "response_text" (markdown) and "ui_components" (array of
-{type:customer|order, id:UUID} for entities the user can tap — use the id
-columns returned by the tools; customer rows -> type customer, order rows ->
-type order; never measurement ids). Empty [] when not applicable.
-Style: concise, ₹ for currency, readable dates, never fabricate data.
-''';
+/// Reader-mode block: this device cannot write, so don't offer or claim changes.
+/// The propose_* tools are not even available in this mode.
+const String _readOnlyBlock = '''
+You are in read-only mode on this device. You can answer questions and look up
+data, but you have NO tools to change orders, payments, prices, or dates — never
+claim or imply you made a change. If the user asks for one, briefly say it must
+be done from the primary device, then offer to look up whatever helps.''';
 
 const aiResponseSchema = {
   'type': 'object',

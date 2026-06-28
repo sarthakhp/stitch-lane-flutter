@@ -5,9 +5,11 @@ import '../../../backend/models/customer.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
+import '../../../domain/state/sync_state.dart';
 import '../detail/delete_entity_button.dart';
 import '../markdown_description_text.dart';
 import '../measurement_card.dart';
+import '../sync/writer_only.dart';
 import 'customer_voice_notes_card.dart';
 
 /// Scrollable content of a customer's detail: name, latest measurement, unpaid
@@ -60,7 +62,9 @@ class CustomerDetailBody extends StatelessWidget {
           // customer has none; renders its own leading gap when visible.
           CustomerVoiceNotesCard(customer: customer),
           const SizedBox(height: AppConfig.spacing24),
-          DeleteEntityButton(label: 'Delete Customer', onPressed: onDelete),
+          WriterOnly(
+            child: DeleteEntityButton(label: 'Delete Customer', onPressed: onDelete),
+          ),
         ],
       ),
     );
@@ -103,13 +107,17 @@ class CustomerDetailBody extends StatelessWidget {
       builder: (context, measurementState, _) {
         final latest =
             measurementState.getLatestMeasurementForCustomer(customer.id);
+        final canWrite =
+            context.select<SyncState, bool>((s) => s.canWrite);
         return MeasurementCard(
           latestMeasurement: latest,
-          onCreateNew: () => Navigator.pushNamed(
-            context,
-            AppConstants.measurementFormRoute,
-            arguments: {'customer': customer},
-          ),
+          onCreateNew: canWrite
+              ? () => Navigator.pushNamed(
+                    context,
+                    AppConstants.measurementFormRoute,
+                    arguments: {'customer': customer},
+                  )
+              : null,
           onViewAll: () => Navigator.pushNamed(
             context,
             AppConstants.measurementsListRoute,

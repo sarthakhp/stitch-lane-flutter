@@ -8,6 +8,7 @@ import '../confirmation_dialog.dart';
 import '../detail/detail_header.dart';
 import 'customer_detail_action_bar.dart';
 import 'customer_detail_body.dart';
+import '../sync/writer_only.dart';
 
 /// Self-contained customer detail: header (edit/delete), scrollable body, and
 /// the bottom action bar. Live-resolves the customer from state. Used both
@@ -123,10 +124,12 @@ class _CustomerDetailViewState extends State<CustomerDetailView> {
               title: customer.name,
               leading: widget.leading,
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Edit',
-                  onPressed: () => _editCustomer(customer),
+                WriterOnly(
+                  child: IconButton(
+                    icon: const Icon(Icons.edit),
+                    tooltip: 'Edit',
+                    onPressed: () => _editCustomer(customer),
+                  ),
                 ),
               ],
             ),

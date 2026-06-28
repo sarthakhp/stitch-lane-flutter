@@ -4,6 +4,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:workmanager/workmanager.dart';
 import 'backend/backend.dart';
 import 'domain/domain.dart';
+import 'domain/services/sync/firebase_firestore_gateway.dart';
+import 'domain/services/sync/firestore_gateway.dart';
+import 'domain/services/sync/sync_config.dart';
+import 'domain/services/sync/sync_coordinator.dart';
+import 'domain/state/sync_state.dart';
 import 'domain/services/home_widget/home_widget_service.dart';
 import 'screens/app_root.dart';
 import 'utils/app_logger.dart';
@@ -54,6 +59,12 @@ void main() async {
   // Database must be ready before the first widget tree builds.
   await DatabaseService.initialize();
   StartupTracker.instance.mark('database_initialized');
+
+  // Load the persisted multi-device sync flag from sync_meta. Defaults to off,
+  // so a device that never enabled sync behaves exactly as before.
+  final syncMeta = RepositoryFactory.createSyncMetaRepository();
+  await SyncConfig.init(syncMeta.get);
+  StartupTracker.instance.mark('sync_config_initialized');
 
   // Wire the AI gateway's usage recorder to SQLite. Must happen after the DB
   // is up and before any service that emits LLM calls is constructed.
@@ -108,6 +119,38 @@ class StitchGenieApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MeasurementFieldsState()),
         Provider<MeasurementFieldRepository>(
           create: (_) => RepositoryFactory.createMeasurementFieldRepository(),
+        ),
+        // Single Firestore seam shared by SyncState and the coordinator.
+        Provider<FirestoreGateway>(create: (_) => FirebaseFirestoreGateway()),
+        // SyncState reacts to auth changes via ChangeNotifierProxyProvider.
+        // canWrite defaults to true (unconfigured), so flag-off is a no-op.
+        ChangeNotifierProxyProvider<AuthController, SyncState>(
+          create: (ctx) => SyncState(
+            gateway: ctx.read<FirestoreGateway>(),
+            metaRepo: RepositoryFactory.createSyncMetaRepository(),
+          ),
+          update: (_, authController, syncState) {
+            syncState!.updateAuth(authController);
+            return syncState;
+          },
+        ),
+        // Drives the push pump (writer) off the live role. Lazy: booted
+        // explicitly from AppRoot._boot() once Firebase is ready. All sync
+        // operations go through FirebaseFirestoreGateway, which defers
+        // Firestore.instance to first real use (post-sign-in).
+        Provider<SyncCoordinator>(
+          create: (ctx) => SyncCoordinator(
+            syncState: ctx.read<SyncState>(),
+            gateway: ctx.read<FirestoreGateway>(),
+            metaRepo: RepositoryFactory.createSyncMetaRepository(),
+            customerRepo: ctx.read<CustomerRepository>(),
+            orderRepo: ctx.read<OrderRepository>(),
+            measurementRepo: ctx.read<MeasurementRepository>(),
+            customerState: ctx.read<CustomerState>(),
+            orderState: ctx.read<OrderState>(),
+            measurementState: ctx.read<MeasurementState>(),
+          ),
+          dispose: (_, coordinator) => coordinator.dispose(),
         ),
         ChangeNotifierProvider(create: (_) => MainShellState()),
         // Permission state is read by the home banner and main-shell init.

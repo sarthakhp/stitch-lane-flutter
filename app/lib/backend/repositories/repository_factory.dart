@@ -8,6 +8,8 @@ import 'settings_repository.dart';
 import 'sqlite_settings_repository.dart';
 import 'measurement_field_repository.dart';
 import 'sqlite_measurement_field_repository.dart';
+import 'sync_meta_repository.dart';
+import 'sqlite_sync_meta_repository.dart';
 
 class RepositoryFactory {
   static CustomerRepository createCustomerRepository() {
@@ -28,5 +30,9 @@ class RepositoryFactory {
 
   static MeasurementFieldRepository createMeasurementFieldRepository() {
     return SqliteMeasurementFieldRepository();
+  }
+
+  static SyncMetaRepository createSyncMetaRepository() {
+    return SqliteSyncMetaRepository();
   }
 }

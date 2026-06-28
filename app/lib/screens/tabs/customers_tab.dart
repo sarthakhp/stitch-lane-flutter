@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../constants/app_constants.dart';
 import '../../domain/models/customer_filter_preset.dart';
+import '../../domain/state/sync_state.dart';
 import '../../presentation/presentation.dart';
 
 /// The main Customers tab. A thin wrapper over the shared [CustomersBrowser];
@@ -33,12 +35,14 @@ class CustomersTabState extends State<CustomersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
     return CustomersBrowser(
       key: _browserKey,
       title: 'Customers',
       initialPreset: _preset,
-      onCreate: () =>
-          Navigator.pushNamed(context, AppConstants.customerFormRoute),
+      onCreate: canWrite
+          ? () => Navigator.pushNamed(context, AppConstants.customerFormRoute)
+          : null,
     );
   }
 }

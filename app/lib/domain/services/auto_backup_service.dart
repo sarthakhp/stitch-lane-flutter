@@ -13,6 +13,7 @@ import 'image_sync_service.dart';
 import 'audio_sync_service.dart';
 import 'backup_time_service.dart';
 import 'notification_service.dart';
+import 'sync/sync_drive_authority.dart';
 
 const String autoBackupTaskName = 'com.stitchlane.autobackup';
 const String autoBackupTaskTag = 'auto_backup';
@@ -70,6 +71,19 @@ class AutoBackupService {
       if (!settings.autoBackupEnabled) {
         AppLogger.info('Auto-backup aborted: backup is disabled in settings');
         await cancelAutoBackup();
+        return;
+      }
+
+      // Only the writer (or a sole-owner with sync off) owns the cloud backup.
+      // A reader is a derived replica — backing it up would clobber the
+      // writer's authoritative copy. Re-checked here per run (not cancelled) so
+      // a device that later takes over as writer resumes backups automatically.
+      if (!await SyncDriveAuthority.canWriteDrive()) {
+        AppLogger.info(
+          'Auto-backup skipped: this device is a sync reader — the primary '
+          'device owns the cloud backup.',
+        );
+        await _scheduleNextIfEnabled(settingsRepository);
         return;
       }
 

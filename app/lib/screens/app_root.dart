@@ -7,11 +7,15 @@ import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 import '../config/routes.dart';
 import '../domain/domain.dart';
+import '../domain/services/sync/sync_coordinator.dart';
+import '../domain/services/sync/media_hydration_service.dart';
+import '../domain/services/sync/restore_media_state.dart';
 import '../domain/services/home_widget/home_widget_service.dart';
 import '../main.dart' show navigatorKey, routeObserver;
 import '../utils/app_logger.dart';
 import '../utils/startup_tracker.dart';
 import '../utils/startup_orchestrator.dart';
+import '../presentation/widgets/sync/reader_mode_overlay.dart';
 import 'home_shell_host.dart';
 import 'login_screen.dart';
 import 'backup_restore_check_screen.dart';
@@ -31,6 +35,10 @@ class AppRoot extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       navigatorObservers: [routeObserver],
+      // Wrap every route so the read-only strip shows app-wide (shell + pushed
+      // detail screens), not just inside the home shell.
+      builder: (context, child) =>
+          ReaderModeOverlay(child: child ?? const SizedBox.shrink()),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -125,6 +133,10 @@ class _AppRootHomeState extends State<_AppRootHome> {
       if (!mounted) return;
       // Firebase is up — start the single auth source of truth listening.
       context.read<AuthController>().init();
+      // Boot the sync coordinator now (lazy in main.dart). Constructing it
+      // reads SyncState → AuthController, which touch Firebase, so it must run
+      // after firebaseReady. Flag-off keeps it idle until sync is enabled.
+      context.read<SyncCoordinator>();
       setState(() => _firebaseReady = true);
       StartupTracker.instance.markOnce('firebase_ready_in_ui');
     } catch (e) {
@@ -159,6 +171,7 @@ class _AppRootHomeState extends State<_AppRootHome> {
     // Fire-and-forget: non-blocking tasks.
     _initDebugLogsAsync(settingsState);
     _runImageCompressionMigrationAsync();
+    _resumeMediaHydrationIfPending();
 
     await _initAutoBackup(settingsState, settingsRepository);
     StartupTracker.instance.mark('auto_backup_scheduled');
@@ -190,6 +203,18 @@ class _AppRootHomeState extends State<_AppRootHome> {
   void _runImageCompressionMigrationAsync() {
     ImageCompressionMigration.run().then((_) {}, onError: (Object e) {
       AppLogger.warning('Image compression migration failed: $e');
+    });
+  }
+
+  /// Resume a media download left unfinished by an earlier restore (app killed
+  /// mid-sweep, offline, etc.). The sweep is idempotent and download-only, so
+  /// re-running it just fills whatever is still missing. Gated on the durable
+  /// flag so a device with no pending restore never touches Drive on launch.
+  void _resumeMediaHydrationIfPending() {
+    RestoreMediaState.isPending().then((pending) {
+      if (pending) MediaHydrationService.hydrate();
+    }, onError: (Object e) {
+      AppLogger.warning('Media hydration resume check failed: $e');
     });
   }
 

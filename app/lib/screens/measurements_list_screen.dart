@@ -6,6 +6,7 @@ import '../presentation/presentation.dart';
 import '../presentation/widgets/measurement_list_item.dart';
 import '../presentation/widgets/empty_measurements_state.dart';
 import '../constants/app_constants.dart';
+import '../presentation/widgets/sync/writer_only.dart';
 
 class MeasurementsListScreen extends StatefulWidget {
   final Customer customer;
@@ -94,17 +95,19 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'measurementsFab',
-        onPressed: () {
-          Navigator.pushNamed(
-            context,
-            AppConstants.measurementFormRoute,
-            arguments: {'customer': widget.customer},
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Create'),
+      floatingActionButton: WriterOnly(
+        child: FloatingActionButton.extended(
+          heroTag: 'measurementsFab',
+          onPressed: () {
+            Navigator.pushNamed(
+              context,
+              AppConstants.measurementFormRoute,
+              arguments: {'customer': widget.customer},
+            );
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Create'),
+        ),
       ),
     );
   }

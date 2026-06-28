@@ -5,6 +5,7 @@ import '../models/measurement.dart';
 import '../util/audio_path_list.dart';
 import '../database/sqlite_database.dart';
 import 'measurement_repository.dart';
+import 'sync_outbox.dart';
 
 class SqliteMeasurementRepository implements MeasurementRepository {
   Future<Database> get _db => SqliteDatabase.database;
@@ -50,6 +51,8 @@ class SqliteMeasurementRepository implements MeasurementRepository {
       final db = await _db;
       await db.insert('measurements', toMap(measurement),
           conflictAlgorithm: ConflictAlgorithm.replace);
+      await SyncOutbox.enqueue(
+          'measurements', measurement.id, SyncOutbox.opUpsert);
     } catch (e) {
       throw Exception('Failed to add measurement: $e');
     }
@@ -62,6 +65,8 @@ class SqliteMeasurementRepository implements MeasurementRepository {
       final count = await db.update('measurements', toMap(measurement),
           where: 'id = ?', whereArgs: [measurement.id]);
       if (count == 0) throw Exception('Measurement not found');
+      await SyncOutbox.enqueue(
+          'measurements', measurement.id, SyncOutbox.opUpsert);
     } catch (e) {
       throw Exception('Failed to update measurement: $e');
     }
@@ -72,6 +77,7 @@ class SqliteMeasurementRepository implements MeasurementRepository {
     try {
       final db = await _db;
       await db.delete('measurements', where: 'id = ?', whereArgs: [id]);
+      await SyncOutbox.enqueue('measurements', id, SyncOutbox.opDelete);
     } catch (e) {
       throw Exception('Failed to delete measurement: $e');
     }
@@ -81,7 +87,18 @@ class SqliteMeasurementRepository implements MeasurementRepository {
   Future<void> deleteMeasurementsByCustomerId(String customerId) async {
     try {
       final db = await _db;
-      await db.delete('measurements', where: 'customer_id = ?', whereArgs: [customerId]);
+      // Enumerate ids before deleting so each removed measurement can be
+      // enqueued for the mirror; one transaction keeps the enqueues atomic.
+      await db.transaction((txn) async {
+        final ids = await txn.query('measurements',
+            columns: ['id'], where: 'customer_id = ?', whereArgs: [customerId]);
+        await txn.delete('measurements',
+            where: 'customer_id = ?', whereArgs: [customerId]);
+        for (final row in ids) {
+          await SyncOutbox.enqueueOn(
+              txn, 'measurements', row['id'] as String, SyncOutbox.opDelete);
+        }
+      });
     } catch (e) {
       throw Exception('Failed to delete measurements for customer: $e');
     }
@@ -95,6 +112,36 @@ class SqliteMeasurementRepository implements MeasurementRepository {
     } catch (e) {
       throw Exception('Failed to clear measurements: $e');
     }
+  }
+
+  @override
+  Future<void> upsertFromSync(Measurement measurement) async {
+    final db = await _db;
+    await db.insert('measurements', toMap(measurement),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  Future<void> deleteFromSync(String id) async {
+    final db = await _db;
+    await db.delete('measurements', where: 'id = ?', whereArgs: [id]);
+  }
+
+  @override
+  Future<int> deleteAllExcept(Iterable<String> keepIds) async {
+    final db = await _db;
+    final keep = keepIds.toSet();
+    final rows = await db.query('measurements', columns: ['id']);
+    final stale = rows
+        .map((r) => r['id'] as String)
+        .where((id) => !keep.contains(id))
+        .toList();
+    var deleted = 0;
+    for (final id in stale) {
+      deleted +=
+          await db.delete('measurements', where: 'id = ?', whereArgs: [id]);
+    }
+    return deleted;
   }
 
   static Map<String, dynamic> toMap(Measurement m) => {

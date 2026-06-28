@@ -4,6 +4,7 @@ import '../../backend/backend.dart';
 import '../../utils/app_logger.dart';
 import 'image_storage_service.dart';
 import 'drive_service.dart';
+import 'sync/sync_media_policy.dart';
 
 class ImageSyncService {
   static Future<void> syncImagesToDrive({
@@ -11,6 +12,14 @@ class ImageSyncService {
     required OrderRepository orderRepository,
   }) async {
     try {
+      // Drive media is owned by the writer. A reader must never upload or
+      // (critically) prune Drive images — that path deletes files not present
+      // locally, which on a reader is most of them.
+      if (!await SyncMediaPolicy.canManageDriveMedia()) {
+        AppLogger.info('Skipping image sync to Drive — device is not the writer.');
+        return;
+      }
+
       AppLogger.info('Starting image sync to Drive');
 
       final driveApi = await DriveService.getDriveApi();

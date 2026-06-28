@@ -67,27 +67,59 @@ class StructuredMeasurementView extends StatelessWidget {
       blocks.add(_GarmentBlock(compact: compact, children: inner));
     }
 
-    final children = <Widget>[];
+    final body = <Widget>[];
     for (var i = 0; i < blocks.length; i++) {
       if (i > 0) {
-        children.add(SizedBox(
+        body.add(SizedBox(
             height: compact ? AppConfig.spacing8 : AppConfig.spacing12));
       }
-      children.add(blocks[i]);
+      body.add(blocks[i]);
     }
+    final content =
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: body);
 
-    if (hidden > 0) {
-      children.add(SizedBox(height: compact ? AppConfig.spacing8 : AppConfig.spacing12));
-      children.add(Text(
-        '+$hidden more',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-      ));
-    }
+    // Nothing truncated → show the content as-is (e.g. the full detail view).
+    if (hidden <= 0) return content;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+    // Truncated preview: fade the bottom edge so it reads at a glance as "there
+    // is more below", and still label exactly how many rows are hidden.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _BottomFade(child: content),
+        SizedBox(height: compact ? AppConfig.spacing8 : AppConfig.spacing12),
+        Text(
+          '+$hidden more',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Fades [child] toward transparent along its bottom edge, so a truncated
+/// preview visually signals that the list continues. The top ~70% stays fully
+/// opaque; only the last rows dissolve.
+class _BottomFade extends StatelessWidget {
+  final Widget child;
+
+  const _BottomFade({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Colors.white, Colors.white, Colors.transparent],
+        stops: [0.0, 0.6, 1.0],
+      ).createShader(rect),
+      child: child,
+    );
   }
 }
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from adbw.adb import (
     best_device_ip,
     device_models,
+    friendly_name,
     get_device_ips,
     get_mac_gateway,
     is_responsive,
@@ -57,16 +58,17 @@ def cmd_status() -> int:
     step("ADB device status")
     usb = usb_devices()
     wifi = wireless_devices()
+    models = device_models()
     if not usb and not wifi:
         warn("No devices connected at all.")
     if usb:
         ok("USB devices:")
         for s in usb:
-            print(f"       {s}")
+            print(f"       {friendly_name(s, models)}  [{s}]")
     if wifi:
         ok("Wireless devices:")
         for s in wifi:
-            print(f"       {s}")
+            print(f"       {friendly_name(s, models)}  [{s}]")
     return 0
 
 
@@ -87,7 +89,7 @@ def cmd_mirror() -> int:
     target = wifi[0] if len(wifi) == 1 else pick_from_list(wifi, "Pick a device")
     if target is None:
         return 1
-    ok(f"Starting scrcpy for {target}")
+    ok(f"Starting scrcpy for {friendly_name(target)}")
     return _start_mirror(target, mirror=True)
 
 
@@ -125,7 +127,7 @@ def _connect_if_already_paired(mirror: bool) -> int:
         target = live[0] if len(live) == 1 else pick_from_list(live, "Pick a device")
         if target is None:
             return 1
-        ok(f"Already paired and connected: {target}")
+        ok(f"Already paired and connected: {friendly_name(target)}")
         print(f"   Next time just run:  {sys.argv[0]}   (no 'pair' needed)")
         return _start_mirror(target, mirror)
 
@@ -138,7 +140,7 @@ def _connect_if_already_paired(mirror: bool) -> int:
             candidates.append(cached)
 
     for cand in candidates:
-        info(f"Trying paired device {cand}…")
+        info(f"Trying {friendly_name(cand)}…")
         if _wireless_connect(cand, attempts=2):
             print()
             print(f"{GREEN}{BOLD}Done!{NC} No pairing needed — you were already paired.")
@@ -332,8 +334,8 @@ def _pair_via_code(mirror: bool = True) -> int:
 
 def _device_label(kind: str, serial: str, models: dict[str, str]) -> str:
     tag = "USB" if kind == "usb" else "Wireless"
-    model = models.get(serial, "")
-    return f"{tag}: {model or serial}  [{serial}]"
+    name = friendly_name(serial, models)
+    return f"{tag}: {name}  [{serial}]"
 
 
 def cmd_connect(mirror: bool = True) -> int:
@@ -363,7 +365,7 @@ def cmd_connect(mirror: bool = True) -> int:
             kind, serial = candidates[labels.index(chosen)]
 
         if kind == "wifi":
-            ok(f"Mirroring wireless device: {serial}")
+            ok(f"Device: {friendly_name(serial, models)}  (wireless)")
             return _start_mirror(serial, mirror)
         return _connect_usb_device(serial, mirror)
 
@@ -423,7 +425,7 @@ def _wireless_connect(target: str, attempts: int = 5, delay: float = 1.5) -> boo
 
 def _connect_usb_device(serial: str, mirror: bool) -> int:
     """Switch a USB-connected device to wireless ADB (tcpip), then mirror it."""
-    ok(f"Setting up wireless for USB device: {serial}")
+    ok(f"Setting up wireless for: {friendly_name(serial)}")
 
     step("Getting device IP")
     all_ips = get_device_ips(serial)
@@ -552,10 +554,10 @@ def cmd_run(flutter_args: list[str]) -> int:
         step("1. Looking for a USB device (fast path)")
         usb_serial = next((s for s in usb_devices() if is_responsive(s)), None)
         if usb_serial and _usb_install_blocked(usb_serial, device_models()):
-            info(f"USB device {usb_serial} is in .usb-skip (USB install hangs "
+            info(f"{friendly_name(usb_serial)} is in .usb-skip (USB install hangs "
                  f"here) — using wireless.")
         elif usb_serial:
-            ok(f"Using USB device: {usb_serial}")
+            ok(f"Using USB: {friendly_name(usb_serial)}")
             # Drop any wireless transport to the same device — both bound at
             # once is what makes adb installs hang mid-transfer.
             dupes = wireless_devices()
@@ -573,10 +575,14 @@ def cmd_run(flutter_args: list[str]) -> int:
     # 2. An already-connected wireless device.
     if not serial:
         step("2. Looking for an existing wireless device")
-        w = next((s for s in wireless_devices() if is_responsive(s)), None)
-        if w:
-            ok(f"Using wireless device: {w}")
-            serial = w
+        live = [s for s in wireless_devices() if is_responsive(s)]
+        if len(live) == 1:
+            ok(f"Using wireless: {friendly_name(live[0])}")
+            serial = live[0]
+        elif len(live) > 1:
+            labels = [friendly_name(s) for s in live]
+            chosen_label = pick_from_list(labels, "Multiple wireless devices — pick one")
+            serial = live[labels.index(chosen_label)] if chosen_label else None
 
     # 3. The IP cached from a previous run.
     if not serial and _CACHE_FILE.exists():
@@ -587,7 +593,7 @@ def cmd_run(flutter_args: list[str]) -> int:
             time.sleep(1)
             if is_responsive(cached):
                 serial = cached
-                ok(f"Reconnected: {serial}")
+                ok(f"Reconnected: {friendly_name(serial)}")
             else:
                 warn("Cached device didn't answer — will try USB bootstrap.")
 
@@ -604,7 +610,7 @@ def cmd_run(flutter_args: list[str]) -> int:
             print("   Then re-run. After that, future runs reconnect over WiFi with no cable.")
             return 1
         usb_serial = usb[0]
-        ok(f"USB device: {usb_serial}")
+        ok(f"USB device: {friendly_name(usb_serial)}")
 
         ip = best_device_ip(usb_serial)
         if not ip:

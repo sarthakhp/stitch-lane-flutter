@@ -4,12 +4,20 @@ import '../../backend/repositories/repository_factory.dart';
 import '../../utils/app_logger.dart';
 import 'audio_backup_recorder.dart';
 import 'drive_service.dart';
+import 'sync/sync_media_policy.dart';
 
 class AudioSyncService {
   static Future<void> syncAudiosToDrive({
     void Function(int current, int total, String message)? onProgress,
   }) async {
     try {
+      // Drive media is owned by the writer. A reader must never upload or
+      // prune Drive audio (the prune deletes files not present locally).
+      if (!await SyncMediaPolicy.canManageDriveMedia()) {
+        AppLogger.info('Skipping audio sync to Drive — device is not the writer.');
+        return;
+      }
+
       AppLogger.info('Starting audio sync to Drive');
 
       final driveApi = await DriveService.getDriveApi();

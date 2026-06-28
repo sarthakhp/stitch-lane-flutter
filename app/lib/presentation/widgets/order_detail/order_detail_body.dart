@@ -7,10 +7,12 @@ import '../../../backend/models/order.dart';
 import '../../../config/app_config.dart';
 import '../../../constants/app_constants.dart';
 import '../../../domain/domain.dart';
+import '../../../domain/state/sync_state.dart';
 import '../audio/recordings_card.dart';
 import '../detail/delete_entity_button.dart';
 import '../markdown_description_text.dart';
 import '../measurement_card.dart';
+import '../sync/writer_only.dart';
 import '../order_detail_card.dart';
 import '../order_images_section.dart';
 import '../payments_section.dart';
@@ -90,7 +92,9 @@ class OrderDetailBody extends StatelessWidget {
                 onOrderUpdated(order.copyWith(imagePaths: paths)),
           ),
           const SizedBox(height: AppConfig.spacing24),
-          DeleteEntityButton(label: 'Delete Order', onPressed: onDelete),
+          WriterOnly(
+            child: DeleteEntityButton(label: 'Delete Order', onPressed: onDelete),
+          ),
         ],
       ),
     );
@@ -101,13 +105,17 @@ class OrderDetailBody extends StatelessWidget {
       builder: (context, measurementState, _) {
         final latest =
             measurementState.getLatestMeasurementForCustomer(customer.id);
+        final canWrite =
+            context.select<SyncState, bool>((s) => s.canWrite);
         return MeasurementCard(
           latestMeasurement: latest,
-          onCreateNew: () => Navigator.pushNamed(
-            context,
-            AppConstants.measurementFormRoute,
-            arguments: {'customer': customer},
-          ),
+          onCreateNew: canWrite
+              ? () => Navigator.pushNamed(
+                    context,
+                    AppConstants.measurementFormRoute,
+                    arguments: {'customer': customer},
+                  )
+              : null,
           onViewAll: () => Navigator.pushNamed(
             context,
             AppConstants.measurementsListRoute,

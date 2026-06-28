@@ -51,10 +51,12 @@ class AuthController extends ChangeNotifier {
     Stream<User?>? authStream,
     AuthSessionHint? sessionHint,
     this.restoreGrace = const Duration(seconds: 8),
-  })  : _authStream = authStream ?? AuthService.authStateChanges(),
+  })  : _injectedStream = authStream,
         _hint = sessionHint ?? _PrefsAuthSessionHint();
 
-  final Stream<User?> _authStream;
+  // Null means "call AuthService.authStateChanges() in init(), after Firebase
+  // is initialized". Tests inject a stream directly so they never touch Firebase.
+  final Stream<User?>? _injectedStream;
   final AuthSessionHint _hint;
 
   /// Safety net: if a prior session is expected but no user is restored within
@@ -98,14 +100,17 @@ class AuthController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isDevBypass => _devBypass;
 
-  /// Subscribes to auth changes. Idempotent — call once, after Firebase is
-  /// initialized (the stream can't be read before that).
+  /// Subscribes to auth changes. Call once, after Firebase is initialized.
+  /// Idempotent — safe to call multiple times.
   Future<void> init() async {
     if (_sub != null) return;
     _hadSession = await _hint.read();
     // authStateChanges re-emits the current state to new listeners, so a late
     // subscription (after the hint read) still receives the initial value.
-    _sub = _authStream.listen(_onAuthEvent);
+    // AuthService.authStateChanges() is called here — not in the constructor —
+    // so FirebaseAuth.instance is only accessed after Firebase.initializeApp().
+    final stream = _injectedStream ?? AuthService.authStateChanges();
+    _sub = stream.listen(_onAuthEvent);
   }
 
   void _onAuthEvent(User? user) {

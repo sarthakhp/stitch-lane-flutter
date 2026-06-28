@@ -11,6 +11,7 @@ import '../presentation/widgets/audio/recordings_card.dart';
 import '../presentation/widgets/markdown_description_text.dart';
 import '../presentation/widgets/measurement/structured_measurement_view.dart';
 import '../domain/services/measurement_structurer.dart';
+import '../presentation/widgets/sync/writer_only.dart';
 
 class MeasurementDetailScreen extends StatefulWidget {
   final Measurement measurement;
@@ -78,24 +79,28 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
           appBar: CustomAppBar(
             title: const Text('Measurement Details'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppConstants.measurementFormRoute,
-                    arguments: {
-                      'measurement': measurement,
-                      'customer': widget.customer,
-                    },
-                  );
-                },
-                tooltip: 'Edit',
+              WriterOnly(
+                child: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppConstants.measurementFormRoute,
+                      arguments: {
+                        'measurement': measurement,
+                        'customer': widget.customer,
+                      },
+                    );
+                  },
+                  tooltip: 'Edit',
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () => _deleteMeasurement(context, _measurementId),
-                tooltip: 'Delete',
+              WriterOnly(
+                child: IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => _deleteMeasurement(context, _measurementId),
+                  tooltip: 'Delete',
+                ),
               ),
             ],
           ),

@@ -11,6 +11,7 @@ import '../../domain/models/filter_preset.dart';
 import '../../domain/models/customer_filter_preset.dart';
 import '../../presentation/presentation.dart';
 import '../../presentation/widgets/home_action_tile.dart';
+import '../../domain/state/sync_state.dart';
 
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key});
@@ -116,7 +117,7 @@ class HomeTab extends StatelessWidget {
           return Column(
             children: [
               for (int i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppConfig.spacing12),
+                if (i > 0) const SizedBox(height: AppConfig.spacing8),
                 cards[i],
               ],
             ],
@@ -178,9 +179,11 @@ class HomeTab extends StatelessWidget {
   }
 
   Widget _buildActionSection(BuildContext context) {
-    final tiles = _actionTiles(context);
+    // Read canWrite once so grid sizing and tile list stay in sync.
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
+    final tiles = _actionTiles(context, canWrite: canWrite);
 
-    // Portrait tablet has the full width — lay the four actions in one row.
+    // Portrait tablet has the full width — lay the actions in one row.
     if (context.isMedium) {
       return SizedBox(
         height: 140,
@@ -209,25 +212,27 @@ class HomeTab extends StatelessWidget {
     );
   }
 
-  List<Widget> _actionTiles(BuildContext context) {
+  List<Widget> _actionTiles(BuildContext context, {required bool canWrite}) {
     final colorScheme = Theme.of(context).colorScheme;
     return [
-      HomeActionTile(
-        icon: Icons.note_add,
-        title: 'Create Order',
-        containerColor: colorScheme.primaryContainer,
-        contentColor: colorScheme.onPrimaryContainer,
-        onTap: () =>
-            Navigator.pushNamed(context, AppConstants.orderCreatorRoute),
-      ),
-      HomeActionTile(
-        icon: Icons.person_add,
-        title: 'Create Customer',
-        containerColor: colorScheme.secondaryContainer,
-        contentColor: colorScheme.onSecondaryContainer,
-        onTap: () =>
-            Navigator.pushNamed(context, AppConstants.customerFormRoute),
-      ),
+      if (canWrite)
+        HomeActionTile(
+          icon: Icons.note_add,
+          title: 'Create Order',
+          containerColor: colorScheme.primaryContainer,
+          contentColor: colorScheme.onPrimaryContainer,
+          onTap: () =>
+              Navigator.pushNamed(context, AppConstants.orderCreatorRoute),
+        ),
+      if (canWrite)
+        HomeActionTile(
+          icon: Icons.person_add,
+          title: 'Create Customer',
+          containerColor: colorScheme.secondaryContainer,
+          contentColor: colorScheme.onSecondaryContainer,
+          onTap: () =>
+              Navigator.pushNamed(context, AppConstants.customerFormRoute),
+        ),
       HomeActionTile(
         icon: Icons.analytics_outlined,
         title: 'Business Analysis',
@@ -268,6 +273,8 @@ class HomeTab extends StatelessWidget {
           Navigator.pushNamed(context, AppConstants.settingsRoute);
         } else if (value == 'backup') {
           Navigator.pushNamed(context, AppConstants.backupSettingsRoute);
+        } else if (value == 'sync') {
+          Navigator.pushNamed(context, AppConstants.syncSettingsRoute);
         } else if (value == 'developer') {
           Navigator.pushNamed(context, AppConstants.developerRoute);
         }
@@ -296,6 +303,15 @@ class HomeTab extends StatelessWidget {
           child: ListTile(
             leading: Icon(Icons.cloud_sync),
             title: Text('Backup & Restore'),
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'sync',
+          child: ListTile(
+            leading: Icon(Icons.devices),
+            title: Text('Multi-device Sync'),
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),

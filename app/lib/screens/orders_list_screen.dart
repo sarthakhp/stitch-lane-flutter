@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../backend/backend.dart';
 import '../constants/app_constants.dart';
 import '../domain/models/filter_preset.dart';
+import '../domain/state/sync_state.dart';
 import '../presentation/presentation.dart';
 
 /// Route target for a customer's orders and the all-orders list. A thin wrapper
@@ -20,17 +22,20 @@ class OrdersListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
     return OrdersBrowser(
       customer: customer,
       title: customer != null ? "${customer!.name}'s Orders" : 'All Orders',
       initialPreset: initialFilterPreset,
-      onCreate: () => Navigator.pushNamed(
-        context,
-        AppConstants.orderCreatorRoute,
-        arguments: customer != null
-            ? <String, dynamic>{'customer': customer}
-            : <String, dynamic>{},
-      ),
+      onCreate: canWrite
+          ? () => Navigator.pushNamed(
+                context,
+                AppConstants.orderCreatorRoute,
+                arguments: customer != null
+                    ? <String, dynamic>{'customer': customer}
+                    : <String, dynamic>{},
+              )
+          : null,
     );
   }
 }

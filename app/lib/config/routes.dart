@@ -17,6 +17,8 @@ import '../screens/notification_settings_screen.dart';
 import '../screens/measurement_fields_screen.dart';
 import '../screens/customer_recordings_screen.dart';
 import '../screens/backup_settings_screen.dart';
+import '../screens/sync_settings_screen.dart';
+import '../screens/sync_quarantine_screen.dart';
 import '../screens/ai_usage_screen.dart';
 import '../screens/developer_screen.dart';
 	import '../screens/business_analysis_screen.dart';
@@ -188,6 +190,16 @@ class AppRoutes {
       case AppConstants.backupSettingsRoute:
         return MaterialPageRoute(
           builder: (_) => const BackupSettingsScreen(),
+        );
+
+      case AppConstants.syncSettingsRoute:
+        return MaterialPageRoute(
+          builder: (_) => const SyncSettingsScreen(),
+        );
+
+      case AppConstants.syncQuarantineRoute:
+        return MaterialPageRoute(
+          builder: (_) => const SyncQuarantineScreen(),
         );
 
       case AppConstants.developerRoute:

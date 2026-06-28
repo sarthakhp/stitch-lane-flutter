@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../constants/app_constants.dart';
 import '../../domain/models/filter_preset.dart';
+import '../../domain/state/sync_state.dart';
 import '../../presentation/presentation.dart';
 
 /// The main Orders tab. A thin wrapper over the shared [OrdersBrowser]; the
@@ -32,12 +34,14 @@ class OrdersTabState extends State<OrdersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final canWrite = context.select<SyncState, bool>((s) => s.canWrite);
     return OrdersBrowser(
       key: _browserKey,
       title: 'Orders',
       initialPreset: _preset,
-      onCreate: () =>
-          Navigator.pushNamed(context, AppConstants.orderCreatorRoute),
+      onCreate: canWrite
+          ? () => Navigator.pushNamed(context, AppConstants.orderCreatorRoute)
+          : null,
     );
   }
 }

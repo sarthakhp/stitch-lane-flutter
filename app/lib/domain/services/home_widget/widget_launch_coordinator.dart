@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
 import '../../../main.dart' show navigatorKey;
+import '../../../screens/shell/shell_tab_navigator_access.dart';
 import '../../state/main_shell_state.dart';
 import 'widget_action.dart';
 
@@ -26,6 +27,10 @@ class WidgetLaunchCoordinator {
   void submit(WidgetAction? action) {
     if (action == null) return;
     _pending = action;
+    // Mark the shell covered up-front so a cold launch into the creator defers
+    // the dashboard's data load (set before the shell first builds). Cleared
+    // when the creator is dismissed.
+    if (action == WidgetAction.createOrder) shellCovered.value = true;
     _tryDispatch();
   }
 
@@ -57,12 +62,23 @@ class WidgetLaunchCoordinator {
             .switchToAiTab(startVoice: true);
         break;
       case WidgetAction.createOrder:
-        // Return to the root shell first (same as the chat path) so the creator
-        // is pushed onto the shell, never stacked on top of some other screen
-        // the user had left open. Then cover the dashboard while it's open.
+        // Push the creator INSIDE the active tab so the bottom bar stays
+        // visible (consistent with in-app navigation). Reset the tab to its
+        // root first so it's never stacked on a screen the user had left open.
+        // The dashboard load stays deferred (shellCovered) until it's dismissed.
+        final tabNav = ShellTabNavigatorAccess.activeNavigator;
+        if (tabNav == null) {
+          // Shell not mounted yet — fall back to a root push so the action is
+          // never dropped.
+          navigator.popUntil((route) => route.isFirst);
+          navigator
+              .pushNamed(action.route, arguments: action.arguments)
+              .whenComplete(() => shellCovered.value = false);
+          break;
+        }
         navigator.popUntil((route) => route.isFirst);
-        shellCovered.value = true;
-        navigator
+        tabNav.popUntil((route) => route.isFirst);
+        tabNav
             .pushNamed(action.route, arguments: action.arguments)
             .whenComplete(() => shellCovered.value = false);
         break;

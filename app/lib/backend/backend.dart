@@ -16,5 +16,7 @@ export 'repositories/sqlite_measurement_field_repository.dart';
 export 'repositories/repository_factory.dart';
 export 'repositories/ai_usage_repository.dart';
 export 'seed/default_measurement_fields.dart';
+export 'repositories/sync_meta_repository.dart';
+export 'repositories/sqlite_sync_meta_repository.dart';
 export 'database/database_service.dart';
 export 'database/sqlite_database.dart';

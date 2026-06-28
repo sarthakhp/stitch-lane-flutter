@@ -8,14 +8,14 @@ import 'measurement/structured_measurement_view.dart';
 
 class MeasurementCard extends StatelessWidget {
   final Measurement? latestMeasurement;
-  final VoidCallback onCreateNew;
+  final VoidCallback? onCreateNew;
   final VoidCallback onViewAll;
   final VoidCallback? onTapLatest;
 
   const MeasurementCard({
     super.key,
     this.latestMeasurement,
-    required this.onCreateNew,
+    this.onCreateNew,
     required this.onViewAll,
     this.onTapLatest,
   });
@@ -150,16 +150,20 @@ class MeasurementCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: AppConfig.spacing16),
+            // In read-only mode (no create callback) the "New" button is hidden
+            // entirely rather than shown disabled — "View All" takes the width.
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onCreateNew,
-                    icon: const Icon(Icons.add),
-                    label: const Text('New'),
+                if (onCreateNew != null) ...[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onCreateNew,
+                      icon: const Icon(Icons.add),
+                      label: const Text('New'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppConfig.spacing12),
+                  const SizedBox(width: AppConfig.spacing12),
+                ],
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: onViewAll,

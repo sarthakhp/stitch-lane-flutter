@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../backend/backend.dart';
 import '../domain/domain.dart';
+import '../domain/services/sync/sync_drive_authority.dart';
 import 'widgets/confirmation_dialog.dart';
 
 /// The user-facing "Back up now" flow, shared by the Settings backup button
@@ -21,6 +22,26 @@ import 'widgets/confirmation_dialog.dart';
 /// [SettingsState] is reloaded at the end so the freshness indicator on the
 /// home card updates immediately.
 Future<bool> runManualBackup(BuildContext context) async {
+  // Only the writer (or a sole-owner with sync off) owns the cloud backup. A
+  // reader is a derived replica — let it back up and it would clobber the
+  // writer's authoritative copy. UI hides the entry points for readers; this is
+  // the shared last-line guard so neither the home card nor Settings can slip
+  // through. Checked first so a reader never even sees the confirm dialog.
+  if (!await SyncDriveAuthority.canWriteDrive()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This device syncs from the primary device, which manages backups. '
+            'Back up from there instead.',
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+  if (!context.mounted) return false;
+
   final confirmed = await ConfirmationDialog.show(
     context: context,
     title: 'Backup to Google Drive',
