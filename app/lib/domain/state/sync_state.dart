@@ -73,6 +73,16 @@ class SyncState extends ChangeNotifier {
   /// control subscription starts or stops and the role recomputes immediately.
   Future<void> refresh() => _startSubscription(_currentUid);
 
+  /// Tear down the live Firestore control listener and drop to `unconfigured`.
+  /// Called at the very start of sign-out so the listener can't fire
+  /// permission-denied while Firebase auth is being cleared. The role recomputes
+  /// on the next [updateAuth] / [refresh] after a fresh sign-in.
+  Future<void> stop() async {
+    await _controlSub?.cancel();
+    _controlSub = null;
+    _setRole(SyncRole.unconfigured, null);
+  }
+
   // ── subscription lifecycle ────────────────────────────────────────────────
 
   Future<void> _startSubscription(String? uid) async {

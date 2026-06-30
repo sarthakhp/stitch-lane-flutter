@@ -109,6 +109,78 @@ class SyncEnableService {
     return EnableOutcome.success;
   }
 
+  /// Break-glass "make this the primary" for when the cloud control doc still
+  /// names a device that is gone (lost / sold / reset / **reinstalled** — a
+  /// fresh install mints a new device id, so the same physical device no longer
+  /// matches its old claim). [enableAsPrimary] correctly refuses in that case;
+  /// this is the explicit, user-confirmed override.
+  ///
+  /// Order is deliberate: rollback snapshot FIRST, then force-claim the writer
+  /// role (no epoch guard — the named primary won't contest it), commit local
+  /// state, then republish every local row so the cloud reflects this device's
+  /// data. We reset `backfill_done` so the publish always runs, even on a device
+  /// that had published before.
+  static Future<EnableOutcome> forceEnableAsPrimary({
+    required FirestoreGateway gateway,
+    required SyncMetaRepository meta,
+    required SyncState syncState,
+    required CustomerRepository customerRepo,
+    required OrderRepository orderRepo,
+    required MeasurementRepository measurementRepo,
+    required Future<void> Function() drain,
+    required Future<bool> Function() ensureRollbackSnapshot,
+    required String deviceName,
+    void Function(int done, int total)? onBackfillProgress,
+  }) async {
+    final uid = syncState.currentUid;
+    if (uid == null) return EnableOutcome.notSignedIn;
+
+    final deviceId =
+        syncState.myDeviceId ?? await DeviceIdentity.deviceId(meta);
+
+    // The one rollback artifact for the whole operation — taken before we touch
+    // the cloud claim. If it fails, nothing changes.
+    if (!await ensureRollbackSnapshot()) return EnableOutcome.snapshotFailed;
+
+    try {
+      await SyncControlService.forceTakeover(
+        gateway: gateway,
+        uid: uid,
+        deviceId: deviceId,
+        deviceName: deviceName,
+      );
+    } catch (e) {
+      AppLogger.warning('[SyncEnable] forceEnableAsPrimary cloud op failed: $e');
+      return EnableOutcome.unavailable;
+    }
+
+    await DeviceIdentity.setDeviceName(meta, deviceName);
+    await meta.set(SyncMetaKeys.syncEnabled, '1');
+    SyncConfig.setEnabled(true);
+    // Force a republish even if this device had backfilled before.
+    await meta.set(SyncMetaKeys.backfillDone, '0');
+
+    // Role → writer → coordinator starts the pump.
+    await syncState.refresh();
+
+    final backfill = SyncBackfillService(
+      customerRepo: customerRepo,
+      orderRepo: orderRepo,
+      measurementRepo: measurementRepo,
+      metaRepo: meta,
+      // The rollback snapshot was already taken above; don't take a second one.
+      ensureRollbackSnapshot: () async => true,
+      drain: drain,
+    );
+    final result = await backfill.run(onProgress: onBackfillProgress);
+    if (result.status == BackfillStatus.snapshotFailed) {
+      return EnableOutcome.snapshotFailed;
+    }
+
+    AppLogger.warning('[SyncEnable] Force-enabled as primary "$deviceName".');
+    return EnableOutcome.success;
+  }
+
   /// Adopt reader (mirror) mode. Takes a rollback snapshot first because the
   /// applier's reconcile will replace this device's local data with the cloud
   /// mirror. The caller should already have confirmed with the user.

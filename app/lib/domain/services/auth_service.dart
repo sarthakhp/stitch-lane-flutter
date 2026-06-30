@@ -13,6 +13,7 @@ import 'onboarding_service.dart';
 import 'pending_orders_reminder_service.dart';
 import 'sync/media_hydration_service.dart';
 import 'sync/restore_media_state.dart';
+import 'sync/sync_coordinator.dart';
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -81,6 +82,12 @@ class AuthService {
       // Clearing the flag also stops a relaunch from resuming it.
       MediaHydrationService.cancel();
       await RestoreMediaState.clearPending();
+
+      // Tear down sync workers + the live Firestore control listener before we
+      // clear Firebase auth and wipe the DB. Otherwise the listener fires
+      // permission-denied mid-wipe and an in-flight push-pump drain races the
+      // database clear — both of which made sign-out slow and noisy.
+      await SyncCoordinator.instance?.stopForSignOut();
 
       // Firebase sign-out flips the auth stream → the app returns to login, so
       // it must run; bound it so a stuck call can't hang sign-out forever.

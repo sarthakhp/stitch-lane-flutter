@@ -72,8 +72,37 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
   Future<void> _enableAsPrimary() async {
     final name = await _promptDeviceName('Name this device', 'Shop tablet');
     if (name == null) return;
+    EnableOutcome? outcome;
     await _run(() async {
-      final outcome = await _coordinator.enableAsPrimary(deviceName: name);
+      outcome = await _coordinator.enableAsPrimary(deviceName: name);
+    });
+    if (outcome == null) return; // _run already surfaced an error.
+    // The account already has a primary recorded in the cloud. If that device
+    // is genuinely gone (lost / sold / reset / reinstalled), offer a takeover —
+    // otherwise the user is stuck with no way to reclaim primary on this device.
+    if (outcome == EnableOutcome.otherDeviceIsPrimary) {
+      await _offerTakeover(name);
+      return;
+    }
+    _snack(_enableMessage(outcome!, primary: true));
+  }
+
+  Future<void> _offerTakeover(String deviceName) async {
+    final other = await _coordinator.currentPrimaryName() ?? 'Another device';
+    if (!mounted) return;
+    final confirmed = await ConfirmationDialog.show(
+      context: context,
+      title: 'Take over as primary?',
+      content: '"$other" is currently set as the primary device. If that device '
+          'is gone — lost, sold, reset, or reinstalled — this device can take '
+          'over and become the primary. Any changes on "$other" that never '
+          'synced will be set aside for review. A rollback snapshot is taken '
+          'first. Continue?',
+    );
+    if (!confirmed) return;
+    await _run(() async {
+      final outcome =
+          await _coordinator.forceEnableAsPrimary(deviceName: deviceName);
       _snack(_enableMessage(outcome, primary: true));
     });
   }

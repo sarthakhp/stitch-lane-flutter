@@ -43,6 +43,12 @@ class SyncCoordinator {
   SyncRole? _lastRole;
   bool _disposed = false;
 
+  /// The one live coordinator, so the static sign-out path ([AuthService]) can
+  /// tear sync down without threading this instance through every UI call site.
+  /// There is exactly one coordinator app-wide (a Provider singleton).
+  static SyncCoordinator? _instance;
+  static SyncCoordinator? get instance => _instance;
+
   SyncCoordinator({
     required SyncState syncState,
     required FirestoreGateway gateway,
@@ -62,6 +68,7 @@ class SyncCoordinator {
         _customerState = customerState,
         _orderState = orderState,
         _measurementState = measurementState {
+    _instance = this;
     _syncState.addListener(_onSyncStateChanged);
     SyncOutbox.revision.addListener(_onOutboxChanged);
     // Adopt the current role immediately (the role may already be writer when
@@ -220,6 +227,36 @@ class SyncCoordinator {
     );
   }
 
+  /// Break-glass takeover from the setup screen: become the primary even though
+  /// the cloud still names another (gone) device. Caller must confirm first.
+  Future<EnableOutcome> forceEnableAsPrimary({
+    required String deviceName,
+    void Function(int done, int total)? onBackfillProgress,
+  }) {
+    return SyncEnableService.forceEnableAsPrimary(
+      gateway: _gateway,
+      meta: _metaRepo,
+      syncState: _syncState,
+      customerRepo: _customerRepo,
+      orderRepo: _orderRepo,
+      measurementRepo: _measurementRepo,
+      drain: drainNow,
+      ensureRollbackSnapshot: _snapshot,
+      deviceName: deviceName,
+      onBackfillProgress: onBackfillProgress,
+    );
+  }
+
+  /// Name of the device the cloud currently records as the primary, or null if
+  /// none / not signed in. Used to name the device in the takeover prompt.
+  Future<String?> currentPrimaryName() async {
+    final uid = _syncState.currentUid;
+    if (uid == null) return null;
+    final control =
+        await SyncEnableService.currentControl(gateway: _gateway, uid: uid);
+    return control?.writerDeviceName;
+  }
+
   /// Mirror this device against the existing primary (replaces local data).
   Future<EnableOutcome> enableAsReader({String? deviceName}) {
     return SyncEnableService.enableAsReader(
@@ -232,6 +269,22 @@ class SyncCoordinator {
 
   Future<void> disableSync() =>
       SyncEnableService.disable(meta: _metaRepo, syncState: _syncState);
+
+  /// Synchronously tear down the push pump, applier, and the live Firestore
+  /// control listener — called at the very start of sign-out, BEFORE Firebase
+  /// auth is cleared and the local DB is wiped. Without this the control
+  /// listener fires permission-denied mid-wipe and an in-flight pump drain can
+  /// race the database clear. Best-effort; never throws.
+  Future<void> stopForSignOut() async {
+    try {
+      _stopPump();
+      _stopApplier();
+      _lastRole = SyncRole.unconfigured;
+      await _syncState.stop();
+    } catch (e) {
+      AppLogger.warning('[SyncCoordinator] stopForSignOut: $e');
+    }
+  }
 
   /// Normal handoff: claim the writer role from a reader (gated on online +
   /// the current writer being fully drained).
@@ -270,6 +323,7 @@ class SyncCoordinator {
 
   void dispose() {
     _disposed = true;
+    if (identical(_instance, this)) _instance = null;
     _syncState.removeListener(_onSyncStateChanged);
     SyncOutbox.revision.removeListener(_onOutboxChanged);
     _stopPump();
