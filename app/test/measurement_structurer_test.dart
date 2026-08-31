@@ -41,6 +41,48 @@ void main() {
       expect(back.sections.single.values, {'Length': '41', 'Mori': '11'});
       expect(back.sections.single.notes, 'note');
     });
+
+    test('toJson emits an explicit valueOrder alongside values', () {
+      const section = MeasurementSection(
+        heading: 'Top',
+        values: {'Length': '41', 'Mori': '11', 'Waist': '30'},
+      );
+      expect(section.toJson()['valueOrder'], ['Length', 'Mori', 'Waist']);
+    });
+
+    test('fromJson restores order from valueOrder, ignoring the map\'s own key '
+        'order — the shape a value survives a Firestore round-trip in, since '
+        'map fields there don\'t guarantee key order is preserved', () {
+      final section = MeasurementSection.fromJson({
+        'heading': 'Top',
+        // Deliberately out of order vs. valueOrder below.
+        'values': {'Waist': '30', 'Length': '41', 'Mori': '11'},
+        'valueOrder': ['Length', 'Mori', 'Waist'],
+        'notes': '',
+      });
+      expect(section.values.keys.toList(), ['Length', 'Mori', 'Waist']);
+    });
+
+    test('fromJson falls back to the map\'s own order when valueOrder is '
+        'absent — old measurements saved before this field existed', () {
+      final section = MeasurementSection.fromJson({
+        'heading': 'Top',
+        'values': {'Waist': '30', 'Length': '41'},
+        'notes': '',
+      });
+      expect(section.values.keys.toList(), ['Waist', 'Length']);
+    });
+
+    test('fromJson appends keys missing from valueOrder instead of dropping '
+        'them — defensive against a partial/stale order list', () {
+      final section = MeasurementSection.fromJson({
+        'heading': 'Top',
+        'values': {'Waist': '30', 'Length': '41', 'Mori': '11'},
+        'valueOrder': ['Length'],
+        'notes': '',
+      });
+      expect(section.values.keys.toList(), ['Length', 'Waist', 'Mori']);
+    });
   });
 
   group('mergeSections (folding a new dictation into the form)', () {

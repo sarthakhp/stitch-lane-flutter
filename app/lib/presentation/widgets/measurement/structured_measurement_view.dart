@@ -56,8 +56,8 @@ class StructuredMeasurementView extends StatelessWidget {
         inner.add(SizedBox(
             height: compact ? AppConfig.spacing8 : AppConfig.spacing12));
       }
-      for (final e in shown) {
-        inner.add(_MeasurementRow(label: e.key, value: e.value, compact: compact));
+      if (shown.isNotEmpty) {
+        inner.add(_MeasurementGrid(entries: shown, compact: compact));
       }
       if (!compact && notes.isNotEmpty) {
         inner.add(const SizedBox(height: AppConfig.spacing8));
@@ -176,6 +176,73 @@ class _SectionHeading extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Lays out a garment's `label: value` rows in a grid, switching from one
+/// column to two once there's enough width (tablet/landscape) — otherwise a
+/// single wide row leaves the label pinned left and the value pinned far
+/// right, with a large empty gap between them. Divider lines between rows
+/// (and between columns) make each label easy to trace across to its value.
+class _MeasurementGrid extends StatelessWidget {
+  final List<MapEntry<String, String>> entries;
+  final bool compact;
+
+  const _MeasurementGrid({required this.entries, required this.compact});
+
+  static const double _twoColumnBreakpoint = 480;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dividerColor = theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns =
+            !compact && constraints.maxWidth >= _twoColumnBreakpoint ? 2 : 1;
+
+        final rows = <Widget>[];
+        for (var i = 0; i < entries.length; i += columns) {
+          if (rows.isNotEmpty) {
+            rows.add(Divider(
+              height: compact ? 9 : 13,
+              thickness: 1,
+              color: dividerColor,
+            ));
+          }
+
+          final rowItems = <Widget>[];
+          for (var col = 0; col < columns; col++) {
+            final index = i + col;
+            if (col > 0 && index < entries.length) {
+              rowItems.add(VerticalDivider(
+                width: AppConfig.spacing16,
+                thickness: 1,
+                color: dividerColor,
+              ));
+            }
+            rowItems.add(Expanded(
+              child: index < entries.length
+                  ? _MeasurementRow(
+                      label: entries[index].key,
+                      value: entries[index].value,
+                      compact: compact,
+                    )
+                  : const SizedBox.shrink(),
+            ));
+          }
+          // IntrinsicHeight gives the VerticalDivider a real height to draw
+          // against — inside a plain Row it has no bound and renders as
+          // nothing.
+          rows.add(IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: rowItems),
+          ));
+        }
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+      },
     );
   }
 }

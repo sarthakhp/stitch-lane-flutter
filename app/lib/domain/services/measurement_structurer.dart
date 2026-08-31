@@ -27,17 +27,37 @@ class MeasurementSection {
   Map<String, dynamic> toJson() => {
         'heading': heading,
         'values': values,
+        // Explicit order of the `values` keys. Firestore map fields don't
+        // guarantee key order is preserved on read-back, so display order
+        // can't rely on `values`' own iteration order once this round-trips
+        // through sync — this list is the source of truth for that.
+        'valueOrder': values.keys.toList(),
         'notes': notes,
       };
 
   factory MeasurementSection.fromJson(Map<String, dynamic> json) {
     final rawValues = json['values'];
-    final values = <String, String>{};
+    final unordered = <String, String>{};
     if (rawValues is Map) {
       rawValues.forEach((k, v) {
-        values[k.toString()] = v?.toString() ?? '';
+        unordered[k.toString()] = v?.toString() ?? '';
       });
     }
+
+    // Older data (written before `valueOrder` existed) has no such key —
+    // fall through to `unordered` as-is, exactly like before this field
+    // was introduced.
+    final values = <String, String>{};
+    final rawOrder = json['valueOrder'];
+    if (rawOrder is List) {
+      for (final key in rawOrder) {
+        final k = key.toString();
+        final v = unordered.remove(k);
+        if (v != null) values[k] = v;
+      }
+    }
+    values.addAll(unordered);
+
     return MeasurementSection(
       heading: (json['heading'] ?? '').toString(),
       values: values,
