@@ -51,23 +51,36 @@ jobs:
         working-directory: app
         run: flutter pub get
 
-      - name: Build release APK
+      # Universal (all ABIs) — biggest but installs on anything.
+      - name: Build universal release APK
         working-directory: app
         run: flutter build apk --release
 
-      - name: Upload APK artifact
+      - name: Set aside universal APK
+        run: cp app/build/app/outputs/flutter-apk/app-release.apk StitchGenie-release-universal.apk
+
+      # arm64-only — ~3x smaller, covers virtually all modern Android devices
+      # (see scripts/build-apk.sh --arm64). Overwrites the same output path
+      # as the universal build above, which is why it's set aside first.
+      - name: Build arm64 release APK
+        working-directory: app
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Set aside arm64 APK
+        run: cp app/build/app/outputs/flutter-apk/app-release.apk StitchGenie-release-arm64.apk
+
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: StitchGenie-release-universal-${{ github.sha }}
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          name: StitchGenie-release-apks-${{ github.sha }}
+          path: |
+            StitchGenie-release-universal.apk
+            StitchGenie-release-arm64.apk
           retention-days: 30
 
       - name: Read app version
         id: app_version
         run: echo "value=$(grep '^version:' app/pubspec.yaml | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
-
-      - name: Rename APK for release
-        run: cp app/build/app/outputs/flutter-apk/app-release.apk StitchGenie-release-universal.apk
 
       # A stable, easy-to-share download link for users, on top of the
       # workflow artifact above. Tag includes the run number since the
@@ -78,4 +91,6 @@ jobs:
           tag_name: v${{ steps.app_version.outputs.value }}-run${{ github.run_number }}
           name: StitchGenie v${{ steps.app_version.outputs.value }} (run ${{ github.run_number }})
           body: Automated build from commit ${{ github.sha }}.
-          files: StitchGenie-release-universal.apk
+          files: |
+            StitchGenie-release-universal.apk
+            StitchGenie-release-arm64.apk
