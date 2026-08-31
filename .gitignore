@@ -34,3 +34,5 @@ __pycache__/
 
 /.localdev/
 scripts/.last-wireless-device
+# Added by code-review-graph
+.code-review-graph/
