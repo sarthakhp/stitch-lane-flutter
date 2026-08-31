@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write # needed to create the GitHub Release below
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -58,3 +61,21 @@ jobs:
           name: StitchGenie-release-universal-${{ github.sha }}
           path: app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      - name: Read app version
+        id: app_version
+        run: echo "value=$(grep '^version:' app/pubspec.yaml | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Rename APK for release
+        run: cp app/build/app/outputs/flutter-apk/app-release.apk StitchGenie-release-universal.apk
+
+      # A stable, easy-to-share download link for users, on top of the
+      # workflow artifact above. Tag includes the run number since the
+      # pubspec version doesn't bump on every commit — keeps tags unique.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.app_version.outputs.value }}-run${{ github.run_number }}
+          name: StitchGenie v${{ steps.app_version.outputs.value }} (run ${{ github.run_number }})
+          body: Automated build from commit ${{ github.sha }}.
+          files: StitchGenie-release-universal.apk
