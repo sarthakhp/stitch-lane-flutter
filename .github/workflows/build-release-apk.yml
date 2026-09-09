@@ -47,6 +47,22 @@ jobs:
           storeFile=$(pwd)/android/app-release.jks
           EOF
 
+      # TEMPORARY — prints the release keystore's SHA-1 fingerprint so it can
+      # be copied from the Actions log into Google Cloud Console's API key
+      # restrictions. The fingerprint itself isn't a secret. Remove this step
+      # once copied.
+      - name: Print release SHA-1 fingerprint
+        working-directory: app
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list -v \
+            -keystore android/app-release.jks \
+            -alias "$ANDROID_KEY_ALIAS" \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            | grep "SHA1:"
+
       - name: flutter pub get
         working-directory: app
         run: flutter pub get
