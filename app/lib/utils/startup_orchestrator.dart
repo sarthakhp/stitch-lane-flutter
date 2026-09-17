@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
+import '../domain/services/ai_gateway/ai_kill_switch.dart';
 import '../domain/services/auth_service.dart';
 import '../domain/services/notification_service.dart';
 import '../firebase_options.dart';
@@ -35,8 +38,32 @@ class StartupOrchestrator {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       StartupTracker.instance.mark('firebase_initialized');
+
+      // Route uncaught Flutter/Dart errors to Crashlytics. Debug builds skip
+      // reporting (kept local in the console) so local dev noise never
+      // pollutes production crash data.
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        if (!kDebugMode) {
+          FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+        }
+      };
+      PlatformDispatcher.instance.onError = (error, stack) {
+        if (!kDebugMode) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        }
+        return true;
+      };
+      await FirebaseCrashlytics.instance
+          .setCrashlyticsCollectionEnabled(!kDebugMode);
+      StartupTracker.instance.mark('crashlytics_initialized');
+
       await AuthService.initializeAuthPersistence();
       StartupTracker.instance.mark('auth_persistence_ready');
+
+      // Start listening for the remote AI kill switch. Fails open (AI stays
+      // enabled) if this never fires or errors — see AiKillSwitch.
+      AiKillSwitch.listen();
     } catch (e) {
       AppLogger.error('StartupOrchestrator: Firebase init failed', e);
       rethrow;

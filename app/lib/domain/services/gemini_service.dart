@@ -256,6 +256,7 @@ class GeminiService {
     required String callerTag,
     required UsageKind kind,
   }) async {
+    AiGateway.instance.checkEnabled();
     final sw = Stopwatch()..start();
     try {
       final response = await client.models.generateContent(

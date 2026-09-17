@@ -1,5 +1,17 @@
 import '../../../backend/repositories/ai_usage_repository.dart';
+import 'ai_kill_switch.dart';
 import 'usage_recorder.dart';
+
+/// Thrown by [AiGateway.checkEnabled] when the remote kill switch has
+/// disabled AI features. Call sites should catch this and show the same
+/// "AI temporarily unavailable" affordance, rather than letting it surface
+/// as a generic network/provider error.
+class AiDisabledException implements Exception {
+  const AiDisabledException();
+
+  @override
+  String toString() => 'AiDisabledException: AI features are currently disabled';
+}
 
 /// Single entry point for every external AI provider call in the app.
 ///
@@ -39,6 +51,18 @@ class AiGateway {
   /// gateway methods, but exposing this now lets us start collecting data
   /// against existing code paths with minimal churn.
   UsageRecorder get recorder => UsageRecorder.instance;
+
+  /// Whether AI features are currently allowed to run, per the remote kill
+  /// switch (see [AiKillSwitch]). Every call site that invokes an AI
+  /// provider directly (until the phase-2 methods above land) should check
+  /// this — or call [checkEnabled] — before making the call.
+  bool get isEnabled => AiKillSwitch.enabled;
+
+  /// Throws [AiDisabledException] if the kill switch has disabled AI.
+  /// Call at the top of any AI call site as a cheap pre-flight guard.
+  void checkEnabled() {
+    if (!isEnabled) throw const AiDisabledException();
+  }
 
   // ---------------------------------------------------------------------------
   // Phase 2 method stubs — kept as commented signatures so reviewers can see
