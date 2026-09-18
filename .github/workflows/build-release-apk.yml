@@ -69,6 +69,14 @@ jobs:
       - name: Set aside arm64 APK
         run: cp app/build/app/outputs/flutter-apk/app-release.apk StitchGenie-release-arm64.apk
 
+      # AAB is required for Play Store uploads (Play Console rejects APKs).
+      - name: Build release AAB
+        working-directory: app
+        run: flutter build appbundle --release
+
+      - name: Set aside AAB
+        run: cp app/build/app/outputs/bundle/release/app-release.aab StitchGenie-release.aab
+
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -76,6 +84,7 @@ jobs:
           path: |
             StitchGenie-release-universal.apk
             StitchGenie-release-arm64.apk
+            StitchGenie-release.aab
           retention-days: 30
 
       - name: Read app version
@@ -94,3 +103,4 @@ jobs:
           files: |
             StitchGenie-release-universal.apk
             StitchGenie-release-arm64.apk
+            StitchGenie-release.aab
