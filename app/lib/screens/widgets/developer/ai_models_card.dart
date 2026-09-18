@@ -10,6 +10,7 @@ class AiModelsCard extends StatelessWidget {
   const AiModelsCard({super.key});
 
   static const _chatModels = [
+    'gemini-3.5-flash-lite',
     'gemini-3.1-flash-lite',
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
@@ -17,6 +18,7 @@ class AiModelsCard extends StatelessWidget {
   ];
 
   static const _formattingModels = [
+    'gemini-3.5-flash-lite',
     'gemini-2.5-flash-lite',
     'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
@@ -25,6 +27,7 @@ class AiModelsCard extends StatelessWidget {
 
   static const _sttModels = [
     'sarvam:saaras:v3',
+    'gemini:gemini-3.5-flash-lite',
     'gemini:gemini-2.5-flash-lite',
     'gemini:gemini-3.1-flash-lite',
     'gemini:gemini-2.5-flash',
